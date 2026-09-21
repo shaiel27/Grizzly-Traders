@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Grizzly Traders
 
-## Getting Started
+Portal de noticias y mercados financieros (criptomonedas, forex, materias primas y acciones) con cotizaciones, niveles de pivote y un panel CMS para editores.
 
-First, run the development server:
+Stack: Next.js 16 (App Router), React 19, Tailwind CSS 4, Supabase (Postgres + Auth) y lightweight-charts. Gestor de paquetes: **pnpm**.
+
+> Esta versión de Next.js tiene cambios incompatibles con versiones anteriores (por ejemplo `proxy.ts` en lugar de `middleware.ts`). La documentación local está en `node_modules/next/dist/docs/`.
+
+## Puesta en marcha
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
+cp .env.example .env.local   # completa los valores
+pnpm dev                     # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Variables de entorno
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Variable | Uso |
+|---|---|
+| `NEXT_PUBLIC_SITE_URL` | URL pública (canonical, sitemap, RSS). Se incrusta en el build. |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Cliente Supabase (públicas). |
+| `SUPABASE_SERVICE_ROLE_KEY` | Opcional, solo servidor. Escrituras del CMS sin depender de RLS. |
+| `CMS_ALLOWED_EMAILS` | Correos (separados por coma) de usuarios de Supabase Auth con acceso al CMS. Vacío = nadie. |
+| `FINNHUB_API_KEY` | Cotizaciones de acciones e índices. |
+| `N8N_MCP_TOKEN`, `N8N_MCP_URL`, `N8N_WORKFLOW_ID` | Pipeline de contenido en n8n (solo servidor). |
+| `NEXT_PUBLIC_VIP_URL`, `NEXT_PUBLIC_TELEGRAM_URL` | Botones de la home (se ocultan si están vacías). |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Al arrancar el servidor, `instrumentation.ts` valida estas variables con `lib/env.ts`: si falta una obligatoria (las dos de Supabase) o alguna tiene un formato inválido, el servidor se detiene con un mensaje que las lista todas. Las variables vacías (`KEY=`) se tratan como no definidas.
 
-## Learn More
+## Acceso al CMS
 
-To learn more about Next.js, take a look at the following resources:
+1. Crea un usuario en Supabase Auth (email + contraseña).
+2. Añade su correo a `CMS_ALLOWED_EMAILS`.
+3. Entra en `/login`. `/cms` y todas las rutas `POST/PATCH/DELETE` de `/api/posts/*` exigen sesión y pertenecer a esa lista.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Si no defines `SUPABASE_SERVICE_ROLE_KEY`, las escrituras usan la sesión del editor y necesitas políticas RLS que permitan escribir a usuarios autenticados.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Scripts
 
-## Deploy on Vercel
+| Comando | Qué hace |
+|---|---|
+| `pnpm dev` / `build` / `start` | Desarrollo, build y servidor de producción. |
+| `pnpm lint` | ESLint. |
+| `pnpm typecheck` | `tsc --noEmit`. |
+| `pnpm test` | Pruebas unitarias (Vitest). |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Estructura
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `app/` rutas (páginas, `api/`, `sitemap.ts`, `robots.ts`, `feed.xml`).
+- `components/ui` componentes de interfaz; `components/modules` bloques de la home.
+- `lib/api.ts` lecturas públicas de Supabase; `lib/auth.ts` autorización de editores; `lib/validation.ts` esquemas zod; `lib/sanitize.ts` sanitizado de HTML; `lib/pivots.ts` cálculo de pivotes; `lib/prices.ts` cotizaciones; `lib/format.ts` formato de precios y cifras (un único punto para cambiar el locale); `lib/env.ts` validación de variables de entorno.
+- `components/ui/ArticleCard.tsx` tarjeta de artículo con variantes `cover` y `compact`; enlaza siempre con el slug de la traducción, que es el que resuelve `/articulos/[slug]`.
+- Los tipos de mercado (`MarketItem`) viven en `lib/markets.ts` y se comparten con los componentes de `/markets`.
+- `proxy.ts` refresca la sesión de Supabase (la autorización se comprueba en cada página y ruta, no aquí).
+- `supabase/schema.sql` esquema de referencia (puede estar desactualizado respecto a la base real).
+
+## Fuentes de datos
+
+Cotizaciones: CoinGecko (cripto y oro vía PAXG), Frankfurter/BCE (forex, un valor por día hábil) y Finnhub (acciones; S&P 500 y DXY se aproximan con los ETF SPY y UUP). Pivotes y mercados: scanner no oficial de TradingView, que puede cambiar o bloquearse sin aviso.
