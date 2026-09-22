@@ -1,4 +1,5 @@
 import { unstable_cache } from 'next/cache'
+import { MARKET_ASSETS, type MarketAssetDef } from './market-assets'
 
 const TRADINGVIEW_SCANNER = 'https://scanner.tradingview.com/global/scan'
 
@@ -20,75 +21,6 @@ const MARKET_COLUMNS = [
   'Perf.1M', 'Perf.3M', 'Perf.6M', 'Perf.Y',
   'EMA10', 'EMA20', 'EMA50', 'SMA50', 'SMA200',
   'VWAP', 'beta_1_year',
-]
-
-const ASSETS: { symbol: string; category: string }[] = [
-  // Crypto
-  { symbol: 'BINANCE:BTCUSDT', category: 'crypto' },
-  { symbol: 'BINANCE:ETHUSDT', category: 'crypto' },
-  { symbol: 'BINANCE:SOLUSDT', category: 'crypto' },
-  { symbol: 'BINANCE:BNBUSDT', category: 'crypto' },
-  { symbol: 'BINANCE:XRPUSDT', category: 'crypto' },
-  { symbol: 'BINANCE:ADAUSDT', category: 'crypto' },
-  { symbol: 'BINANCE:DOGEUSDT', category: 'crypto' },
-  { symbol: 'BINANCE:DOTUSDT', category: 'crypto' },
-  { symbol: 'BINANCE:AVAXUSDT', category: 'crypto' },
-  { symbol: 'BINANCE:LINKUSDT', category: 'crypto' },
-  { symbol: 'BINANCE:MATICUSDT', category: 'crypto' },
-  { symbol: 'BINANCE:UNIUSDT', category: 'crypto' },
-  { symbol: 'BINANCE:ATOMUSDT', category: 'crypto' },
-  { symbol: 'BINANCE:LTCUSDT', category: 'crypto' },
-  { symbol: 'BINANCE:NEARUSDT', category: 'crypto' },
-  // Forex
-  { symbol: 'FX:EURUSD', category: 'forex' },
-  { symbol: 'FX:GBPUSD', category: 'forex' },
-  { symbol: 'FX:USDJPY', category: 'forex' },
-  { symbol: 'FX:USDCHF', category: 'forex' },
-  { symbol: 'FX:AUDUSD', category: 'forex' },
-  { symbol: 'FX:USDCAD', category: 'forex' },
-  { symbol: 'FX:NZDUSD', category: 'forex' },
-  { symbol: 'FX:EURGBP', category: 'forex' },
-  { symbol: 'FX:EURJPY', category: 'forex' },
-  { symbol: 'FX:GBPJPY', category: 'forex' },
-  // Commodities
-  { symbol: 'COMEX:XAUUSD', category: 'commodity' },
-  { symbol: 'COMEX:XAGUSD', category: 'commodity' },
-  { symbol: 'NYMEX:CL', category: 'commodity' },
-  { symbol: 'NYMEX:NG', category: 'commodity' },
-  { symbol: 'LME:HG', category: 'commodity' },
-  { symbol: 'CBOT:ZC', category: 'commodity' },
-  { symbol: 'CBOT:ZW', category: 'commodity' },
-  { symbol: 'ICE:SB', category: 'commodity' },
-  { symbol: 'ICE:KC', category: 'commodity' },
-  { symbol: 'COMEX:PL', category: 'commodity' },
-  { symbol: 'COMEX:PA', category: 'commodity' },
-  // Stocks - US
-  { symbol: 'NASDAQ:AAPL', category: 'stock' },
-  { symbol: 'NASDAQ:NVDA', category: 'stock' },
-  { symbol: 'NASDAQ:MSFT', category: 'stock' },
-  { symbol: 'NASDAQ:GOOGL', category: 'stock' },
-  { symbol: 'NASDAQ:AMZN', category: 'stock' },
-  { symbol: 'NASDAQ:META', category: 'stock' },
-  { symbol: 'NASDAQ:TSLA', category: 'stock' },
-  { symbol: 'NASDAQ:AMD', category: 'stock' },
-  { symbol: 'NASDAQ:NFLX', category: 'stock' },
-  { symbol: 'NASDAQ:INTC', category: 'stock' },
-  { symbol: 'NYSE:JPM', category: 'stock' },
-  { symbol: 'NYSE:V', category: 'stock' },
-  { symbol: 'NYSE:JNJ', category: 'stock' },
-  { symbol: 'NYSE:WMT', category: 'stock' },
-  { symbol: 'NYSE:UNH', category: 'stock' },
-  // Indices
-  { symbol: 'SP:SPX', category: 'index' },
-  { symbol: 'DJI', category: 'index' },
-  { symbol: 'NASDAQ:NDX', category: 'index' },
-  { symbol: 'TVC:DXY', category: 'index' },
-  { symbol: 'TVC:US10Y', category: 'index' },
-  { symbol: 'TVC:US02Y', category: 'index' },
-  { symbol: 'TVC:DAX', category: 'index' },
-  { symbol: 'TVC:NIKKEI', category: 'index' },
-  { symbol: 'TVC:HSI', category: 'index' },
-  { symbol: 'TVC:FTSE', category: 'index' },
 ]
 
 export interface MarketItem {
@@ -131,13 +63,19 @@ export interface MarketItem {
 const BATCH_SIZE = 30
 const REQUEST_TIMEOUT_MS = 10_000
 
-async function fetchBatch(batch: { symbol: string; category: string }[]): Promise<MarketItem[]> {
+export interface ScannerRow {
+  s: string
+  d: unknown[]
+}
+
+// One scanner request; symbols the scanner doesn't know are simply absent from the result
+export async function scanTradingView(tickers: string[], columns: string[]): Promise<ScannerRow[]> {
   const payload = {
-    columns: MARKET_COLUMNS,
-    symbols: { tickers: batch.map((a) => a.symbol) },
+    columns,
+    symbols: { tickers },
     options: { lang: 'en' },
     sort: { sortBy: 'market_cap_basic', sortOrder: 'desc' },
-    range: [0, batch.length],
+    range: [0, tickers.length],
   }
 
   const response = await fetch(TRADINGVIEW_SCANNER, {
@@ -149,18 +87,23 @@ async function fetchBatch(batch: { symbol: string; category: string }[]): Promis
   if (!response.ok) throw new Error(`TradingView batch error: ${response.status}`)
 
   const result = await response.json()
+  return (result.data ?? []) as ScannerRow[]
+}
+
+async function fetchBatch(batch: MarketAssetDef[]): Promise<MarketItem[]> {
+  const rows = await scanTradingView(batch.map((a) => a.symbol), MARKET_COLUMNS)
   const symbolToAsset = new Map(batch.map((a) => [a.symbol, a]))
   const items: MarketItem[] = []
 
-  for (const item of (result.data ?? []) as { s: string; d: unknown[] }[]) {
+  for (const item of rows) {
     const assetDef = symbolToAsset.get(item.s)
     if (!assetDef || !item) continue
 
         const d = item.d as unknown[]
         items.push({
           symbol: assetDef.symbol,
-          name: (d[0] as string) || assetDef.symbol.split(':').pop() || '',
-          description: (d[1] as string) || '',
+          name: assetDef.label || (d[0] as string) || assetDef.symbol.split(':').pop() || '',
+          description: assetDef.title || (d[1] as string) || '',
           category: assetDef.category,
           type: (d[2] as string) || '',
           close: d[3] as number,
@@ -200,17 +143,21 @@ async function fetchBatch(batch: { symbol: string; category: string }[]): Promis
 
 // Batches run in parallel; one failing batch only drops its own assets instead of the whole table.
 async function fetchMarketsUncached(): Promise<MarketItem[]> {
-  const batches: (typeof ASSETS)[] = []
-  for (let i = 0; i < ASSETS.length; i += BATCH_SIZE) batches.push(ASSETS.slice(i, i + BATCH_SIZE))
+  const batches: (typeof MARKET_ASSETS)[] = []
+  for (let i = 0; i < MARKET_ASSETS.length; i += BATCH_SIZE) batches.push(MARKET_ASSETS.slice(i, i + BATCH_SIZE))
 
   const results = await Promise.allSettled(batches.map(fetchBatch))
-  return results.flatMap((result) => {
+  const items = results.flatMap((result) => {
     if (result.status === 'rejected') {
       console.error('Markets batch failed:', result.reason)
       return []
     }
     return result.value
   })
+
+  // The scanner answers by market cap; keep the catalog order so the terminal is stable between refreshes
+  const order = new Map(MARKET_ASSETS.map((asset, index) => [asset.symbol, index]))
+  return items.sort((a, b) => (order.get(a.symbol) ?? 0) - (order.get(b.symbol) ?? 0))
 }
 
 export const getMarkets = unstable_cache(

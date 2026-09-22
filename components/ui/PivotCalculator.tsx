@@ -1,354 +1,551 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { clsx } from 'clsx'
-import { calculatePivots } from '@/lib/pivots'
+import { formatLevel } from '@/lib/format'
+import { PIVOT_ASSET_BY_TV, PIVOT_ASSETS, PIVOT_CATEGORIES, POPULAR_PIVOT_ASSETS } from '@/lib/pivot-assets'
+import type { PivotQuote } from '@/lib/pivot-data'
+import { PIVOT_METHOD_INFO } from '@/lib/pivot-methods'
+import {
+  PIVOT_METHODS,
+  analyzePosition,
+  calculatePivots,
+  distancePct,
+  findConfluences,
+  levelsFor,
+  parseDecimal,
+  validateOhlc,
+  type OhlcErrors,
+  type PivotLevel,
+  type PivotMethod,
+} from '@/lib/pivots'
+import { PivotLadder } from './PivotLadder'
 
-interface AssetPreset {
-  label: string
-  symbol: string
-  tvSymbol: string
-  icon: string
+interface PivotCalculatorProps {
+  quotes: PivotQuote[]
+  timeframeLabel: string
+  periodLabel: string
+  // Asset selected in the page, offered as a one-click load
+  selectedAsset?: string | null
 }
 
-const PRESETS: AssetPreset[] = [
-  { label: 'BTC', symbol: 'BTCUSDT', tvSymbol: 'BINANCE:BTCUSDT', icon: 'currency_bitcoin' },
-  { label: 'ETH', symbol: 'ETHUSDT', tvSymbol: 'BINANCE:ETHUSDT', icon: 'currency_bitcoin' },
-  { label: 'SOL', symbol: 'SOLUSDT', tvSymbol: 'BINANCE:SOLUSDT', icon: 'currency_bitcoin' },
-  { label: 'EUR/USD', symbol: 'EURUSD', tvSymbol: 'FX:EURUSD', icon: 'currency_exchange' },
-  { label: 'GBP/USD', symbol: 'GBPUSD', tvSymbol: 'FX:GBPUSD', icon: 'currency_exchange' },
-  { label: 'XAU/USD', symbol: 'XAUUSD', tvSymbol: 'COMEX:XAUUSD', icon: 'diamond' },
-  { label: 'AAPL', symbol: 'AAPL', tvSymbol: 'NASDAQ:AAPL', icon: 'phone_iphone' },
-  { label: 'NVDA', symbol: 'NVDA', tvSymbol: 'NASDAQ:NVDA', icon: 'memory' },
-  { label: 'S&P 500', symbol: 'SPX', tvSymbol: 'SP:SPX', icon: 'show_chart' },
-  { label: 'DXY', symbol: 'DXY', tvSymbol: 'TVC:DXY', icon: 'payments' },
+type Field = 'open' | 'high' | 'low' | 'close' | 'price'
+type FormState = Record<Field, string>
+type FormErrors = OhlcErrors & { price?: string }
+
+const EMPTY_FORM: FormState = { open: '', high: '', low: '', close: '', price: '' }
+
+const FIELDS: { key: Field; label: string; hint: string; accent: string }[] = [
+  { key: 'open', label: 'Apertura (O)', hint: 'Opcional, solo DeMark', accent: 'text-ink' },
+  { key: 'high', label: 'Máximo (H)', hint: 'Del período anterior', accent: 'text-semantic-success' },
+  { key: 'low', label: 'Mínimo (L)', hint: 'Del período anterior', accent: 'text-semantic-danger' },
+  { key: 'close', label: 'Cierre (C)', hint: 'Del período anterior', accent: 'text-accent-blue' },
+  { key: 'price', label: 'Precio actual', hint: 'Opcional, marca la posición', accent: 'text-ink' },
 ]
 
-function formatLevel(value: number, ref: number): string {
-  if (ref >= 10000) return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  if (ref >= 100) return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  if (ref < 5) return value.toFixed(5)
-  return value.toFixed(2)
+const TOLERANCES = [0.05, 0.1, 0.25, 0.5]
+
+// Row order of the comparison matrix, highest level first
+const MATRIX_ROWS: [key: string, label: string][] = [
+  ['r4', 'R4'],
+  ['r3', 'R3'],
+  ['r2', 'R2'],
+  ['r1', 'R1'],
+  ['pivot', 'PP'],
+  ['s1', 'S1'],
+  ['s2', 'S2'],
+  ['s3', 'S3'],
+  ['s4', 'S4'],
+]
+
+const KIND_TEXT = { resistance: 'text-semantic-success', pivot: 'text-accent-blue', support: 'text-semantic-danger' } as const
+
+function signed(value: number): string {
+  return `${value > 0 ? '+' : ''}${value.toFixed(2)}%`
 }
 
-const METHODS = ['classic', 'fibonacci', 'camarilla', 'woodie', 'demark'] as const
-type Method = (typeof METHODS)[number]
-
-const METHOD_INFO: Record<Method, { label: string; desc: string; formula: string }> = {
-  classic: { label: 'Clásico', desc: 'El más usado. P = (H+L+C)/3. Soportes y resistencias simétricos.', formula: 'P = (H+L+C)/3' },
-  fibonacci: { label: 'Fibonacci', desc: 'Usa ratios 38.2% sobre el rango. Ideal para retracements.', formula: 'S1 = P − 0.382(H−L)' },
-  camarilla: { label: 'Camarilla', desc: 'Basado en cierre, rangos estrechos. Para day trading.', formula: 'S1 = C − 1.1(H−L)/12' },
-  woodie: { label: 'Woodie', desc: 'Da más peso al cierre. Popular entre day traders.', formula: 'P = (H+L+2C)/4' },
-  demark: { label: 'DeMark', desc: 'Ajusta según relación Apertura/Cierre.', formula: 'X = f(C vs O)' },
+function InputField({
+  id,
+  label,
+  hint,
+  accent,
+  value,
+  error,
+  onChange,
+  onBlur,
+}: {
+  id: string
+  label: string
+  hint: string
+  accent: string
+  value: string
+  error?: string
+  onChange: (value: string) => void
+  onBlur: () => void
+}) {
+  return (
+    <div>
+      <label htmlFor={id} className={clsx('mb-1.5 block text-micro font-medium', accent)}>
+        {label}
+      </label>
+      <input
+        id={id}
+        type="text"
+        inputMode="decimal"
+        autoComplete="off"
+        placeholder="0.00"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onBlur={onBlur}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={`${id}-note`}
+        className={clsx(
+          'w-full rounded-lg border bg-surface-2 px-3 py-2.5 font-mono text-sm text-ink transition-colors placeholder:text-ink-subtle focus:outline-none focus:ring-1',
+          error
+            ? 'border-semantic-danger/60 focus:border-semantic-danger focus:ring-semantic-danger/30'
+            : 'border-outline-variant/40 focus:border-accent-blue focus:ring-accent-blue/30'
+        )}
+      />
+      <p id={`${id}-note`} className={clsx('mt-1 text-[11px]', error ? 'text-semantic-danger' : 'text-ink-subtle')}>
+        {error ?? hint}
+      </p>
+    </div>
+  )
 }
 
-export function PivotCalculator() {
-  const [high, setHigh] = useState('')
-  const [low, setLow] = useState('')
-  const [close, setClose] = useState('')
-  const [openPrice, setOpenPrice] = useState('')
-  const [activeMethod, setActiveMethod] = useState<Method>('classic')
-  const [loadingAsset, setLoadingAsset] = useState<string | null>(null)
-  const [activePreset, setActivePreset] = useState<string | null>(null)
+export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedAsset }: PivotCalculatorProps) {
+  const [form, setForm] = useState<FormState>(EMPTY_FORM)
+  const [touched, setTouched] = useState<Partial<Record<Field, boolean>>>({})
+  const [assetTv, setAssetTv] = useState<string | null>(null)
+  const [source, setSource] = useState<string | null>(null)
+  const [modified, setModified] = useState(false)
+  const [livePrice, setLivePrice] = useState(false)
+  const [method, setMethod] = useState<PivotMethod>('classic')
+  const [tolerance, setTolerance] = useState(0.1)
+  const [copied, setCopied] = useState<string | null>(null)
 
-  const result = useMemo(() => {
-    const h = parseFloat(high)
-    const l = parseFloat(low)
-    const c = parseFloat(close)
-    const o = parseFloat(openPrice) || c
-    if (isNaN(h) || isNaN(l) || isNaN(c) || h <= 0 || l <= 0 || c <= 0) return null
-    return calculatePivots(h, l, c, o)
-  }, [high, low, close, openPrice])
+  const quoteByTv = useMemo(() => new Map(quotes.map((quote) => [quote.symbol, quote])), [quotes])
+  const liveQuote = livePrice && assetTv ? quoteByTv.get(assetTv) : undefined
+  // While "live" is on, the price follows the polled quote instead of the typed text
+  const priceText = liveQuote ? String(liveQuote.price) : form.price
 
-  const loadPreset = async (preset: AssetPreset) => {
-    setLoadingAsset(preset.label)
-    setActivePreset(preset.label)
+  const parsed = useMemo(() => {
+    const numbers = {
+      open: parseDecimal(form.open),
+      high: parseDecimal(form.high),
+      low: parseDecimal(form.low),
+      close: parseDecimal(form.close),
+      price: parseDecimal(priceText),
+    }
+    const errors: FormErrors = validateOhlc({ high: numbers.high, low: numbers.low, close: numbers.close, open: numbers.open })
+    if (priceText.trim() !== '' && !(numbers.price > 0)) errors.price = 'Debe ser un número mayor que 0'
+    return { numbers, errors }
+  }, [form.open, form.high, form.low, form.close, priceText])
+
+  const { numbers, errors } = parsed
+  const ready = Object.keys(errors).length === 0
+  const symbol = assetTv ?? ''
+  const price = numbers.price > 0 ? numbers.price : numbers.close
+
+  const result = useMemo(
+    () => (ready ? calculatePivots(numbers.high, numbers.low, numbers.close, Number.isNaN(numbers.open) ? numbers.close : numbers.open) : null),
+    [ready, numbers]
+  )
+  const levels = useMemo(() => (result ? levelsFor(result, method) : []), [result, method])
+  const position = useMemo(() => (levels.length ? analyzePosition(levels, price) : null), [levels, price])
+  const confluences = useMemo(() => (result ? findConfluences(result, tolerance) : []), [result, tolerance])
+  const confluentCells = useMemo(
+    () => new Set(confluences.flatMap((confluence) => confluence.levels.map((level) => `${level.method}:${level.label}`))),
+    [confluences]
+  )
+
+  const shownError = (field: Field) => (touched[field] || form[field].trim() !== '' ? errors[field] : undefined)
+
+  function setField(field: Field, value: string) {
+    setForm((current) => ({ ...current, [field]: value }))
+    if (field === 'price') setLivePrice(false)
+    else setModified(true)
+  }
+
+  function loadAsset(tv: string) {
+    const quote = quoteByTv.get(tv)
+    if (!quote) return
+    setForm({
+      open: String(quote.previous.open),
+      high: String(quote.previous.high),
+      low: String(quote.previous.low),
+      close: String(quote.previous.close),
+      price: String(quote.price),
+    })
+    setTouched({})
+    setAssetTv(tv)
+    setLivePrice(true)
+    setSource(`${PIVOT_ASSET_BY_TV.get(tv)?.name ?? tv} · ${periodLabel} (${timeframeLabel})`)
+    setModified(false)
+  }
+
+  function clearForm() {
+    setForm(EMPTY_FORM)
+    setTouched({})
+    setAssetTv(null)
+    setSource(null)
+    setModified(false)
+    setLivePrice(false)
+  }
+
+  async function copy(text: string, key: string) {
     try {
-      const res = await fetch(`/api/pivots?symbols=${preset.tvSymbol}`)
-      const data = await res.json()
-      const d = data.success
-        ? (data.data?.find((item: { symbol: string }) => item.symbol === preset.symbol) ?? data.data?.[0])
-        : null
-      if (d) {
-        setHigh(String(d.high))
-        setLow(String(d.low))
-        setClose(String(d.close))
-        setOpenPrice(String(d.open))
-      }
-    } catch (e) {
-      console.error('Failed to load preset:', e)
-    } finally {
-      setLoadingAsset(null)
+      await navigator.clipboard.writeText(text)
+      setCopied(key)
+      setTimeout(() => setCopied((current) => (current === key ? null : current)), 1500)
+    } catch {
+      // clipboard blocked (insecure context or denied permission): nothing to fall back to
     }
   }
 
-  const clearForm = () => {
-    setHigh('')
-    setLow('')
-    setClose('')
-    setOpenPrice('')
-    setActivePreset(null)
-  }
+  const copyAllText = (list: PivotLevel[]) =>
+    [
+      `${assetTv ? PIVOT_ASSET_BY_TV.get(assetTv)?.label : 'Pivot points'} · ${PIVOT_METHOD_INFO[method].label}`,
+      ...list.map((level) => `${level.label}: ${formatLevel(level.value, price, symbol)}`),
+    ].join('\n')
 
-  const h = parseFloat(high) || 0
-  const l = parseFloat(low) || 0
-  const c = parseFloat(close) || 0
-  const range = h - l || 1
-  const ref = c || 1
+  const range = numbers.high - numbers.low
+  const hasAnyValue = Object.values(form).some((value) => value.trim() !== '')
+  const availablePresets = POPULAR_PIVOT_ASSETS.filter((tv) => PIVOT_ASSET_BY_TV.has(tv))
 
   return (
-    <div className="rounded-2xl border border-outline-variant/40 bg-surface-container-lowest overflow-hidden">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-outline-variant/40 bg-surface-container-low">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-headline font-bold text-ink flex items-center gap-2">
-              <span className="material-symbols-outlined text-[20px] text-accent-blue">calculate</span>
-              Calculadora de Pivot Points
-            </h3>
-            <p className="text-body-sm text-ink-muted mt-0.5">Selecciona un activo o ingresa datos manualmente</p>
-          </div>
-          {(high || low || close) && (
-            <button onClick={clearForm} className="text-micro text-ink-muted hover:text-ink transition-colors px-3 py-1.5 rounded-lg border border-outline-variant/40 hover:bg-surface-2">
-              Limpiar
-            </button>
-          )}
+    <div className="overflow-hidden rounded-2xl border border-outline-variant/40 bg-surface-container-lowest">
+      <div className="flex items-center justify-between gap-3 border-b border-outline-variant/40 bg-surface-container-low px-6 py-4">
+        <div>
+          <h2 className="flex items-center gap-2 text-headline font-bold text-ink">
+            <span className="material-symbols-outlined text-[20px] text-accent-blue" aria-hidden="true">
+              calculate
+            </span>
+            Calculadora de Pivot Points
+          </h2>
+          <p className="mt-0.5 text-body-sm text-ink-muted">Carga un activo o escribe los datos del período anterior.</p>
         </div>
+        {hasAnyValue && (
+          <button
+            type="button"
+            onClick={clearForm}
+            className="rounded-lg border border-outline-variant/40 px-3 py-1.5 text-micro text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+          >
+            Limpiar
+          </button>
+        )}
       </div>
 
-      <div className="p-6">
-        {/* Asset Presets */}
-        <div className="mb-6">
-          <p className="text-micro font-bold text-ink-muted uppercase tracking-wider mb-3">Carga rápida de activos</p>
-          <div className="flex flex-wrap gap-2">
-            {PRESETS.map((p) => (
+      <div className="space-y-6 p-6">
+        <section aria-labelledby="calc-asset-heading">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+            <h3 id="calc-asset-heading" className="text-micro font-bold uppercase tracking-wider text-ink-muted">
+              Cargar un activo
+            </h3>
+            <p className="text-micro text-ink-subtle">
+              Período: <span className="font-bold text-ink">{timeframeLabel}</span> ({periodLabel}). Se cambia arriba en la página.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {selectedAsset && PIVOT_ASSET_BY_TV.has(selectedAsset) && !availablePresets.includes(selectedAsset) && (
               <button
-                key={p.label}
-                onClick={() => loadPreset(p)}
-                disabled={loadingAsset !== null}
-                className={clsx(
-                  'flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition-all',
-                  activePreset === p.label
-                    ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
-                    : 'border-outline-variant/40 bg-surface-2/50 text-ink-muted hover:border-outline-variant hover:text-ink hover:bg-surface-2',
-                  loadingAsset === p.label && 'opacity-50 cursor-wait'
-                )}
+                type="button"
+                onClick={() => loadAsset(selectedAsset)}
+                disabled={!quoteByTv.has(selectedAsset)}
+                className="rounded-xl border border-accent-blue/50 bg-accent-blue/10 px-3 py-2 text-xs font-bold text-accent-blue transition-colors hover:bg-accent-blue/20 disabled:opacity-40"
               >
-                {loadingAsset === p.label ? (
-                  <span className="size-3 border-2 border-accent-blue border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <span className="material-symbols-outlined text-[14px]">{p.icon}</span>
-                )}
-                {p.label}
+                Usar {PIVOT_ASSET_BY_TV.get(selectedAsset)?.label}
               </button>
+            )}
+            {availablePresets.map((tv) => {
+              const asset = PIVOT_ASSET_BY_TV.get(tv)!
+              const active = assetTv === tv
+              return (
+                <button
+                  key={tv}
+                  type="button"
+                  aria-pressed={active}
+                  disabled={!quoteByTv.has(tv)}
+                  onClick={() => loadAsset(tv)}
+                  className={clsx(
+                    'rounded-xl border px-3 py-2 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+                    active
+                      ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
+                      : 'border-outline-variant/40 bg-surface-2/50 text-ink-muted hover:border-outline-variant hover:bg-surface-2 hover:text-ink'
+                  )}
+                >
+                  {asset.label}
+                </button>
+              )
+            })}
+
+            <label className="sr-only" htmlFor="calc-asset-select">
+              Más activos
+            </label>
+            <select
+              id="calc-asset-select"
+              value=""
+              onChange={(event) => event.target.value && loadAsset(event.target.value)}
+              className="rounded-xl border border-outline-variant/40 bg-surface-2/50 px-3 py-2 text-xs font-bold text-ink-muted transition-colors hover:border-outline-variant focus:border-accent-blue focus:outline-none"
+            >
+              <option value="">Más activos…</option>
+              {PIVOT_CATEGORIES.map((category) => (
+                <optgroup key={category.key} label={category.label}>
+                  {PIVOT_ASSETS.filter((asset) => asset.category === category.key).map((asset) => (
+                    <option key={asset.tv} value={asset.tv} disabled={!quoteByTv.has(asset.tv)}>
+                      {asset.label} — {asset.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+
+          {source && (
+            <p className="mt-3 flex items-center gap-1.5 text-micro text-ink-muted" role="status">
+              <span className="material-symbols-outlined text-[14px] text-semantic-success" aria-hidden="true">
+                check_circle
+              </span>
+              Datos cargados: {source}
+              {modified && ' (modificado)'}
+              {livePrice && <span className="text-ink-subtle"> · precio actual en vivo</span>}
+            </p>
+          )}
+        </section>
+
+        <section aria-labelledby="calc-inputs-heading">
+          <h3 id="calc-inputs-heading" className="sr-only">
+            Datos del período
+          </h3>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+            {FIELDS.map((field) => (
+              <InputField
+                key={field.key}
+                id={`pivot-input-${field.key}`}
+                label={field.label}
+                hint={field.hint}
+                accent={field.accent}
+                value={field.key === 'price' ? priceText : form[field.key]}
+                error={shownError(field.key)}
+                onChange={(value) => setField(field.key, value)}
+                onBlur={() => setTouched((current) => ({ ...current, [field.key]: true }))}
+              />
             ))}
           </div>
-        </div>
+          <p className="mt-2 text-micro text-ink-subtle">
+            Los niveles se calculan con el máximo, mínimo y cierre del período anterior. Acepta punto o coma como separador decimal.
+          </p>
+        </section>
 
-        <p className="mb-3 text-micro text-ink-muted">
-          Los presets cargan el rango actual de la sesión. Para pivotes estándar usa el máximo, mínimo y cierre de la
-          sesión anterior.
-        </p>
-
-        {/* OHLC Inputs */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-          {[
-            { label: 'Apertura (O)', value: openPrice, set: setOpenPrice, color: 'text-ink' },
-            { label: 'Máximo (H)', value: high, set: setHigh, color: 'text-semantic-success' },
-            { label: 'Mínimo (L)', value: low, set: setLow, color: 'text-semantic-danger' },
-            { label: 'Cierre (C)', value: close, set: setClose, color: 'text-accent-blue' },
-          ].map((input, index) => (
-            <div key={input.label}>
-              <label htmlFor={`pivot-input-${index}`} className={clsx('text-micro font-medium block mb-1.5', input.color)}>{input.label}</label>
-              <input
-                id={`pivot-input-${index}`}
-                type="number"
-                value={input.value}
-                onChange={(e) => input.set(e.target.value)}
-                placeholder="0.00"
-                step="any"
-                className="w-full rounded-lg border border-outline-variant/40 bg-surface-2 px-3 py-2.5 text-sm font-mono text-ink placeholder:text-ink-subtle focus:border-accent-blue focus:ring-1 focus:ring-accent-blue/30 focus:outline-none transition-colors"
-              />
+        {ready && result && position ? (
+          <>
+            <div className="grid grid-cols-3 gap-3 rounded-xl border border-outline-variant/20 bg-surface-2/40 px-4 py-3 text-center sm:flex sm:items-center sm:gap-8 sm:text-left">
+              <div>
+                <p className="text-micro text-ink-muted">Rango</p>
+                <p className="font-mono text-sm font-bold tabular-nums text-ink">{formatLevel(range, price, symbol)}</p>
+              </div>
+              <div>
+                <p className="text-micro text-ink-muted">Volatilidad</p>
+                <p className="font-mono text-sm font-bold tabular-nums text-ink">{((range / numbers.close) * 100).toFixed(2)}%</p>
+              </div>
+              <div>
+                <p className="text-micro text-ink-muted">Cierre en el rango</p>
+                <p className={clsx('font-mono text-sm font-bold tabular-nums', numbers.close >= (numbers.high + numbers.low) / 2 ? 'text-semantic-success' : 'text-semantic-danger')}>
+                  {range > 0 ? (((numbers.close - numbers.low) / range) * 100).toFixed(0) : '50'}%
+                </p>
+              </div>
             </div>
-          ))}
-        </div>
 
-        {/* Quick OHLC info */}
-        {h > 0 && l > 0 && c > 0 && (
-          <div className="flex items-center gap-4 mb-6 px-4 py-3 rounded-xl bg-surface-2/50 border border-outline-variant/20">
-            <div className="flex items-center gap-2">
-              <span className="text-micro text-ink-muted">Rango:</span>
-              <span className="font-mono text-xs font-bold text-ink tabular-nums">{formatLevel(range, ref)}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-micro text-ink-muted">Volatilidad:</span>
-              <span className="font-mono text-xs font-bold text-ink tabular-nums">{((range / c) * 100).toFixed(2)}%</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-micro text-ink-muted">Posición C/R:</span>
-              <span className={clsx('font-mono text-xs font-bold tabular-nums', c > (h + l) / 2 ? 'text-semantic-success' : 'text-semantic-danger')}>
-                {(((c - l) / range) * 100).toFixed(1)}%
-              </span>
-            </div>
-          </div>
-        )}
+            <section aria-labelledby="calc-method-heading">
+              <h3 id="calc-method-heading" className="sr-only">
+                Método de cálculo
+              </h3>
+              <div className="mb-3 flex gap-1 overflow-x-auto rounded-xl bg-surface-2 p-1" role="group" aria-label="Método">
+                {PIVOT_METHODS.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    aria-pressed={method === option}
+                    onClick={() => setMethod(option)}
+                    className={clsx(
+                      'flex-1 whitespace-nowrap rounded-lg px-4 py-2.5 text-xs font-bold uppercase tracking-wider transition-all',
+                      method === option ? 'bg-surface-container-lowest text-ink shadow-sm' : 'text-ink-muted hover:text-ink'
+                    )}
+                  >
+                    {PIVOT_METHOD_INFO[option].label}
+                  </button>
+                ))}
+              </div>
+              <div className="rounded-xl border border-accent-blue/20 bg-accent-blue/5 px-4 py-3">
+                <p className="text-body-sm text-ink">{PIVOT_METHOD_INFO[method].description}</p>
+                <p className="mt-1 font-mono text-xs text-accent-blue">{PIVOT_METHOD_INFO[method].formula}</p>
+              </div>
+            </section>
 
-        {/* Method Tabs */}
-        <div className="flex gap-1 p-1 rounded-xl bg-surface-2 mb-4 overflow-x-auto">
-          {METHODS.map((m) => (
-            <button
-              key={m}
-              onClick={() => setActiveMethod(m)}
-              className={clsx(
-                'px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap flex-1',
-                activeMethod === m
-                  ? 'bg-surface-container-lowest text-ink shadow-sm'
-                  : 'text-ink-muted hover:text-ink'
-              )}
-            >
-              {METHOD_INFO[m].label}
-            </button>
-          ))}
-        </div>
+            <div className="grid gap-6 lg:grid-cols-2">
+              <PivotLadder levels={levels} price={price} symbol={symbol} />
 
-        {/* Method Description */}
-        <div className="mb-6 px-4 py-3 rounded-xl bg-accent-blue/5 border border-accent-blue/20">
-          <p className="text-body-sm text-ink">{METHOD_INFO[activeMethod].desc}</p>
-          <p className="font-mono text-xs text-accent-blue mt-1">{METHOD_INFO[activeMethod].formula}</p>
-        </div>
+              <div className="rounded-xl border border-outline-variant/40 bg-surface-2/30 p-4">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <h3 className="text-micro font-bold uppercase tracking-wider text-ink-muted">Niveles · {PIVOT_METHOD_INFO[method].label}</h3>
+                  <button
+                    type="button"
+                    onClick={() => copy(copyAllText(levels), 'all')}
+                    className="flex items-center gap-1 rounded-lg border border-outline-variant/40 px-2.5 py-1 text-micro text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+                  >
+                    <span className="material-symbols-outlined text-[14px]" aria-hidden="true">
+                      {copied === 'all' ? 'check' : 'content_copy'}
+                    </span>
+                    {copied === 'all' ? 'Copiado' : 'Copiar todo'}
+                  </button>
+                </div>
 
-        {/* Results */}
-        {result ? (
-          <div className="space-y-4">
-            {/* Classic: full S3-R3 */}
-            {activeMethod === 'classic' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Left: Visual bar */}
-                <div className="relative rounded-xl border border-outline-variant/40 p-6 bg-surface-2/30">
-                  <p className="text-micro font-bold text-ink-muted uppercase tracking-wider mb-4">Niveles Clásicos</p>
-                  <div className="space-y-2">
-                    {[
-                      { label: 'R3', value: result.classic.r3, color: 'semantic-success', intensity: 30 },
-                      { label: 'R2', value: result.classic.r2, color: 'semantic-success', intensity: 22 },
-                      { label: 'R1', value: result.classic.r1, color: 'semantic-success', intensity: 15 },
-                      { label: 'PP', value: result.classic.pivot, color: 'accent-blue', intensity: 20, main: true },
-                      { label: 'S1', value: result.classic.s1, color: 'semantic-danger', intensity: 15 },
-                      { label: 'S2', value: result.classic.s2, color: 'semantic-danger', intensity: 22 },
-                      { label: 'S3', value: result.classic.s3, color: 'semantic-danger', intensity: 30 },
-                    ].map((level) => {
-                      const pos = ((level.value - result!.classic.s3) / (result!.classic.r3 - result!.classic.s3)) * 100
+                <table className="w-full text-left">
+                  <caption className="sr-only">Niveles del método {PIVOT_METHOD_INFO[method].label} y su distancia al precio actual</caption>
+                  <thead>
+                    <tr className="text-[10px] uppercase tracking-wider text-ink-subtle">
+                      <th scope="col" className="pb-2 font-bold">Nivel</th>
+                      <th scope="col" className="pb-2 text-right font-bold">Precio</th>
+                      <th scope="col" className="pb-2 text-right font-bold">Distancia</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {levels.map((level) => {
+                      const isNearest = position.resistance?.key === level.key || position.support?.key === level.key
                       return (
-                        <div key={level.label} className="flex items-center gap-3">
-                          <span className={clsx('text-xs font-bold w-8', level.main ? `text-${level.color}` : `text-${level.color}`)}>
+                        <tr key={level.key} className={clsx('border-t border-hairline-soft', isNearest && 'bg-surface-2/70')}>
+                          <th scope="row" className={clsx('py-2 pl-1 text-xs font-bold', KIND_TEXT[level.kind])}>
                             {level.label}
-                          </span>
-                          <div className="flex-1 relative h-8 rounded-lg overflow-hidden" style={{ background: `rgba(var(--${level.color}-rgb, 128,128,128), 0.05)` }}>
-                            <div
-                              className={clsx('absolute inset-y-0 left-0 rounded-lg', `bg-${level.color}/${level.intensity}`)}
-                              style={{ width: `${Math.max(5, Math.abs(pos - 50))}%` }}
-                            />
-                            <div className="absolute inset-0 flex items-center justify-end pr-3">
-                              <span className="font-mono text-xs font-bold tabular-nums text-ink">
-                                {formatLevel(level.value, ref)}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
+                          </th>
+                          <td className="py-2 text-right">
+                            <button
+                              type="button"
+                              onClick={() => copy(formatLevel(level.value, price, symbol).replace(/,/g, ''), level.key)}
+                              title="Copiar valor"
+                              className="rounded px-1.5 py-0.5 font-mono text-sm tabular-nums text-ink transition-colors hover:bg-surface-2"
+                            >
+                              {copied === level.key ? 'Copiado' : formatLevel(level.value, price, symbol)}
+                            </button>
+                          </td>
+                          <td className="py-2 pr-1 text-right font-mono text-xs tabular-nums text-ink-muted">{signed(distancePct(level.value, price))}</td>
+                        </tr>
                       )
                     })}
-                  </div>
+                  </tbody>
+                </table>
+
+                <p className="mt-3 border-t border-hairline-soft pt-3 text-micro text-ink-muted">
+                  Precio en <span className="font-mono font-bold text-ink">{formatLevel(price, price, symbol)}</span> ·{' '}
+                  <span className="font-bold text-ink">{position.zone}</span>
+                  {position.bias !== 'neutral' && (
+                    <span className={position.bias === 'bullish' ? 'text-semantic-success' : 'text-semantic-danger'}>
+                      {' '}
+                      · sesgo {position.bias === 'bullish' ? 'alcista' : 'bajista'}
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-2">
+              <section className="rounded-xl border border-outline-variant/40 bg-surface-2/30 p-4" aria-labelledby="calc-confluence-heading">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <h3 id="calc-confluence-heading" className="text-micro font-bold uppercase tracking-wider text-ink-muted">
+                    Zonas de confluencia
+                  </h3>
+                  <label className="flex items-center gap-2 text-micro text-ink-subtle">
+                    Tolerancia
+                    <select
+                      value={tolerance}
+                      onChange={(event) => setTolerance(Number(event.target.value))}
+                      className="rounded-lg border border-outline-variant/40 bg-surface-2 px-2 py-1 text-micro text-ink focus:border-accent-blue focus:outline-none"
+                    >
+                      {TOLERANCES.map((value) => (
+                        <option key={value} value={value}>
+                          ±{value}%
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
 
-                {/* Right: All methods comparison */}
-                <div className="rounded-xl border border-outline-variant/40 p-6 bg-surface-2/30">
-                  <p className="text-micro font-bold text-ink-muted uppercase tracking-wider mb-4">Comparación S1 / R1</p>
-                  <div className="space-y-3">
-                    {METHODS.map((m) => {
-                      const data = result![m]
-                      const isClassic = m === 'classic'
-                      return (
-                        <div key={m} className={clsx('rounded-lg border p-3 transition-all', isClassic ? 'border-accent-blue/30 bg-accent-blue/5' : 'border-outline-variant/30')}>
-                          <div className="flex items-center justify-between mb-2">
-                            <span className={clsx('text-xs font-bold', isClassic ? 'text-accent-blue' : 'text-ink-muted')}>
-                              {METHOD_INFO[m].label}
-                            </span>
-                            {isClassic && <span className="text-[9px] font-bold text-accent-blue bg-accent-blue/10 px-1.5 py-0.5 rounded">ACTUAL</span>}
-                          </div>
-                          <div className="grid grid-cols-3 gap-2 text-center">
-                            <div>
-                              <p className="text-[10px] text-semantic-danger font-bold">S1</p>
-                              <p className="font-mono text-xs font-bold tabular-nums text-semantic-danger">{formatLevel(data.s1, ref)}</p>
-                            </div>
-                            {isClassic && (
-                              <div>
-                                <p className="text-[10px] text-accent-blue font-bold">PP</p>
-                                <p className="font-mono text-xs font-bold tabular-nums text-accent-blue">{formatLevel(result!.classic.pivot, ref)}</p>
-                              </div>
-                            )}
-                            <div>
-                              <p className="text-[10px] text-semantic-success font-bold">R1</p>
-                              <p className="font-mono text-xs font-bold tabular-nums text-semantic-success">{formatLevel(data.r1, ref)}</p>
-                            </div>
-                          </div>
+                {confluences.length === 0 ? (
+                  <p className="text-body-sm text-ink-muted">Ningún nivel de distintos métodos coincide con esta tolerancia.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {confluences.map((confluence) => (
+                      <li key={confluence.value} className="flex items-center justify-between gap-3 rounded-lg border border-hairline-soft bg-surface-container-lowest px-3 py-2">
+                        <div className="min-w-0">
+                          <p className="font-mono text-sm font-bold tabular-nums text-ink">{formatLevel(confluence.value, price, symbol)}</p>
+                          <p className="truncate text-[11px] text-ink-muted">
+                            {confluence.levels.map((level) => `${PIVOT_METHOD_INFO[level.method].short} ${level.label}`).join(' · ')}
+                          </p>
                         </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
+                        <span className="shrink-0 font-mono text-xs tabular-nums text-ink-muted">{signed(distancePct(confluence.value, price))}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
 
-            {/* Non-classic: S1/R1 only */}
-            {activeMethod !== 'classic' && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="rounded-xl border border-semantic-danger/30 bg-semantic-danger/5 p-6 text-center">
-                  <p className="text-micro font-bold text-semantic-danger uppercase tracking-wider mb-2">S1 (Soporte)</p>
-                  <p className="font-mono text-2xl font-bold tabular-nums text-semantic-danger">{formatLevel(result[activeMethod].s1, ref)}</p>
-                  <p className="text-micro text-ink-subtle mt-1">{((result[activeMethod].s1 - c) / c * 100).toFixed(2)}% del precio</p>
+              <section className="min-w-0 rounded-xl border border-outline-variant/40 bg-surface-2/30 p-4" aria-labelledby="calc-matrix-heading">
+                <h3 id="calc-matrix-heading" className="mb-3 text-micro font-bold uppercase tracking-wider text-ink-muted">
+                  Comparación de métodos
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[26rem] text-right">
+                    <thead>
+                      <tr className="text-[10px] uppercase tracking-wider text-ink-subtle">
+                        <th scope="col" className="pb-2 text-left font-bold">Nivel</th>
+                        {PIVOT_METHODS.map((option) => (
+                          <th key={option} scope="col" className={clsx('pb-2 pl-2 font-bold', option === method && 'text-accent-blue')}>
+                            {PIVOT_METHOD_INFO[option].short}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {MATRIX_ROWS.map(([key, label]) => (
+                        <tr key={key} className="border-t border-hairline-soft">
+                          <th scope="row" className="py-1.5 text-left text-[11px] font-bold text-ink-muted">{label}</th>
+                          {PIVOT_METHODS.map((option) => {
+                            const value = (result[option] as Record<string, number>)[key]
+                            const inConfluence = value !== undefined && confluentCells.has(`${option}:${label}`)
+                            return (
+                              <td
+                                key={option}
+                                className={clsx(
+                                  'py-1.5 pl-2 font-mono text-[11px] tabular-nums',
+                                  value === undefined ? 'text-ink-subtle' : 'text-ink',
+                                  option === method && 'bg-accent-blue/5'
+                                )}
+                              >
+                                {value === undefined ? '—' : formatLevel(value, price, symbol)}
+                                {inConfluence && <span className="ml-1 text-accent-blue" title="Confluencia con otro método" aria-label="en confluencia">●</span>}
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-                <div className="rounded-xl border border-accent-blue/30 bg-accent-blue/5 p-6 text-center">
-                  <p className="text-micro font-bold text-accent-blue uppercase tracking-wider mb-2">Pivot Point</p>
-                  <p className="font-mono text-2xl font-bold tabular-nums text-accent-blue">
-                    {formatLevel('pivot' in result[activeMethod] ? (result[activeMethod] as { pivot: number }).pivot : result.classic.pivot, ref)}
-                  </p>
-                  <p className="text-micro text-ink-subtle mt-1">Punto de equilibrio</p>
-                </div>
-                <div className="rounded-xl border border-semantic-success/30 bg-semantic-success/5 p-6 text-center">
-                  <p className="text-micro font-bold text-semantic-success uppercase tracking-wider mb-2">R1 (Resistencia)</p>
-                  <p className="font-mono text-2xl font-bold tabular-nums text-semantic-success">{formatLevel(result[activeMethod].r1, ref)}</p>
-                  <p className="text-micro text-ink-subtle mt-1">{((result[activeMethod].r1 - c) / c * 100).toFixed(2)}% del precio</p>
-                </div>
-              </div>
-            )}
-
-            {/* Price position indicator */}
-            {c > 0 && (
-              <div className="rounded-xl border border-outline-variant/40 p-4 bg-surface-2/30">
-                <p className="text-micro font-bold text-ink-muted uppercase tracking-wider mb-3">Posición del precio actual</p>
-                <div className="relative h-6 rounded-full bg-surface-2 overflow-hidden">
-                  <div className="absolute inset-0 flex">
-                    <div className="flex-1 bg-gradient-to-r from-semantic-danger/20 to-transparent" />
-                    <div className="w-px bg-accent-blue/40" />
-                    <div className="flex-1 bg-gradient-to-l from-semantic-success/20 to-transparent" />
-                  </div>
-                  <div
-                    className="absolute top-0 bottom-0 w-1 bg-ink rounded-full transition-all"
-                    style={{ left: `${Math.min(98, Math.max(2, ((c - result!.classic.s3) / (result!.classic.r3 - result!.classic.s3)) * 100))}%` }}
-                  />
-                </div>
-                <div className="flex justify-between mt-2">
-                  <span className="text-[10px] font-mono text-semantic-danger">S3: {formatLevel(result!.classic.s3, ref)}</span>
-                  <span className="text-[10px] font-mono text-ink font-bold">ACTUAL: {formatLevel(c, ref)}</span>
-                  <span className="text-[10px] font-mono text-semantic-success">R3: {formatLevel(result!.classic.r3, ref)}</span>
-                </div>
-              </div>
-            )}
-          </div>
+                <p className="mt-2 text-[10px] text-ink-subtle">
+                  <span className="text-accent-blue">●</span> Nivel que coincide con otro método dentro de la tolerancia.
+                </p>
+              </section>
+            </div>
+          </>
         ) : (
-          <div className="rounded-xl border border-dashed border-outline-variant/40 py-16 text-center">
-            <span className="material-symbols-outlined text-5xl text-ink-subtle mb-3 block">candlestick_chart</span>
-            <p className="text-body text-ink-muted mb-1">Selecciona un activo o ingresa datos</p>
-            <p className="text-micro text-ink-subtle">Haz clic en uno de los botones de arriba para cargar datos reales</p>
+          <div className="rounded-xl border border-dashed border-outline-variant/40 px-6 py-14 text-center">
+            <span className="material-symbols-outlined mb-3 block text-5xl text-ink-subtle" aria-hidden="true">
+              candlestick_chart
+            </span>
+            <p className="mb-1 text-body text-ink-muted">
+              {hasAnyValue ? 'Corrige los campos marcados para ver los niveles' : 'Elige un activo o escribe los datos del período anterior'}
+            </p>
+            <p className="text-micro text-ink-subtle">Hacen falta el máximo, el mínimo y el cierre.</p>
           </div>
         )}
       </div>

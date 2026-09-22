@@ -210,6 +210,15 @@ async function getAssetsRaw() {
   }) as (Asset & { tipo: AssetType })[]
 }
 
+async function getAssetTypesRaw() {
+  const supabase = createPublicClient()
+
+  const { data, error } = await supabase.from('tipos_activo').select('*').order('name')
+
+  if (error) throw error
+  return (data ?? []) as AssetType[]
+}
+
 async function getSourcesRaw() {
   const supabase = createPublicClient()
 
@@ -433,6 +442,7 @@ export const getCategories = cached('getCategories', getCategoriesRaw, 'catalog'
 export const getTags = cached('getTags', getTagsRaw, 'catalog')
 export const getAssets = cached('getAssets', getAssetsRaw, 'catalog')
 export const getSources = cached('getSources', getSourcesRaw, 'catalog')
+export const getAssetTypes = cached('getAssetTypes', getAssetTypesRaw, 'catalog')
 export const getRelatedPosts = cached('getRelatedPosts', getRelatedPostsRaw, 'posts')
 export const getPostsByCategory = cached('getPostsByCategory', getPostsByCategoryRaw, 'posts')
 export const getAssetsForTicker = cached('getAssetsForTicker', getAssetsForTickerRaw, 'catalog')

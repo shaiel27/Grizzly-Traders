@@ -10,9 +10,16 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 }
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ recovery?: string; error?: string }>
+}) {
   const editor = await getEditor()
-  if (editor.status === 'ok') redirect('/cms')
+  const { recovery, error } = await searchParams
+
+  // A recovery session must not bounce straight to /cms: the user still needs to pick a new password.
+  if (editor.status === 'ok' && recovery !== '1') redirect('/cms')
 
   return (
     <main
@@ -43,7 +50,7 @@ export default async function LoginPage() {
             <p className="mt-1.5 text-body-sm text-ink-muted">Inicia sesión para gestionar el contenido del portal.</p>
           </div>
 
-          <LoginForm forbidden={editor.status === 'forbidden'} />
+          <LoginForm forbidden={editor.status === 'forbidden'} recovery={recovery === '1'} error={error} />
         </div>
 
         <Link

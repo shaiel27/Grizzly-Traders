@@ -27,7 +27,12 @@ export async function proxy(request: NextRequest) {
 
   // Optimistic redirect only; the allowlist check happens in the page (lib/auth.ts)
   if (!data.user && request.nextUrl.pathname.startsWith('/cms')) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    const redirect = NextResponse.redirect(new URL('/login', request.url))
+    // Propagar cookies refrescadas (setAll) que quedaron en `response`
+    for (const cookie of response.cookies.getAll()) {
+      redirect.cookies.set(cookie)
+    }
+    return redirect
   }
 
   return response

@@ -15,7 +15,8 @@ export async function GET() {
         category:categorias(name, slug),
         author:perfiles_autores(full_name),
         assets:post_activos(asset:activos(symbol, name)),
-        tags:post_tags(tag:tags(name, slug))
+        tags:post_tags(tag:tags(name, slug)),
+        translations:posts_translations(locale, slug)
       `)
       .order('created_at', { ascending: false })
       .limit(50)
@@ -40,6 +41,7 @@ export async function GET() {
       tags: Array.isArray(p.tags)
         ? p.tags.map((t: Record<string, unknown>) => (t as { tag: Record<string, unknown> }).tag).filter(Boolean)
         : [],
+      translations: Array.isArray(p.translations) ? p.translations : [],
     }))
 
     return NextResponse.json({ success: true, data: posts })

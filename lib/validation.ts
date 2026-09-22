@@ -38,6 +38,11 @@ export const publishSchema = z.object({
   is_featured: z.boolean().default(false),
 })
 
+// Full edit: same shape as creation, plus the id of the post being updated
+export const updatePostSchema = publishSchema.extend({
+  id: z.string().uuid(),
+})
+
 export const patchPostSchema = z
   .object({
     id: z.string().uuid(),
@@ -49,6 +54,54 @@ export const patchPostSchema = z
   })
 
 export const postIdSchema = z.string().uuid()
+
+const slugField = z
+  .string()
+  .trim()
+  .min(1)
+  .max(200)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug inválido')
+
+export const categorySchema = z.object({
+  type: z.literal('category'),
+  name: z.string().trim().min(1).max(100),
+  slug: slugField,
+})
+
+export const tagSchema = z.object({
+  type: z.literal('tag'),
+  name: z.string().trim().min(1).max(100),
+  slug: slugField,
+})
+
+export const assetSchema = z.object({
+  type: z.literal('asset'),
+  symbol: z
+    .string()
+    .trim()
+    .min(1)
+    .max(20)
+    .transform((v) => v.toUpperCase()),
+  name: z.string().trim().min(1).max(150),
+  tipo_id: z.coerce.number().int().positive(),
+})
+
+export const sourceSchema = z.object({
+  type: z.literal('source'),
+  name: z.string().trim().min(1).max(150),
+  url: optionalUrl,
+  reliability_score: z.coerce.number().int().min(0).max(100).default(50),
+})
+
+export const catalogCreateSchema = z.discriminatedUnion('type', [
+  categorySchema,
+  tagSchema,
+  assetSchema,
+  sourceSchema,
+])
+
+export const catalogTypeSchema = z.enum(['category', 'tag', 'asset', 'source'])
+export const catalogIdSchema = z.coerce.number().int().positive()
 
 export function firstIssue(error: z.ZodError): string {
   const issue = error.issues[0]

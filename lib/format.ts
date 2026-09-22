@@ -27,6 +27,8 @@ export function formatPrice(value: number | null | undefined, symbol = '', optio
   if (value >= 1000) {
     return prefix + value.toLocaleString(NUMBER_LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   }
+  // Sub-dollar assets (DOGE, ADA...) need more digits or every move rounds to the same value
+  if (value > 0 && value < 1) return prefix + value.toFixed(4)
   return prefix + value.toFixed(2)
 }
 
@@ -35,5 +37,24 @@ export function formatNumber(value: number | null | undefined, decimals = 2, com
   if (isMissing(value)) return '—'
   if (Math.abs(value) >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(compactDecimals)}B`
   if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(compactDecimals)}M`
+  return value.toLocaleString(NUMBER_LOCALE, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+}
+
+// Trading volume and similar counts: 1.23B, 4.5M, 12.3K
+export function formatCompact(value: number | null | undefined): string {
+  if (isMissing(value)) return '—'
+  const abs = Math.abs(value)
+  if (abs >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)}B`
+  if (abs >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`
+  if (abs >= 1_000) return `${(value / 1_000).toFixed(1)}K`
+  return value.toFixed(0)
+}
+
+// Pivot levels are derived numbers with no tick size of their own, so precision follows the price magnitude
+export function formatLevel(value: number, reference: number, symbol = ''): string {
+  if (isMissing(value)) return '—'
+  if ([...FOREX_3_DECIMALS, ...FOREX_5_DECIMALS].some((pair) => symbol.includes(pair))) return formatPrice(value, symbol)
+
+  const decimals = reference >= 100 ? 2 : reference >= 10 ? 3 : reference >= 1 ? 4 : 5
   return value.toLocaleString(NUMBER_LOCALE, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
 }

@@ -1,326 +1,424 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { clsx } from 'clsx'
-import { formatPrice as formatMarketPrice } from '@/lib/format'
-
+import { PivotAssetList, type PivotRow } from '@/components/ui/PivotAssetList'
+import { PageControls } from '@/components/ui/PageControls'
+import { PivotAssetPanel } from '@/components/ui/PivotAssetPanel'
 import { PivotCalculator } from '@/components/ui/PivotCalculator'
-import { PivotLevelsChart } from '@/components/ui/PivotLevelsChart'
+import { pageCount, pageSlice } from '@/lib/pagination'
+import { PIVOT_ASSETS, PIVOT_ASSET_BY_TV, PIVOT_CATEGORIES, type PivotCategory } from '@/lib/pivot-assets'
+import { PIVOT_METHOD_INFO } from '@/lib/pivot-methods'
+import { PIVOT_TIMEFRAMES, type PivotQuote, type PivotTimeframe } from '@/lib/pivot-types'
+import { PIVOT_METHODS, analyzePosition, calculatePivots, distancePct, levelsFor, type PivotMethod } from '@/lib/pivots'
+import { useWatchlist } from '@/lib/watchlist'
 
-interface PivotData {
-  symbol: string
-  description: string
-  close: number
-  open: number
-  high: number
-  low: number
-  change: number
-  changeAbs: number
-  volume: number
-  classic: { pivot: number; s1: number; s2: number; s3: number; r1: number; r2: number; r3: number }
-  fibonacci: { s1: number; r1: number }
-  camarilla: { s1: number; r1: number }
-  woodie: { s1: number; r1: number }
-  demark: { s1: number; r1: number }
-}
+const REFRESH_MS = 15_000
+// Assets shown per page in the list
+const PAGE_SIZE = 10
 
-const ASSET_CATEGORIES = [
-  { key: 'all', label: 'Todos' },
-  { key: 'crypto', label: 'Crypto' },
-  { key: 'forex', label: 'Forex' },
-  { key: 'commodity', label: 'Materias Primas' },
-  { key: 'stock', label: 'Acciones' },
-  { key: 'index', label: 'Índices' },
+type CategoryFilter = 'all' | PivotCategory
+type SortKey = 'default' | 'change' | 'proximity'
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'default', label: 'Predeterminado' },
+  { key: 'change', label: 'Mayor variación hoy' },
+  { key: 'proximity', label: 'Más cerca de un nivel' },
 ]
 
-const CATEGORY_MAP: Record<string, string> = {
-  'BINANCE:BTCUSDT': 'crypto', 'BINANCE:ETHUSDT': 'crypto', 'BINANCE:SOLUSDT': 'crypto',
-  'FX:EURUSD': 'forex', 'FX:GBPUSD': 'forex',
-  'COMEX:XAUUSD': 'commodity', 'COMEX:XAGUSD': 'commodity',
-  'NASDAQ:AAPL': 'stock', 'NASDAQ:NVDA': 'stock',
-  'SP:SPX': 'index', 'TVC:DXY': 'index',
+function formatUtcTime(timestamp: number): string {
+  return new Date(timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'UTC' })
 }
 
-const SYMBOL_NAMES: Record<string, string> = {
-  'BINANCE:BTCUSDT': 'Bitcoin', 'BINANCE:ETHUSDT': 'Ethereum', 'BINANCE:SOLUSDT': 'Solana',
-  'FX:EURUSD': 'Euro/Dólar', 'FX:GBPUSD': 'Libra/Dólar',
-  'COMEX:XAUUSD': 'Oro', 'COMEX:XAGUSD': 'Plata',
-  'NASDAQ:AAPL': 'Apple', 'NASDAQ:NVDA': 'Nvidia',
-  'SP:SPX': 'S&P 500', 'TVC:DXY': 'Dollar Index',
+// Smallest distance (in %) from the price to the level directly above or below it
+function nearestDistance(row: PivotRow): number {
+  const distances = [row.position.resistance, row.position.support]
+    .filter((level) => level !== null)
+    .map((level) => Math.abs(distancePct(level.value, row.quote.price)))
+  return distances.length ? Math.min(...distances) : Infinity
 }
 
-type Method = 'classic' | 'fibonacci' | 'camarilla' | 'woodie' | 'demark'
+function Segmented<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string
+  options: { key: T; label: string; title?: string }[]
+  value: T
+  onChange: (value: T) => void
+}) {
+  return (
+    <div role="group" aria-label={label} className="flex max-w-full gap-1 overflow-x-auto rounded-xl bg-surface-2 p-1">
+      {options.map((option) => (
+        <button
+          key={option.key}
+          type="button"
+          title={option.title}
+          aria-pressed={value === option.key}
+          onClick={() => onChange(option.key)}
+          className={clsx(
+            'whitespace-nowrap rounded-lg px-3.5 py-2 text-[11px] font-bold uppercase tracking-wider transition-all',
+            value === option.key ? 'bg-surface-container-lowest text-ink shadow-sm' : 'text-ink-muted hover:text-ink'
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  )
+}
 
-export function PivotPointsClient({ initialPivots }: { initialPivots: PivotData[] }) {
-  const [pivots, setPivots] = useState<PivotData[]>(initialPivots)
-  const [loading, setLoading] = useState(initialPivots.length === 0)
-  const [selectedCategory, setSelectedCategory] = useState('all')
-  const [selectedAsset, setSelectedAsset] = useState<PivotData | null>(initialPivots[0] ?? null)
-  const [selectedMethod, setSelectedMethod] = useState<Method>('classic')
-  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+interface PivotPointsClientProps {
+  initialQuotes: PivotQuote[]
+}
+
+export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
+  const [timeframe, setTimeframe] = useState<PivotTimeframe>('D')
+  const [quotes, setQuotes] = useState<PivotQuote[]>(initialQuotes)
+  // The timeframe the quotes belong to: while it differs from the selected one, we are loading
+  const [quotesTimeframe, setQuotesTimeframe] = useState<PivotTimeframe | null>(initialQuotes.length > 0 ? 'D' : null)
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null)
   const [error, setError] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
+
+  const [method, setMethod] = useState<PivotMethod>('classic')
+  const [category, setCategory] = useState<CategoryFilter>('all')
+  const [search, setSearch] = useState('')
+  const [onlyFavorites, setOnlyFavorites] = useState(false)
+  const [sort, setSort] = useState<SortKey>('default')
+  const [selectedTv, setSelectedTv] = useState<string | null>(null)
+
+  const { symbols: favorites, toggle: toggleFavorite } = useWatchlist()
+  const seeded = useRef(initialQuotes.length > 0)
 
   useEffect(() => {
-    async function fetchPivots() {
-      if (document.hidden) return
+    const controller = new AbortController()
+    let timer: ReturnType<typeof setTimeout>
+
+    async function refresh() {
       try {
-        const response = await fetch('/api/pivots')
+        const response = await fetch(`/api/pivots?tf=${timeframe}`, { signal: controller.signal, cache: 'no-store' })
         const result = await response.json()
-        if (result.success && result.data) {
-          const fresh: PivotData[] = result.data
-          setPivots(fresh)
-          setSelectedAsset((prev) => fresh.find((p) => p.symbol === prev?.symbol) ?? fresh[0] ?? null)
-          setLastUpdate(new Date())
-          setError(false)
-        } else {
-          setError(true)
-        }
-      } catch (error) {
-        console.error('Failed to fetch pivots:', error)
+        if (!result.success || !Array.isArray(result.data)) throw new Error('Invalid pivots response')
+
+        setQuotes(result.data)
+        setQuotesTimeframe(timeframe)
+        setUpdatedAt(Date.now())
+        setError(false)
+      } catch (failure) {
+        if (controller.signal.aborted) return
+        console.error('Failed to fetch pivots:', failure)
         setError(true)
-      } finally {
-        setLoading(false)
       }
     }
-    // The server already rendered the table, so only fetch right away when it came empty
-    if (initialPivots.length === 0) fetchPivots()
-    const interval = setInterval(fetchPivots, 60_000)
-    return () => clearInterval(interval)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- initialPivots only decides the first fetch
-  }, [])
 
-  const filteredPivots = selectedCategory === 'all'
-    ? pivots
-    : pivots.filter((p) => CATEGORY_MAP[p.symbol] === selectedCategory)
+    function schedule(delay: number) {
+      timer = setTimeout(async () => {
+        if (!document.hidden) await refresh()
+        schedule(REFRESH_MS)
+      }, delay)
+    }
 
-  const formatPrice = (v: number | null | undefined, sym: string) =>
-    formatMarketPrice(v, sym, { currency: true, forexDecimals: 4 })
+    // The server already rendered the daily quotes; any other timeframe (or an empty first paint) fetches now
+    const skipFirstFetch = seeded.current && timeframe === 'D'
+    seeded.current = false
+    if (skipFirstFetch) schedule(REFRESH_MS)
+    else refresh().then(() => !controller.signal.aborted && schedule(REFRESH_MS))
+
+    return () => {
+      controller.abort()
+      clearTimeout(timer)
+    }
+  }, [timeframe, reloadKey])
+
+  const loading = quotesTimeframe !== timeframe
+  const timeframeInfo = PIVOT_TIMEFRAMES.find((option) => option.key === timeframe)!
+
+  const rows = useMemo<PivotRow[]>(() => {
+    if (loading) return []
+    return quotes.flatMap((quote) => {
+      const asset = PIVOT_ASSET_BY_TV.get(quote.symbol)
+      if (!asset) return []
+      const { previous } = quote
+      const levels = levelsFor(calculatePivots(previous.high, previous.low, previous.close, previous.open), method)
+      return [{ asset, quote, levels, position: analyzePosition(levels, quote.price) }]
+    })
+  }, [quotes, method, loading])
+
+  const visibleRows = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    const filtered = rows.filter(
+      ({ asset }) =>
+        (category === 'all' || asset.category === category) &&
+        (!onlyFavorites || favorites.includes(asset.tv)) &&
+        (!term || asset.label.toLowerCase().includes(term) || asset.name.toLowerCase().includes(term))
+    )
+    if (sort === 'change') return [...filtered].sort((a, b) => Math.abs(b.quote.change) - Math.abs(a.quote.change))
+    if (sort === 'proximity') return [...filtered].sort((a, b) => nearestDistance(a) - nearestDistance(b))
+    return filtered
+  }, [rows, category, onlyFavorites, favorites, search, sort])
+
+  const [page, setPage] = useState(0)
+  const resetKey = `${timeframe}|${category}|${onlyFavorites}|${sort}|${search}`
+  const [seenResetKey, setSeenResetKey] = useState(resetKey)
+  // Any change to what the list shows sends it back to page 1 (reset while rendering: no frame with a stale page)
+  if (seenResetKey !== resetKey) {
+    setSeenResetKey(resetKey)
+    setPage(0)
+  }
+  const currentPage = Math.min(page, pageCount(visibleRows.length, PAGE_SIZE) - 1)
+  const pageRows = pageSlice(visibleRows, currentPage, PAGE_SIZE)
+
+  const selectedRow = rows.find((row) => row.asset.tv === selectedTv) ?? visibleRows[0] ?? rows[0] ?? null
+  const filtersActive = category !== 'all' || onlyFavorites || search.trim() !== ''
+  // Some futures have no weekly or monthly bars in the data source
+  const missingAssets = loading || rows.length === 0 ? [] : PIVOT_ASSETS.filter((asset) => !rows.some((row) => row.asset.tv === asset.tv))
+
+  function clearFilters() {
+    setCategory('all')
+    setOnlyFavorites(false)
+    setSearch('')
+  }
 
   return (
-    <>
+    <main id="main-content" tabIndex={-1} className="flex-1 pt-[104px] pb-24">
+      <div className="section-container mx-auto max-w-[1400px] pt-8">
+        <header className="mb-8">
+          <div className="mb-3 flex items-center gap-3">
+            <span className="material-symbols-outlined text-[28px] text-accent-blue" aria-hidden="true">
+              candlestick_chart
+            </span>
+            <h1 className="text-display-lg-mobile font-bold text-ink sm:text-display-lg">Pivot Points</h1>
+          </div>
+          <p className="max-w-3xl text-body text-on-surface-variant">
+            Soportes y resistencias calculados con el máximo, mínimo y cierre de la {timeframeInfo.period}, con cinco métodos distintos. Los
+            precios se actualizan solos cada 15 segundos.
+          </p>
+          <p className="mt-2 flex items-center gap-2 text-micro text-ink-subtle">
+            <span className="relative flex size-1.5" aria-hidden="true">
+              {!error && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-semantic-success opacity-75" />}
+              <span className={clsx('relative inline-flex size-1.5 rounded-full', error ? 'bg-semantic-warning' : 'bg-semantic-success')} />
+            </span>
+            {updatedAt ? `Actualizado ${formatUtcTime(updatedAt)} UTC` : initialQuotes.length > 0 ? 'Datos cargados' : 'Cargando datos…'} · Fuente: TradingView
+          </p>
+        </header>
 
-      <main id="main-content" tabIndex={-1} className="flex-1 pt-[104px] pb-24">
-        <div className="section-container max-w-[1400px] mx-auto pt-8">
-          {/* Header */}
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-3">
-              <span className="material-symbols-outlined text-[28px] text-accent-blue" aria-hidden="true">candlestick_chart</span>
-              <h1 className="text-display-lg-mobile sm:text-display-lg font-bold text-ink">Pivot Points Diarios</h1>
+        {error && (
+          <div role="alert" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-semantic-warning/40 bg-semantic-warning/10 px-4 py-3 text-body-sm text-ink">
+            <span>{quotes.length > 0 && !loading ? 'No se pudieron actualizar los pivotes; se muestran los últimos datos.' : 'No se pudieron cargar los pivotes.'}</span>
+            <button
+              type="button"
+              onClick={() => setReloadKey((key) => key + 1)}
+              className="rounded-lg border border-semantic-warning/50 px-3 py-1.5 text-xs font-bold text-ink transition-colors hover:bg-semantic-warning/20"
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
+
+        <div className="mb-6 space-y-4 rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-4">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            <div className="flex max-w-full flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
+              <span className="text-micro font-bold uppercase tracking-wider text-ink-muted">Período</span>
+              <Segmented
+                label="Período"
+                value={timeframe}
+                onChange={setTimeframe}
+                options={PIVOT_TIMEFRAMES.map((option) => ({ key: option.key, label: option.label, title: `Usa la ${option.period}` }))}
+              />
             </div>
-            <p className="text-body text-on-surface-variant max-w-3xl">
-              Niveles de soporte y resistencia calculados con 5 métodos distintos. Datos en tiempo real proporcionados por TradingView Scanner API.
-            </p>
-            {lastUpdate && (
-              <p className="text-micro text-ink-subtle mt-2">
-                Última actualización: {lastUpdate.toLocaleTimeString('es-ES')}
-              </p>
-            )}
+            <div className="flex min-w-0 max-w-full flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
+              <span className="text-micro font-bold uppercase tracking-wider text-ink-muted">Método</span>
+              <Segmented
+                label="Método"
+                value={method}
+                onChange={setMethod}
+                options={PIVOT_METHODS.map((option) => ({ key: option, label: PIVOT_METHOD_INFO[option].short, title: PIVOT_METHOD_INFO[option].levels }))}
+              />
+            </div>
           </div>
 
-          {error && (
-            <p role="alert" className="mb-6 rounded-xl border border-semantic-warning/40 bg-semantic-warning/10 px-4 py-3 text-body-sm text-ink">
-              No se pudieron actualizar los pivotes. Se reintentará automáticamente.
-            </p>
-          )}
+          <div className="flex flex-wrap items-center gap-3 border-t border-hairline-soft pt-4">
+            <div role="group" aria-label="Categorías" className="flex flex-wrap gap-2">
+              {([{ key: 'all', label: 'Todos' }, ...PIVOT_CATEGORIES] as { key: CategoryFilter; label: string }[]).map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  aria-pressed={category === option.key}
+                  onClick={() => setCategory(option.key)}
+                  className={clsx(
+                    'rounded-full border px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-all',
+                    category === option.key
+                      ? 'border-accent-blue bg-accent-blue text-white'
+                      : 'border-outline-variant/40 text-ink-muted hover:border-outline-variant hover:text-ink'
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
 
-          {loading ? (
-            <div className="space-y-6">
-              <div className="h-12 bg-surface-2 rounded-xl animate-pulse" />
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <div key={i} className="h-48 bg-surface-2 rounded-2xl animate-pulse" />
+            <div className="ml-auto flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                aria-pressed={onlyFavorites}
+                onClick={() => setOnlyFavorites((value) => !value)}
+                className={clsx(
+                  'flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-all',
+                  onlyFavorites
+                    ? 'border-semantic-warning/60 bg-semantic-warning/10 text-semantic-warning'
+                    : 'border-outline-variant/40 text-ink-muted hover:border-outline-variant hover:text-ink'
+                )}
+              >
+                <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
+                  star
+                </span>
+                Favoritos
+              </button>
+
+              <label className="sr-only" htmlFor="pivot-sort">
+                Ordenar por
+              </label>
+              <select
+                id="pivot-sort"
+                value={sort}
+                onChange={(event) => setSort(event.target.value as SortKey)}
+                className="rounded-full border border-outline-variant/40 bg-surface-2 px-3.5 py-1.5 text-[11px] font-bold text-ink-muted focus:border-accent-blue focus:outline-none"
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
                 ))}
+              </select>
+
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-10 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+          <section className="overflow-hidden rounded-2xl border border-outline-variant/40 bg-surface-container-lowest" aria-label="Niveles por activo">
+            <div className="flex items-center justify-between border-b border-outline-variant/40 bg-surface-container-low px-6 py-4">
+              <h2 className="text-subhead font-bold text-ink">Niveles por activo</h2>
+              <p className="text-micro text-ink-muted">
+                {loading ? 'Cargando…' : `${visibleRows.length} de ${rows.length} activos`}
+              </p>
+            </div>
+
+            <div className="border-b border-outline-variant/40 px-6 py-3">
+              <label className="sr-only" htmlFor="pivot-search">
+                Buscar activo
+              </label>
+              <div className="relative">
+                <span className="material-symbols-outlined pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[18px] text-ink-subtle" aria-hidden="true">
+                  search
+                </span>
+                <input
+                  id="pivot-search"
+                  type="search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Buscar por nombre o símbolo"
+                  autoComplete="off"
+                  className="w-full rounded-full border border-outline-variant/40 bg-surface-2 py-2 pl-10 pr-4 text-body-sm text-ink placeholder:text-ink-subtle focus:border-accent-blue focus:outline-none"
+                />
               </div>
             </div>
-          ) : (
-            <>
-              {/* Category Filter */}
-              <div className="flex flex-wrap gap-2 mb-8" role="group" aria-label="Categorías">
-                {ASSET_CATEGORIES.map((cat) => (
-                  <button
-                    key={cat.key}
-                    type="button"
-                    aria-pressed={selectedCategory === cat.key}
-                    onClick={() => setSelectedCategory(cat.key)}
-                    className={clsx(
-                      'px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border transition-all',
-                      selectedCategory === cat.key
-                        ? 'bg-accent-blue text-white border-accent-blue'
-                        : 'bg-transparent text-ink-muted border-outline-variant/40 hover:border-outline-variant hover:text-ink'
-                    )}
-                  >
-                    {cat.label}
+
+            {missingAssets.length > 0 && (
+              <p className="border-b border-hairline-soft px-6 py-2 text-micro text-ink-subtle">
+                Sin datos de la {timeframeInfo.period}: {missingAssets.map((asset) => asset.label).join(', ')}.
+              </p>
+            )}
+
+            {!loading && rows.length > 0 && visibleRows.length === 0 ? (
+              <div className="px-6 py-14 text-center">
+                <p className="mb-1 text-body text-ink-muted">Ningún activo coincide con los filtros.</p>
+                {filtersActive && (
+                  <button type="button" onClick={clearFilters} className="mt-2 text-body-sm font-medium text-accent-blue hover:text-accent-blue-hover">
+                    Quitar filtros
                   </button>
-                ))}
+                )}
               </div>
+            ) : !loading && rows.length === 0 ? (
+              <p className="px-6 py-14 text-center text-body text-ink-muted">No hay datos de pivotes disponibles por ahora.</p>
+            ) : (
+              <PivotAssetList
+                rows={pageRows}
+                selected={selectedRow?.asset.tv ?? null}
+                favorites={favorites}
+                loading={loading}
+                onSelect={setSelectedTv}
+                onToggleFavorite={toggleFavorite}
+              />
+            )}
 
-              {/* Main Content: Table + Chart */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
-                {/* Pivot Table */}
-                <div className="lg:col-span-2">
-                  <div className="rounded-2xl border border-outline-variant/40 bg-surface-container-lowest overflow-hidden">
-                    <div className="px-6 py-4 border-b border-outline-variant/40 bg-surface-container-low flex items-center justify-between">
-                      <h2 className="text-subhead font-bold text-ink">Niveles por Activo</h2>
-                      <div className="flex gap-1 p-0.5 rounded-lg bg-surface-2">
-                        {(['classic', 'fibonacci', 'camarilla', 'woodie', 'demark'] as Method[]).map((m) => (
-                          <button
-                            key={m}
-                            type="button"
-                            aria-pressed={selectedMethod === m}
-                            onClick={() => setSelectedMethod(m)}
-                            className={clsx(
-                              'px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all',
-                              selectedMethod === m
-                                ? 'bg-surface-container-lowest text-ink shadow-sm'
-                                : 'text-ink-muted hover:text-ink'
-                            )}
-                          >
-                            {m === 'classic' ? 'Clásico' : m === 'fibonacci' ? 'Fib' : m === 'camarilla' ? 'Cam' : m === 'woodie' ? 'Wood' : 'DM'}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+            {!loading && (
+              <PageControls
+                page={currentPage}
+                total={visibleRows.length}
+                pageSize={PAGE_SIZE}
+                onPageChange={setPage}
+                label="Paginación de niveles por activo"
+                className="border-t border-outline-variant/40 px-6 py-3"
+              />
+            )}
+          </section>
 
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b border-outline-variant/40">
-                            <th scope="col" className="px-4 py-3 text-left text-micro font-bold text-ink-muted uppercase tracking-wider">Activo</th>
-                            <th scope="col" className="px-4 py-3 text-right text-micro font-bold text-ink-muted uppercase tracking-wider">Precio</th>
-                            <th scope="col" className="px-4 py-3 text-right text-micro font-bold text-semantic-danger uppercase tracking-wider">S3</th>
-                            <th scope="col" className="px-4 py-3 text-right text-micro font-bold text-semantic-danger uppercase tracking-wider">S2</th>
-                            <th scope="col" className="px-4 py-3 text-right text-micro font-bold text-semantic-danger uppercase tracking-wider">S1</th>
-                            <th scope="col" className="px-4 py-3 text-right text-micro font-bold text-accent-blue uppercase tracking-wider">PP</th>
-                            <th scope="col" className="px-4 py-3 text-right text-micro font-bold text-semantic-success uppercase tracking-wider">R1</th>
-                            <th scope="col" className="px-4 py-3 text-right text-micro font-bold text-semantic-success uppercase tracking-wider">R2</th>
-                            <th scope="col" className="px-4 py-3 text-right text-micro font-bold text-semantic-success uppercase tracking-wider">R3</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredPivots.map((p) => {
-                            const isSelected = selectedAsset?.symbol === p.symbol
-                            const isAbovePivot = p.close >= p.classic.pivot
-                            return (
-                              <tr
-                                key={p.symbol}
-                                onClick={() => setSelectedAsset(p)}
-                                className={clsx(
-                                  'border-b border-outline-variant/20 cursor-pointer transition-colors',
-                                  isSelected ? 'bg-accent-blue/5' : 'hover:bg-surface-2/50'
-                                )}
-                              >
-                                <td className="px-4 py-3">
-                                  <button
-                                    type="button"
-                                    onClick={(event) => {
-                                      event.stopPropagation()
-                                      setSelectedAsset(p)
-                                    }}
-                                    aria-pressed={isSelected}
-                                    className="text-left"
-                                  >
-                                    <span className="block text-sm font-bold text-ink">{SYMBOL_NAMES[p.symbol] ?? p.symbol}</span>
-                                    <span className="block text-micro text-ink-muted">{p.symbol}</span>
-                                  </button>
-                                </td>
-                                <td className="px-4 py-3 text-right">
-                                  <span className={clsx('text-sm font-bold font-mono tabular-nums', isAbovePivot ? 'text-semantic-success' : 'text-semantic-danger')}>
-                                    {formatPrice(p.close, p.symbol)}
-                                  </span>
-                                </td>
-                                {selectedMethod === 'classic' ? (
-                                  <>
-                                    <td className="px-4 py-3 text-right font-mono text-xs tabular-nums text-semantic-danger">{formatPrice(p.classic.s3, p.symbol)}</td>
-                                    <td className="px-4 py-3 text-right font-mono text-xs tabular-nums text-semantic-danger">{formatPrice(p.classic.s2, p.symbol)}</td>
-                                    <td className="px-4 py-3 text-right font-mono text-xs tabular-nums text-semantic-danger">{formatPrice(p.classic.s1, p.symbol)}</td>
-                                    <td className="px-4 py-3 text-right font-mono text-xs tabular-nums text-accent-blue font-bold">{formatPrice(p.classic.pivot, p.symbol)}</td>
-                                    <td className="px-4 py-3 text-right font-mono text-xs tabular-nums text-semantic-success">{formatPrice(p.classic.r1, p.symbol)}</td>
-                                    <td className="px-4 py-3 text-right font-mono text-xs tabular-nums text-semantic-success">{formatPrice(p.classic.r2, p.symbol)}</td>
-                                    <td className="px-4 py-3 text-right font-mono text-xs tabular-nums text-semantic-success">{formatPrice(p.classic.r3, p.symbol)}</td>
-                                  </>
-                                ) : (
-                                  <>
-                                    <td className="px-4 py-3 text-right font-mono text-xs tabular-nums text-ink-muted">—</td>
-                                    <td className="px-4 py-3 text-right font-mono text-xs tabular-nums text-ink-muted">—</td>
-                                    <td className="px-4 py-3 text-right font-mono text-xs tabular-nums text-semantic-danger">{formatPrice(p[selectedMethod].s1, p.symbol)}</td>
-                                    <td className="px-4 py-3 text-right font-mono text-xs tabular-nums text-accent-blue font-bold">{formatPrice(p.classic.pivot, p.symbol)}</td>
-                                    <td className="px-4 py-3 text-right font-mono text-xs tabular-nums text-semantic-success">{formatPrice(p[selectedMethod].r1, p.symbol)}</td>
-                                    <td className="px-4 py-3 text-right font-mono text-xs tabular-nums text-ink-muted">—</td>
-                                    <td className="px-4 py-3 text-right font-mono text-xs tabular-nums text-ink-muted">—</td>
-                                  </>
-                                )}
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right sidebar: Selected asset chart + method info */}
-                <div className="space-y-6">
-                  {selectedAsset && (
-                    <PivotLevelsChart
-                      close={selectedAsset.close}
-                      levels={selectedAsset.classic}
-                      symbol={selectedAsset.symbol}
-                    />
-                  )}
-
-                  {/* Method info card */}
-                  <div className="rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-6">
-                    <h3 className="text-subhead font-bold text-ink mb-3">Cómo se calculan</h3>
-                    <div className="space-y-3 text-body-sm text-ink-muted">
-                      <div className="flex items-start gap-3">
-                        <span className="material-symbols-outlined text-[18px] text-accent-blue mt-0.5">function</span>
-                        <div>
-                          <p className="font-medium text-ink">Clásico (Standard)</p>
-                          <p className="font-mono text-xs text-ink-subtle">P = (H + L + C) / 3</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <span className="material-symbols-outlined text-[18px] text-accent-blue mt-0.5">auto_awesome</span>
-                        <div>
-                          <p className="font-medium text-ink">Fibonacci</p>
-                          <p className="font-mono text-xs text-ink-subtle">S1 = C − 0.382 × (H − L)</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <span className="material-symbols-outlined text-[18px] text-accent-blue mt-0.5">speed</span>
-                        <div>
-                          <p className="font-medium text-ink">Camarilla</p>
-                          <p className="font-mono text-xs text-ink-subtle">S1 = C − 1.1 × (H − L) / 2</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <span className="material-symbols-outlined text-[18px] text-accent-blue mt-0.5">balance</span>
-                        <div>
-                          <p className="font-medium text-ink">Woodie</p>
-                          <p className="font-mono text-xs text-ink-subtle">P = (H + L + 2C) / 4</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <span className="material-symbols-outlined text-[18px] text-accent-blue mt-0.5">calculate</span>
-                        <div>
-                          <p className="font-medium text-ink">DeMark</p>
-                          <p className="font-mono text-xs text-ink-subtle">Ajusta X según C vs O</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Pivot Calculator */}
-              <section className="mb-10">
-                <PivotCalculator />
-              </section>
-            </>
-          )}
+          <div className="lg:sticky lg:top-[128px] lg:self-start">
+            {selectedRow ? (
+              <PivotAssetPanel
+                asset={selectedRow.asset}
+                quote={selectedRow.quote}
+                method={method}
+                timeframe={timeframe}
+                periodLabel={timeframeInfo.period}
+              />
+            ) : (
+              <div className="h-[560px] animate-pulse rounded-2xl bg-surface-2" aria-hidden="true" />
+            )}
+          </div>
         </div>
-      </main>
 
-    </>
+        <section className="mb-10" aria-label="Calculadora de pivot points">
+          <PivotCalculator
+            quotes={loading ? [] : quotes}
+            timeframeLabel={timeframeInfo.label}
+            periodLabel={timeframeInfo.period}
+            selectedAsset={selectedRow?.asset.tv ?? null}
+          />
+        </section>
+
+        <section aria-labelledby="pivot-methods-heading">
+          <h2 id="pivot-methods-heading" className="mb-4 text-subhead font-bold text-ink">
+            Cómo se calculan
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {PIVOT_METHODS.map((option) => {
+              const info = PIVOT_METHOD_INFO[option]
+              return (
+                <article key={option} className={clsx('rounded-2xl border bg-surface-container-lowest p-5', option === method ? 'border-accent-blue/50' : 'border-outline-variant/40')}>
+                  <h3 className="mb-2 flex items-center gap-2 text-body-sm font-bold text-ink">
+                    <span className="material-symbols-outlined text-[18px] text-accent-blue" aria-hidden="true">
+                      {info.icon}
+                    </span>
+                    {info.label}
+                  </h3>
+                  <p className="mb-3 text-body-sm text-ink-muted">{info.description}</p>
+                  <p className="font-mono text-[11px] leading-relaxed text-ink-subtle">{info.formula}</p>
+                  <p className="mt-2 text-[10px] uppercase tracking-wider text-ink-subtle">{info.levels}</p>
+                </article>
+              )
+            })}
+          </div>
+          <p className="mt-6 max-w-3xl text-micro leading-relaxed text-ink-subtle">
+            Los pivotes son una referencia técnica, no una recomendación de compra o venta: el precio puede ignorarlos. Los datos provienen de un
+            servicio no oficial de TradingView y pueden tener retraso o interrupciones.
+          </p>
+        </section>
+      </div>
+    </main>
   )
 }

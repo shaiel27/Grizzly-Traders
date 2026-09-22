@@ -41,38 +41,40 @@ export function FearGreedGauge() {
   const needleY = 60 - 42 * Math.sin(angle)
 
   return (
-    <div className="flex items-center gap-4 rounded-2xl border border-outline-variant/40 bg-surface-container-lowest px-4 py-3">
-      <svg viewBox="0 0 120 70" className="h-14 w-24 shrink-0" role="img" aria-label={value === null ? 'Índice de miedo y codicia' : `Índice de miedo y codicia: ${value} de 100`}>
-        <path d="M 10 60 A 50 50 0 0 1 110 60" fill="none" stroke="var(--hairline)" strokeWidth="10" strokeLinecap="round" />
-        {value !== null && zone && (
-          <path
-            d="M 10 60 A 50 50 0 0 1 110 60"
-            fill="none"
-            stroke={zone.color}
-            strokeWidth="10"
-            strokeLinecap="round"
-            pathLength={100}
-            strokeDasharray={`${value} 100`}
-          />
-        )}
-        {value !== null && <line x1="60" y1="60" x2={needleX} y2={needleY} stroke="var(--ink)" strokeWidth="2.5" strokeLinecap="round" />}
-        <circle cx="60" cy="60" r="4" fill="var(--ink)" />
-      </svg>
+    <section aria-label="Miedo y codicia en cripto">
+      <h3 className="mb-3 text-[13px] font-semibold text-ink">Miedo y codicia en cripto</h3>
+      <div className="flex items-center gap-4">
+        <svg viewBox="0 0 120 70" className="h-14 w-24 shrink-0" role="img" aria-label={value === null ? 'Índice de miedo y codicia' : `Índice de miedo y codicia: ${value} de 100`}>
+          <path d="M 10 60 A 50 50 0 0 1 110 60" fill="none" stroke="var(--hairline)" strokeWidth="8" strokeLinecap="round" />
+          {value !== null && zone && (
+            <path
+              d="M 10 60 A 50 50 0 0 1 110 60"
+              fill="none"
+              stroke={zone.color}
+              strokeWidth="8"
+              strokeLinecap="round"
+              pathLength={100}
+              strokeDasharray={`${value} 100`}
+            />
+          )}
+          {value !== null && <line x1="60" y1="60" x2={needleX} y2={needleY} stroke="var(--ink)" strokeWidth="2" strokeLinecap="round" />}
+          <circle cx="60" cy="60" r="3.5" fill="var(--ink)" />
+        </svg>
 
-      <div>
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-ink-muted">Miedo y codicia (cripto)</p>
-        {value === null ? (
-          <p className="text-body-sm text-ink-muted">Cargando…</p>
-        ) : (
-          <p className="flex items-baseline gap-2">
-            <span className="font-mono text-headline font-bold tabular-nums text-ink">{value}</span>
-            <span className="text-body-sm font-medium" style={{ color: zone?.color }}>
-              {zone?.label}
-            </span>
-          </p>
-        )}
-        <p className="text-[10px] text-ink-subtle">Fuente: alternative.me</p>
+        <div>
+          {value === null ? (
+            <p className="text-[13px] text-ink-muted">Cargando…</p>
+          ) : (
+            <>
+              <p className="text-[28px] font-semibold leading-none tabular-nums text-ink">{value}</p>
+              <p className="mt-1 text-[13px]" style={{ color: zone?.color }}>
+                {zone?.label}
+              </p>
+            </>
+          )}
+        </div>
       </div>
-    </div>
+      <p className="mt-2 text-[12px] text-ink-subtle">Escala de 0 a 100. Fuente: alternative.me.</p>
+    </section>
   )
 }

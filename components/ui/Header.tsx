@@ -7,7 +7,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { clsx } from 'clsx'
 import { LiveTicker } from './LiveTicker'
 import { Button } from './Button'
-import type { PriceData } from '@/lib/prices'
+import type { TickerSnapshot } from '@/lib/ticker'
 
 interface CategoryData {
   id: number
@@ -17,7 +17,7 @@ interface CategoryData {
 
 interface HeaderProps {
   categories?: CategoryData[]
-  initialPrices?: PriceData[]
+  initialTicker?: TickerSnapshot | null
 }
 
 interface NavEntry {
@@ -101,7 +101,7 @@ function ActiveNavLinks(props: Omit<NavLinksProps, 'activeCategory'>) {
   )
 }
 
-export function Header({ categories = [], initialPrices }: HeaderProps) {
+export function Header({ categories = [], initialTicker }: HeaderProps) {
   const [searchOpen, setSearchOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -156,7 +156,7 @@ export function Header({ categories = [], initialPrices }: HeaderProps) {
       >
         Saltar al contenido
       </a>
-      <LiveTicker initialPrices={initialPrices} />
+      <LiveTicker initialQuotes={initialTicker?.quotes} initialUpdatedAt={initialTicker?.updatedAt} />
 
       <nav className="max-w-[1200px] mx-auto w-full px-6 md:px-8 py-3 flex items-center justify-between gap-4" aria-label="Navegación principal">
         <Link href="/" className="flex items-center gap-2 shrink-0" aria-label="Grizzly Traders - Inicio">

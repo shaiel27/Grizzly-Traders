@@ -5,6 +5,7 @@ import { clsx } from 'clsx'
 interface Mover {
   symbol: string
   name: string
+  description?: string
   change: number
 }
 
@@ -12,47 +13,24 @@ interface TopMoversProps<T extends Mover> {
   assets: T[]
   onSelect: (asset: T) => void
   count?: number
+  // Layout of the two lists; side by side by default, pass a single-column class for a narrow column
+  className?: string
 }
 
-function MoverList<T extends Mover>({
-  title,
-  icon,
-  items,
-  tone,
-  onSelect,
-}: {
-  title: string
-  icon: string
-  items: T[]
-  tone: 'up' | 'down'
-  onSelect: (asset: T) => void
-}) {
+function MoverList<T extends Mover>({ title, items, onSelect }: { title: string; items: T[]; onSelect: (asset: T) => void }) {
   return (
-    <section className="rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-4" aria-label={title}>
-      <h3 className="mb-3 flex items-center gap-2 text-caption font-bold text-ink">
-        <span
-          className={clsx('material-symbols-outlined text-[18px]', tone === 'up' ? 'text-semantic-success' : 'text-semantic-danger')}
-          aria-hidden="true"
-        >
-          {icon}
-        </span>
-        {title}
-      </h3>
-      <ul className="space-y-1">
+    <section aria-label={title}>
+      <h3 className="mb-1 text-[13px] font-semibold text-ink">{title}</h3>
+      <ul>
         {items.map((asset) => (
-          <li key={asset.symbol}>
+          <li key={asset.symbol} className="border-b border-hairline-soft last:border-b-0">
             <button
               type="button"
               onClick={() => onSelect(asset)}
-              className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-surface-2/60"
+              className="flex w-full items-baseline justify-between gap-3 py-2 text-left transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-accent-blue"
             >
-              <span className="truncate text-body-sm font-medium text-ink">{asset.name}</span>
-              <span
-                className={clsx(
-                  'shrink-0 font-mono text-body-sm font-bold tabular-nums',
-                  asset.change >= 0 ? 'text-semantic-success' : 'text-semantic-danger'
-                )}
-              >
+              <span className="min-w-0 truncate text-[13px] text-ink-muted hover:text-ink">{asset.name}</span>
+              <span className={clsx('shrink-0 text-[13px] tabular-nums', asset.change >= 0 ? 'text-semantic-success' : 'text-semantic-danger')}>
                 {asset.change >= 0 ? '+' : ''}
                 {asset.change.toFixed(2)}%
               </span>
@@ -64,18 +42,16 @@ function MoverList<T extends Mover>({
   )
 }
 
-export function TopMovers<T extends Mover>({ assets, onSelect, count = 5 }: TopMoversProps<T>) {
+export function TopMovers<T extends Mover>({ assets, onSelect, count = 5, className = 'grid gap-x-8 gap-y-6 sm:grid-cols-2' }: TopMoversProps<T>) {
   const valid = assets.filter((asset) => Number.isFinite(asset.change))
   const sorted = [...valid].sort((a, b) => b.change - a.change)
-  const gainers = sorted.slice(0, count)
-  const losers = sorted.slice(-count).reverse()
 
   if (valid.length < count * 2) return null
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <MoverList title="Mayores subidas" icon="trending_up" items={gainers} tone="up" onSelect={onSelect} />
-      <MoverList title="Mayores bajadas" icon="trending_down" items={losers} tone="down" onSelect={onSelect} />
+    <div className={className}>
+      <MoverList title="Mayores subidas" items={sorted.slice(0, count)} onSelect={onSelect} />
+      <MoverList title="Mayores bajadas" items={sorted.slice(-count).reverse()} onSelect={onSelect} />
     </div>
   )
 }

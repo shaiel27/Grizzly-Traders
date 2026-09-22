@@ -1,77 +1,86 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type Ref } from 'react'
 import { clsx } from 'clsx'
-import type { PriceData } from '@/lib/prices'
+import type { TickerQuote } from '@/lib/ticker'
 import { formatPrice } from '@/lib/format'
 
-interface TickerItem {
-  symbol: string
-  name: string
-  price: number | null
-  changePercent: number | null
+interface TickerItem extends TickerQuote {
+  // Direction of the last price change; `tick` remounts the price so the flash animation replays
+  flash: 'up' | 'down' | null
+  tick: number
 }
 
-const TICKER_ASSETS: { symbol: string; name: string }[] = [
-  { symbol: 'BTC', name: 'Bitcoin' },
-  { symbol: 'ETH', name: 'Ethereum' },
-  { symbol: 'SOL', name: 'Solana' },
-  { symbol: 'XAUUSD', name: 'Oro' },
-  { symbol: 'EURUSD', name: 'Euro/Dólar' },
-  { symbol: 'GBPUSD', name: 'Libra/Dólar' },
-  { symbol: 'AAPL', name: 'Apple' },
-  { symbol: 'NVDA', name: 'Nvidia' },
-  { symbol: 'SPX', name: 'S&P 500' },
-  { symbol: 'DXY', name: 'Dollar Index' },
-]
+const REFRESH_MS = 3_000
+// After failures the interval doubles up to this cap, so an outage isn't hammered every 3 s
+const MAX_BACKOFF_MS = 30_000
+// Constant reading speed regardless of how many assets are shown
+const SCROLL_SPEED_PX_PER_S = 45
+// One copy of the loop must be wider than any screen, otherwise the wrap-around shows a gap
+const MIN_LOOP_ITEMS = 24
 
-const REFRESH_MS = 30_000
-
-function applyPrices(items: TickerItem[], prices: PriceData[]): TickerItem[] {
-  return items.map((item) => {
-    const match = prices.find((price) => price.symbol === item.symbol)
-    if (!match || !(match.price > 0)) return item
-    return {
-      ...item,
-      price: match.price,
-      changePercent: typeof match.changePercent24h === 'number' ? match.changePercent24h : null,
-    }
+function toItems(quotes: TickerQuote[], previous: TickerItem[] = []): TickerItem[] {
+  const before = new Map(previous.map((item) => [item.symbol, item]))
+  return quotes.map((quote) => {
+    const prev = before.get(quote.symbol)
+    if (!prev) return { ...quote, flash: null, tick: 0 }
+    if (prev.price === quote.price) return { ...quote, flash: null, tick: prev.tick }
+    return { ...quote, flash: quote.price > prev.price ? 'up' : 'down', tick: prev.tick + 1 }
   })
 }
 
-function formatUtcTime(timestamp: number): string {
-  return new Date(timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
+function fillLoop(items: TickerItem[]): TickerItem[] {
+  if (items.length === 0) return items
+  const loop = [...items]
+  while (loop.length < MIN_LOOP_ITEMS) loop.push(...items)
+  return loop
 }
 
-function TickerItems({ items, hidden = false }: { items: TickerItem[]; hidden?: boolean }) {
+function formatUtcTime(timestamp: number): string {
+  return new Date(timestamp).toLocaleTimeString('es-ES', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZone: 'UTC',
+  })
+}
+
+function TickerItems({
+  items,
+  hidden = false,
+  copyRef,
+}: {
+  items: TickerItem[]
+  hidden?: boolean
+  copyRef?: Ref<HTMLDivElement>
+}) {
   return (
-    <div className="flex shrink-0 items-center gap-5 pr-5" aria-hidden={hidden || undefined}>
+    <div ref={copyRef} className="flex shrink-0 items-center gap-5 pr-5" aria-hidden={hidden || undefined}>
       {items.map((item, index) => {
         const percent = item.changePercent
         const isPositive = (percent ?? 0) >= 0
         return (
           <div key={`${item.symbol}-${index}`} className="flex items-center gap-2.5 whitespace-nowrap">
-            <span className="text-[11px] font-bold tracking-wide text-ink">{item.symbol}</span>
-            <span className="font-mono tabular-nums text-[11px] font-medium text-on-surface">
-              {formatPrice(item.price, item.symbol, { currency: true, forexDecimals: 4 })}
+            <span className="text-[11px] font-medium text-ink">{item.label}</span>
+            <span
+              key={item.tick}
+              className={clsx(
+                'rounded px-1 font-mono tabular-nums text-[11px] text-ink-muted',
+                item.flash && `ticker-flash-${item.flash}`
+              )}
+            >
+              {formatPrice(item.price, item.symbol, { currency: item.currency, forexDecimals: 4 })}
             </span>
             {percent !== null && (
               <span
                 className={clsx(
-                  'inline-flex items-center gap-0.5 rounded-md px-1.5 py-[3px] text-[10px] font-bold tabular-nums',
+                  'rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums',
                   isPositive
-                    ? 'bg-semantic-success/15 text-semantic-success'
-                    : 'bg-semantic-danger/15 text-semantic-danger'
+                    ? 'bg-semantic-success/10 text-semantic-success'
+                    : 'bg-semantic-danger/10 text-semantic-danger'
                 )}
               >
-                <svg
-                  className={clsx('size-[10px] shrink-0', !isPositive && 'rotate-180')}
-                  viewBox="0 0 10 10"
-                  fill="currentColor"
-                  aria-hidden="true"
-                >
-                  <path d="M5 2L8.5 7H1.5L5 2Z" />
-                </svg>
+                {isPositive ? '+' : ''}
                 {percent.toFixed(2)}%
               </span>
             )}
@@ -85,50 +94,62 @@ function TickerItems({ items, hidden = false }: { items: TickerItem[]; hidden?: 
   )
 }
 
-export function LiveTicker({ initialPrices = [] }: { initialPrices?: PriceData[] }) {
-  const [tickerData, setTickerData] = useState<TickerItem[]>(() =>
-    applyPrices(
-      TICKER_ASSETS.map((asset) => ({ ...asset, price: null, changePercent: null })),
-      initialPrices
-    )
-  )
-  // Server-provided prices carry their own timestamp, so the label is identical on server and client
-  const [updatedAt, setUpdatedAt] = useState<number | null>(() =>
-    initialPrices.length > 0 ? Math.max(...initialPrices.map((price) => price.timestamp)) : null
-  )
+interface LiveTickerProps {
+  initialQuotes?: TickerQuote[]
+  initialUpdatedAt?: number | null
+}
+
+export function LiveTicker({ initialQuotes = [], initialUpdatedAt = null }: LiveTickerProps) {
+  const [items, setItems] = useState<TickerItem[]>(() => toItems(initialQuotes))
+  // Server-provided quotes carry their own timestamp, so the label is identical on server and client
+  const [updatedAt, setUpdatedAt] = useState<number | null>(initialUpdatedAt)
   const [stale, setStale] = useState(false)
+  const [paused, setPaused] = useState(false)
+  const trackRef = useRef<HTMLDivElement>(null)
+  const copyRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const controller = new AbortController()
     let timer: ReturnType<typeof setTimeout>
+    let failures = 0
 
     async function refresh() {
       if (document.hidden) return
       try {
-        const response = await fetch('/api/prices', { signal: controller.signal })
+        const response = await fetch('/api/ticker', { signal: controller.signal, cache: 'no-store' })
         const result = await response.json()
-        if (!result.success || !Array.isArray(result.data)) throw new Error('Invalid prices response')
+        if (!result.success || !Array.isArray(result.data) || result.data.length === 0) {
+          throw new Error('Invalid ticker response')
+        }
 
-        setTickerData((prev) => applyPrices(prev, result.data))
+        setItems((prev) => toItems(result.data, prev))
         setUpdatedAt(typeof result.timestamp === 'number' ? result.timestamp : Date.now())
         setStale(false)
+        failures = 0
       } catch (error) {
         if (controller.signal.aborted) return
-        console.error('Failed to fetch prices:', error)
+        console.error('Failed to fetch ticker quotes:', error)
         setStale(true)
+        failures += 1
       }
     }
 
+    // Requests are spaced from start to start (a true 3 s cadence) but never overlap: the next one is
+    // scheduled only after the previous finished, so a slow response just makes the next one immediate
     function schedule(delay: number) {
       timer = setTimeout(async () => {
+        const startedAt = Date.now()
         await refresh()
-        schedule(REFRESH_MS)
+        const interval = Math.min(REFRESH_MS * 2 ** failures, MAX_BACKOFF_MS)
+        schedule(Math.max(0, interval - (Date.now() - startedAt)))
       }, delay)
     }
 
-    // The first render already has server prices, so only fetch right away when it doesn't
-    schedule(initialPrices.length > 0 ? REFRESH_MS : 0)
+    // Server quotes can be as old as the page cache; fetch right away unless they are fresh enough
+    const firstPaintAge = initialUpdatedAt === null ? Infinity : Date.now() - initialUpdatedAt
+    schedule(initialQuotes.length > 0 && firstPaintAge < REFRESH_MS ? REFRESH_MS - firstPaintAge : 0)
 
+    // Catch up as soon as the tab is visible again instead of waiting out the interval
     const onVisible = () => {
       if (!document.hidden) {
         clearTimeout(timer)
@@ -142,11 +163,31 @@ export function LiveTicker({ initialPrices = [] }: { initialPrices?: PriceData[]
       clearTimeout(timer)
       document.removeEventListener('visibilitychange', onVisible)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- initialPrices only decides the first delay
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the initial props only decide the first delay
   }, [])
 
-  // Each half is longer than any screen, and the two halves are identical, so the -50% loop has no gap or jump
-  const half = [...tickerData, ...tickerData]
+  // Loop duration follows the content width so the scroll speed stays the same for any number of assets.
+  // Rounded to 5 s so text-width changes from price updates don't retune the animation constantly.
+  useEffect(() => {
+    const track = trackRef.current
+    const copy = copyRef.current
+    if (!track || !copy) return
+
+    const applyDuration = () => {
+      const width = copy.getBoundingClientRect().width
+      if (width <= 0) return
+      const seconds = Math.max(30, Math.round(width / SCROLL_SPEED_PX_PER_S / 5) * 5)
+      track.style.setProperty('--ticker-duration', `${seconds}s`)
+    }
+
+    applyDuration()
+    const observer = new ResizeObserver(applyDuration)
+    observer.observe(copy)
+    return () => observer.disconnect()
+  }, [])
+
+  // Two identical copies: translating the track by -50% loops with no gap or jump
+  const loop = fillLoop(items)
 
   return (
     <div className="flex h-8 w-full items-center overflow-hidden border-b border-outline-variant/40 bg-surface-container-lowest">
@@ -157,13 +198,13 @@ export function LiveTicker({ initialPrices = [] }: { initialPrices?: PriceData[]
           )}
           <span className={clsx('relative inline-flex size-1.5 rounded-full', stale ? 'bg-semantic-warning' : 'bg-semantic-success')} />
         </span>
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-ink">Mercados</span>
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-muted">Feed en vivo</span>
       </div>
 
       <div className="ticker-viewport relative ml-3 flex w-full items-center" role="marquee" aria-label="Cotizaciones de mercado">
-        <div className="ticker-motion items-center">
-          <TickerItems items={half} />
-          <TickerItems items={half} hidden />
+        <div ref={trackRef} className="ticker-motion items-center" data-paused={paused ? 'true' : undefined}>
+          <TickerItems items={loop} copyRef={copyRef} />
+          <TickerItems items={loop} hidden />
         </div>
       </div>
 
@@ -177,6 +218,18 @@ export function LiveTicker({ initialPrices = [] }: { initialPrices?: PriceData[]
           </span>
         )}
       </div>
+
+      <button
+        type="button"
+        onClick={() => setPaused((value) => !value)}
+        aria-pressed={paused}
+        aria-label={paused ? 'Reanudar desplazamiento de cotizaciones' : 'Pausar desplazamiento de cotizaciones'}
+        className="relative z-10 flex h-full w-9 shrink-0 items-center justify-center border-l border-outline-variant/40 bg-surface-container-lowest text-ink-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-blue"
+      >
+        <svg className="size-3" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+          {paused ? <path d="M3 1.5v9l7.5-4.5L3 1.5Z" /> : <path d="M2.5 1.5h2.75v9H2.5v-9Zm4.25 0H9.5v9H6.75v-9Z" />}
+        </svg>
+      </button>
     </div>
   )
 }

@@ -169,27 +169,38 @@
   0% { transform: translateX(0%); }
   100% { transform: translateX(-50%); }
 }
+@keyframes tickerFlashUp {
+  from { background-color: color-mix(in srgb, var(--semantic-success) 45%, transparent); }
+  to { background-color: transparent; }
+}
+@keyframes tickerFlashDown {
+  from { background-color: color-mix(in srgb, var(--semantic-danger) 45%, transparent); }
+  to { background-color: transparent; }
+}
 .ticker-viewport {
   overflow: hidden;
+  mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent);
 }
 .ticker-motion {
   display: flex;
   width: max-content;
-  animation: tickerScroll 110s linear infinite;
+  /* --ticker-duration is set from the measured content width so the speed stays constant */
+  animation: tickerScroll var(--ticker-duration, 240s) linear infinite;
+  will-change: transform;
 }
 .ticker-motion:hover,
-.ticker-motion:focus-within {
+.ticker-motion:focus-within,
+.ticker-motion[data-paused] {
   animation-play-state: paused;
 }
-@media (prefers-reduced-motion: reduce) {
-  .ticker-viewport {
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .ticker-motion {
-    animation: none;
-  }
+.ticker-flash-up {
+  animation: tickerFlashUp 1.4s ease-out;
 }
+.ticker-flash-down {
+  animation: tickerFlashDown 1.4s ease-out;
+}
+/* Deliberately no prefers-reduced-motion override: Windows with animations turned off reports it
+   too, and the bar would stop being a ticker. Motion is optional through the pause button (WCAG 2.2.2). */
 
 @utility text-display-xxl {
   @apply text-[110px] font-medium leading-[0.85] tracking-[-0.05em];
@@ -246,5 +257,27 @@
   scrollbar-width: none;
   &::-webkit-scrollbar {
     display: none;
+  }
+}
+
+/* Slim scrollbar in the system palette: a hairline-toned thumb on a transparent track, brighter on hover */
+@utility scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-bright) transparent;
+  &::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--surface-bright);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: var(--outline-variant);
   }
 }

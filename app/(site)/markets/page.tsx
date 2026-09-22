@@ -5,12 +5,13 @@ import { MarketsClient } from './MarketsClient'
 export const metadata: Metadata = {
   title: 'Terminal de mercados',
   description:
-    'Cotizaciones e indicadores técnicos (RSI, MACD, medias móviles) de criptomonedas, forex, acciones, índices y materias primas, con gráficos.',
+    'Cotizaciones, mapa de calor e indicadores técnicos (RSI, MACD, medias móviles, pivotes) de criptomonedas, forex, acciones, índices y materias primas, con gráficos.',
   alternates: { canonical: '/markets' },
 }
 
-// Cached for a minute; the client keeps the table fresh afterwards
-export default async function MarketsPage() {
-  const assets = await getMarkets().catch(() => [])
-  return <MarketsClient initialAssets={assets} />
+// The market data is cached for a minute; the client keeps the table fresh afterwards.
+// ?activo=<ticker> preselects an asset so a link can point at a specific chart.
+export default async function MarketsPage({ searchParams }: { searchParams: Promise<{ activo?: string }> }) {
+  const [assets, { activo }] = await Promise.all([getMarkets().catch(() => []), searchParams])
+  return <MarketsClient initialAssets={assets} initialSymbol={activo ?? null} />
 }
