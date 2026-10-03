@@ -11,7 +11,8 @@ see the plan file itself for exact values; this file only tracks order and statu
 | [004](004-home-loading-terminal-boot.md) | Replace the home skeleton with a terminal boot sequence | N/A | SUPERSEDED by 005 |
 | [005](005-home-loading-minimal-splash.md) | Full-screen minimal splash for the home loading state | N/A | DONE |
 | [006](006-home-globo-holografico.md) | Hero de la home con globo 3D holográfico interactivo | N/A | DONE (ver nota de verificación en el plan — falta revisión visual en navegador) |
-| [007](007-home-starfield-tarjetas-anchor.md) | Estabilidad del globo + fondo estrellado + tarjetas estilo "Anchor AI" | N/A | EN CURSO |
+| [007](007-globo-carga-fondo-y-calidad.md) | Prompt: carga del globo, fondo animado y calidad visual | HIGH | PROMPT |
+| [008](008-home-starfield-tarjetas-anchor.md) | Estabilidad del globo + fondo estrellado + tarjetas estilo "Anchor AI" | N/A | DONE |
 
 ## Execution order
 
