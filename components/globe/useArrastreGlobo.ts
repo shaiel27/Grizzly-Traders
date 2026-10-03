@@ -3,7 +3,6 @@
 import { useCallback, useRef } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react'
 
-const LIMITE_INCLINACION = (60 * Math.PI) / 180 // ±60°
 const AUTO_GIRO_Y = 0.05 // rad/s, oeste a este, una vez en reposo
 const INCLINACION_REPOSO = 0.25 // rad
 // Con la orientacion de lib/globe/geo.ts, rotY=0 ya deja un meridiano de -90° (centro-oeste de
@@ -81,8 +80,11 @@ export function useArrastreGlobo(reducedMotionRef: { current: boolean }, onToque
 
     estado.velY = dx * k
     estado.velX = dy * k
-    estado.rotY += estado.velY
-    estado.rotX = Math.max(-LIMITE_INCLINACION, Math.min(LIMITE_INCLINACION, estado.rotX + estado.velX))
+    // Sin clamp en rotX: el globo gira libre en cualquier direccion, igual que rotY — antes
+    // ±60° de inclinacion lo frenaban en seco al tocar el polo, una sensacion distinta (y mas
+    // limitada) que el giro horizontal, que siempre fue libre. Pedido explicito: que rote
+    // "de igual manera" en todas las direcciones.
+    estado.rotX += estado.velX
   }, [])
 
   const finalizarArrastre = useCallback(
@@ -117,10 +119,10 @@ export function useArrastreGlobo(reducedMotionRef: { current: boolean }, onToque
         estado.rotY += IMPULSO_TECLADO
         break
       case 'ArrowUp':
-        estado.rotX = Math.max(-LIMITE_INCLINACION, estado.rotX - IMPULSO_TECLADO)
+        estado.rotX -= IMPULSO_TECLADO
         break
       case 'ArrowDown':
-        estado.rotX = Math.min(LIMITE_INCLINACION, estado.rotX + IMPULSO_TECLADO)
+        estado.rotX += IMPULSO_TECLADO
         break
       default:
         return
@@ -180,7 +182,7 @@ export function useArrastreGlobo(reducedMotionRef: { current: boolean }, onToque
       estado.rotY += AUTO_GIRO_Y * dt
     } else {
       estado.rotY += estado.velY
-      estado.rotX = Math.max(-LIMITE_INCLINACION, Math.min(LIMITE_INCLINACION, estado.rotX + estado.velX))
+      estado.rotX += estado.velX
     }
   }, [reducedMotionRef])
 

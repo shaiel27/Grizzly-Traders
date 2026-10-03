@@ -44,10 +44,14 @@ interface TarjetaActivoProps {
   locale: Locale
   cotizacion: { precio: number; cambio: number | null } | undefined
   posicionRef: MutableRefObject<PosicionPin>
+  // false cuando el pin se abrio por hover: mover el foco ahi solo porque el mouse paso por
+  // encima le robaria el foco a quien este navegando con teclado en otra parte de la pagina.
+  autoenfocar: boolean
+  onHover: (sobre: boolean) => void
   onCerrar: () => void
 }
 
-export function TarjetaActivo({ marcador, locale, cotizacion, posicionRef, onCerrar }: TarjetaActivoProps) {
+export function TarjetaActivo({ marcador, locale, cotizacion, posicionRef, autoenfocar, onHover, onCerrar }: TarjetaActivoProps) {
   const dict = getDictionary(locale)
   const divRef = useRef<HTMLDivElement>(null)
   const primerEnlaceRef = useRef<HTMLAnchorElement>(null)
@@ -95,8 +99,8 @@ export function TarjetaActivo({ marcador, locale, cotizacion, posicionRef, onCer
   }, [marcador.simbolo, locale])
 
   useEffect(() => {
-    primerEnlaceRef.current?.focus({ preventScroll: true })
-  }, [])
+    if (autoenfocar) primerEnlaceRef.current?.focus({ preventScroll: true })
+  }, [autoenfocar])
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -122,6 +126,8 @@ export function TarjetaActivo({ marcador, locale, cotizacion, posicionRef, onCer
       ref={divRef}
       role="dialog"
       aria-label={nombre}
+      onPointerEnter={() => onHover(true)}
+      onPointerLeave={() => onHover(false)}
       className="absolute left-0 top-0 z-20 w-[260px] -translate-x-1/2 rounded-2xl border border-accent-cyan/30 bg-[rgba(5,12,20,0.88)] p-4 opacity-0 backdrop-blur-md transition-opacity duration-200"
       style={{ boxShadow: '0 0 40px rgba(79,195,255,0.15)' }}
     >
