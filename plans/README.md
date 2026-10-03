@@ -13,6 +13,7 @@ see the plan file itself for exact values; this file only tracks order and statu
 | [006](006-home-globo-holografico.md) | Hero de la home con globo 3D holográfico interactivo | N/A | DONE (ver nota de verificación en el plan — falta revisión visual en navegador) |
 | [007](007-globo-carga-fondo-y-calidad.md) | Prompt: carga del globo, fondo animado y calidad visual | HIGH | PROMPT |
 | [008](008-home-starfield-tarjetas-anchor.md) | Estabilidad del globo + fondo estrellado + tarjetas estilo "Anchor AI" | N/A | DONE |
+| [009](009-globo-activos-sesiones-sentimiento.md) | Globo vivo: pines de activos, sesiones de mercado y heatmap de sentimiento | N/A | PLAN |
 
 ## Execution order
 
