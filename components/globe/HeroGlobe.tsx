@@ -4,6 +4,8 @@ import dynamic from 'next/dynamic'
 import { Component, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { DatosGlobo } from './GloboHolografico'
+import type { Locale } from '@/lib/i18n/get-dictionary'
+import type { EstadoSesion } from '@/lib/globe/sesiones'
 
 // ssr:false solo es valido dentro de un Client Component (confirmado en
 // node_modules/next/dist/docs/01-app/02-guides/lazy-loading.md) — por eso este archivo
@@ -40,10 +42,12 @@ class LimiteErrorGlobo extends Component<{ children: ReactNode; fallback: ReactN
 interface HeroGlobeProps {
   datos: DatosGlobo
   ariaLabel: string
+  locale: Locale
+  estadosSesion: EstadoSesion[]
   onReady?: () => void
 }
 
-export function HeroGlobe({ datos, ariaLabel, onReady }: HeroGlobeProps) {
+export function HeroGlobe({ datos, ariaLabel, locale, estadosSesion, onReady }: HeroGlobeProps) {
   const [reducedMotion, setReducedMotion] = useState(false)
   const [soportaWebgl, setSoportaWebgl] = useState(true)
   const avisado = useRef(false)
@@ -94,6 +98,8 @@ export function HeroGlobe({ datos, ariaLabel, onReady }: HeroGlobeProps) {
         datos={datos}
         reducedMotion={reducedMotion}
         ariaLabel={ariaLabel}
+        locale={locale}
+        estadosSesion={estadosSesion}
         onReady={avisarListo}
         onContextLost={() => setSoportaWebgl(false)}
       />

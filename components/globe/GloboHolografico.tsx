@@ -1,6 +1,7 @@
 'use client'
 
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { clsx } from 'clsx'
 import * as THREE from 'three'
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber'
 import { PerformanceMonitor } from '@react-three/drei'
@@ -15,6 +16,12 @@ import {
 } from './shaders'
 import { extraerImageData, muestrearPuntosTierra } from './muestrearTierra'
 import { useArrastreGlobo, type EstadoArrastreGlobo } from './useArrastreGlobo'
+import { PinesActivos } from './PinesActivos'
+import { TarjetaActivo, precargarNoticias, type PosicionPin } from './TarjetaActivo'
+import { NodosSesion } from './NodosSesion'
+import { MARCADORES } from '@/lib/globe/marcadores'
+import type { EstadoSesion } from '@/lib/globe/sesiones'
+import { getDictionary, type Locale } from '@/lib/i18n/get-dictionary'
 import type { MutableRefObject } from 'react'
 
 const UP = new THREE.Vector3(0, 1, 0)
@@ -31,12 +38,20 @@ export interface DatosGlobo {
   assets: number
   etiquetaNoticias: string
   etiquetaActivos: string
+  // Precio + variacion del dia por simbolo, para las tarjetas emergentes de los pines (plan 009
+  // §1.4) — ya calculado en page.tsx/HomeHero.tsx con datos del ticker ya cacheado.
+  cotizacionesPines: Record<string, { precio: number; cambio: number | null }>
 }
 
 interface GloboHolograficoProps {
   datos: DatosGlobo
   reducedMotion: boolean
   ariaLabel: string
+  locale: Locale
+  // El chip de riesgo global (plan 009 §3) se muestra en LeyendaGlobo.tsx, fuera del canvas —
+  // este componente solo necesita el estado de sesiones, para los nodos 3D que giran con el
+  // globo (estadosSesion abajo).
+  estadosSesion: EstadoSesion[]
   onReady?: () => void
   onContextLost?: () => void
 }
@@ -265,16 +280,57 @@ interface EscenaProps {
   onReady?: () => void
   estadoArrastreRef: MutableRefObject<EstadoArrastreGlobo>
   stepArrastre: (dt: number) => void
+  hitsRef: MutableRefObject<Map<string, THREE.Object3D>>
+  toqueClienteRef: MutableRefObject<{ x: number; y: number } | null>
+  hoverClienteRef: MutableRefObject<{ x: number; y: number } | null>
+  seleccionId: string | null
+  resaltadoId: string | null
+  onSeleccionar: (id: string | null) => void
+  onResaltar: (id: string | null) => void
+  posicionPinRef: MutableRefObject<PosicionPin>
+  registrarHit: (id: string, obj: THREE.Object3D | null) => void
+  estadosSesion: EstadoSesion[]
 }
 
-function Escena({ datos, reducedMotion, calidadAlta, onReady, estadoArrastreRef, stepArrastre }: EscenaProps) {
+function Escena({
+  datos,
+  reducedMotion,
+  estadosSesion,
+  calidadAlta,
+  onReady,
+  estadoArrastreRef,
+  stepArrastre,
+  hitsRef,
+  toqueClienteRef,
+  hoverClienteRef,
+  seleccionId,
+  resaltadoId,
+  onSeleccionar,
+  onResaltar,
+  posicionPinRef,
+  registrarHit,
+}: EscenaProps) {
   const grupoGlobo = useRef<THREE.Group>(null)
   const materialBase = useRef<THREE.ShaderMaterial>(null)
   const materialHolograma = useRef<THREE.ShaderMaterial>(null)
 
   const qY = useMemo(() => new THREE.Quaternion(), [])
   const qX = useMemo(() => new THREE.Quaternion(), [])
+  const ndcToque = useMemo(() => new THREE.Vector2(), [])
+  const posicionMundoPin = useMemo(() => new THREE.Vector3(), [])
   const avisoListo = useRef(false)
+
+  // Comparte el raycaster del frame actual contra el registro de pines — usado tanto para el
+  // tap (seleccion) como el hover (resaltado). Devuelve el id del pin mas cercano o null.
+  const raycastPin = (raycaster: THREE.Raycaster, camera: THREE.Camera, domElement: HTMLElement, clientX: number, clientY: number): string | null => {
+    const rect = domElement.getBoundingClientRect()
+    if (rect.width === 0 || rect.height === 0) return null
+    ndcToque.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1)
+    raycaster.setFromCamera(ndcToque, camera)
+    const objetos = Array.from(hitsRef.current.values())
+    const hits = raycaster.intersectObjects(objetos, false)
+    return hits.length > 0 ? ((hits[0].object.userData.id as string | undefined) ?? null) : null
+  }
 
   const anillos = useMemo<ConfigAnillo[]>(
     () => [
@@ -323,6 +379,38 @@ function Escena({ datos, reducedMotion, calidadAlta, onReady, estadoArrastreRef,
       grupoGlobo.current.quaternion.copy(qX).multiply(qY)
       grupoGlobo.current.scale.setScalar(escalaGlobo)
     }
+
+    // Tap: se consume una sola vez. Tocar un pin lo selecciona; tocar el globo en cualquier
+    // otro lado cierra la tarjeta que estuviera abierta (plan 009 §1.3).
+    if (toqueClienteRef.current) {
+      const { x, y } = toqueClienteRef.current
+      toqueClienteRef.current = null
+      onSeleccionar(raycastPin(state.raycaster, state.camera, state.gl.domElement, x, y))
+    }
+
+    // Hover (solo cuando no se esta arrastrando — mientras se arrastra, cualquier pin bajo el
+    // dedo es incidental, no una intencion de mirarlo).
+    if (!estadoArrastreRef.current.arrastrando) {
+      const puntero = hoverClienteRef.current
+      onResaltar(puntero ? raycastPin(state.raycaster, state.camera, state.gl.domElement, puntero.x, puntero.y) : null)
+    }
+
+    // Posicion en pantalla del pin seleccionado, para la tarjeta HTML (fuera del canvas) que la
+    // lee por su cuenta en TarjetaActivo.tsx — se corre a traves de un ref, sin setState.
+    if (seleccionId) {
+      const obj = hitsRef.current.get(seleccionId)
+      if (obj) {
+        obj.getWorldPosition(posicionMundoPin)
+        const dot = posicionMundoPin.clone().normalize().dot(state.camera.position.clone().normalize())
+        const proyeccion = posicionMundoPin.clone().project(state.camera)
+        const rect = state.gl.domElement.getBoundingClientRect()
+        posicionPinRef.current.x = (proyeccion.x * 0.5 + 0.5) * rect.width
+        posicionPinRef.current.y = (1 - (proyeccion.y * 0.5 + 0.5)) * rect.height
+        posicionPinRef.current.visible = dot > -0.1 && proyeccion.z < 1
+      } else {
+        posicionPinRef.current.visible = false
+      }
+    }
   })
 
   return (
@@ -358,6 +446,12 @@ function Escena({ datos, reducedMotion, calidadAlta, onReady, estadoArrastreRef,
         <Suspense fallback={null}>
           <PuntosTierraCapa urlMascara="/globo/tierra-mascara-2048.png" calidadAlta={calidadAlta} />
         </Suspense>
+
+        {/* Pines de activos: hijos de grupoGlobo para que giren con el planeta (plan 009 §1.2). */}
+        <PinesActivos seleccionId={seleccionId} resaltadoId={resaltadoId} registrarHit={registrarHit} />
+
+        {/* Nodos de sesion: mismo motivo, giran con el planeta (plan 009 §2.2). */}
+        <NodosSesion estados={estadosSesion} />
       </group>
 
       {anillos.map((config) => (
@@ -412,7 +506,8 @@ function AjusteDpr({ alta }: { alta: boolean }) {
   return null
 }
 
-export default function GloboHolografico({ datos, reducedMotion, ariaLabel, onReady, onContextLost }: GloboHolograficoProps) {
+export default function GloboHolografico({ datos, reducedMotion, ariaLabel, locale, estadosSesion, onReady, onContextLost }: GloboHolograficoProps) {
+  const dict = getDictionary(locale)
   const contenedorRef = useRef<HTMLDivElement>(null)
   const visible = useFrameloopVisible(contenedorRef)
   const [calidadAlta, setCalidadAlta] = useState(true)
@@ -420,9 +515,58 @@ export default function GloboHolografico({ datos, reducedMotion, ariaLabel, onRe
   useEffect(() => {
     reducedMotionRef.current = reducedMotion
   }, [reducedMotion])
+
+  // Pines de activos (plan 009 §1): registro de los objetos 3D para el raycast, posiciones de
+  // toque/hover pendientes (se consumen dentro del useFrame de Escena) y la posicion en
+  // pantalla del pin seleccionado (la lee TarjetaActivo.tsx, fuera del canvas, con su propio
+  // rAF — ver el comentario ahi). Todo en refs: nada de esto debe re-renderizar 60 veces/s.
+  const hitsRef = useRef(new Map<string, THREE.Object3D>())
+  const toqueClienteRef = useRef<{ x: number; y: number } | null>(null)
+  const hoverClienteRef = useRef<{ x: number; y: number } | null>(null)
+  const posicionPinRef = useRef<PosicionPin>({ x: 0, y: 0, visible: false })
+  const [seleccionId, setSeleccionId] = useState<string | null>(null)
+  const [resaltadoId, setResaltadoId] = useState<string | null>(null)
+
+  const registrarHit = useCallback((id: string, obj: THREE.Object3D | null) => {
+    if (obj) hitsRef.current.set(id, obj)
+    else hitsRef.current.delete(id)
+  }, [])
+
+  const onToque = useCallback((x: number, y: number) => {
+    toqueClienteRef.current = { x, y }
+  }, [])
+
   // Una sola instancia: el div de abajo recibe los Pointer Events y actualiza `estadoRef`;
   // `Escena`, dentro del Canvas, lee ese mismo `estadoRef` en su useFrame para rotar el grupo.
-  const arrastre = useArrastreGlobo(reducedMotionRef)
+  const arrastre = useArrastreGlobo(reducedMotionRef, onToque)
+
+  // Mientras hay una tarjeta abierta, el auto-giro se congela (useArrastreGlobo.ts ya respeta
+  // estado.pausado). Volver a arrastrar retoma el control normal y cierra la tarjeta (abajo).
+  useEffect(() => {
+    arrastre.setPausado(seleccionId !== null)
+  }, [seleccionId, arrastre])
+
+  // Precarga las noticias del pin apenas se resalta (hover) — para cuando el usuario de verdad
+  // lo toca/clickea, probablemente ya este la respuesta.
+  useEffect(() => {
+    if (!resaltadoId) return
+    const marcador = MARCADORES.find((m) => m.id === resaltadoId)
+    if (marcador) precargarNoticias(marcador.simbolo, locale)
+  }, [resaltadoId, locale])
+
+  // Sin useCallback: no hay un hijo memoizado que necesite que esta referencia sea estable, y
+  // envolverla disparaba react-hooks/preserve-manual-memoization (lee estadoRef.current dentro
+  // del callback, el compilador no puede verificar que [arrastre] alcance como dependencia).
+  const onPointerMoveZona = (e: React.PointerEvent<HTMLDivElement>) => {
+    arrastre.handlers.onPointerMove(e)
+    hoverClienteRef.current = arrastre.estadoRef.current.arrastrando ? null : { x: e.clientX, y: e.clientY }
+  }
+  const onPointerLeaveZona = () => {
+    hoverClienteRef.current = null
+  }
+
+  const marcadorSeleccionado = seleccionId ? MARCADORES.find((m) => m.id === seleccionId) : undefined
+  const cerrarTarjeta = useCallback(() => setSeleccionId(null), [])
 
   return (
     <div ref={contenedorRef} className="relative h-full w-full">
@@ -470,6 +614,16 @@ export default function GloboHolografico({ datos, reducedMotion, ariaLabel, onRe
           onReady={onReady}
           estadoArrastreRef={arrastre.estadoRef}
           stepArrastre={arrastre.step}
+          hitsRef={hitsRef}
+          toqueClienteRef={toqueClienteRef}
+          hoverClienteRef={hoverClienteRef}
+          seleccionId={seleccionId}
+          resaltadoId={resaltadoId}
+          onSeleccionar={setSeleccionId}
+          onResaltar={setResaltadoId}
+          posicionPinRef={posicionPinRef}
+          registrarHit={registrarHit}
+          estadosSesion={estadosSesion}
         />
         {/* Montado siempre, sin gate condicional: montar/desmontar el EffectComposer en
             runtime pisa el manejo interno de gl.autoClear de la libreria en la transicion
@@ -489,17 +643,49 @@ export default function GloboHolografico({ datos, reducedMotion, ariaLabel, onRe
       {/* Zona de arrastre: solo el circulo del globo, no todo el canvas, para que el scroll
           tactil fuera de el siga funcionando. */}
       <div
-        className="absolute left-1/2 top-1/2 size-[72%] -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none rounded-full outline-none active:cursor-grabbing"
+        className={clsx(
+          'absolute left-1/2 top-1/2 size-[72%] -translate-x-1/2 -translate-y-1/2 touch-none rounded-full outline-none active:cursor-grabbing',
+          resaltadoId ? 'cursor-pointer' : 'cursor-grab'
+        )}
         style={{ touchAction: 'none' }}
         tabIndex={0}
         role="img"
         aria-label={ariaLabel}
         onPointerDown={arrastre.handlers.onPointerDown}
-        onPointerMove={arrastre.handlers.onPointerMove}
+        onPointerMove={onPointerMoveZona}
         onPointerUp={arrastre.handlers.onPointerUp}
         onPointerCancel={arrastre.handlers.onPointerCancel}
+        onPointerLeave={onPointerLeaveZona}
         onKeyDown={arrastre.handlers.onKeyDown}
       />
+
+      {/* Lista accesible por teclado: Tab llega a cada pin aunque no se pueda arrastrar/tocar
+          con el mouse (plan 009 §1.3). Invisible hasta recibir foco, mismo patron que el
+          "saltar al contenido" del header. */}
+      <ul className="sr-only">
+        {MARCADORES.map((m) => (
+          <li key={m.id}>
+            <button
+              type="button"
+              className="focus:not-sr-only focus:absolute focus:left-1/2 focus:top-1/2 focus:z-30 focus:-translate-x-1/2 focus:-translate-y-1/2 focus:rounded-full focus:bg-accent-cyan focus:px-3 focus:py-1.5 focus:text-micro focus:font-semibold focus:text-canvas"
+              onClick={() => setSeleccionId(m.id)}
+            >
+              {dict.home.globoMarcadores[m.nombreClave as keyof typeof dict.home.globoMarcadores] ?? m.simbolo}
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      {marcadorSeleccionado && (
+        <TarjetaActivo
+          key={marcadorSeleccionado.id}
+          marcador={marcadorSeleccionado}
+          locale={locale}
+          cotizacion={datos.cotizacionesPines[marcadorSeleccionado.simbolo]}
+          posicionRef={posicionPinRef}
+          onCerrar={cerrarTarjeta}
+        />
+      )}
     </div>
   )
 }
