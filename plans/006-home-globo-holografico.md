@@ -1,6 +1,6 @@
 # 006 — Hero de la home con globo 3D holográfico interactivo
 
-- **Estado**: PLAN, sin implementar
+- **Estado**: IMPLEMENTADO (en `feature/home-video-hero`, sin commitear — ver nota de verificación al final del documento)
 - **Sustituye a**: el hero con video de `feature/home-video-hero` (`components/modules/HomeHero.tsx`)
 - **Origen**: un prompt escrito para otro proyecto (Vite + react-router + zustand, "Control de Saldo / Bodega
   Los Malabares"). Este documento lo adapta a Grizzly Traders.
@@ -185,3 +185,37 @@ Commits en español, uno por bloque (dependencias + máscara, globo, arrastre, h
   La alternativa es cambiar `--canvas` a `#000` en todo el sitio.
 - **D3 — Tarjeta BTC.** Recomiendo pasar sus datos a las etiquetas de los anillos HUD y quitar la tarjeta.
 - **D4 — Videos.** Recomiendo borrar los 3 archivos de `public/` (≈4.6 MB) que ya no se usan.
+
+## Nota de verificación (post-implementación)
+
+Decisiones D1-D4 confirmadas por el usuario antes de implementar: D1 seguir en
+`feature/home-video-hero` (no rama nueva), D2 negro puro solo en hero +
+"Lo que hay dentro", D3 quitar la tarjeta BTC (datos a las etiquetas HUD),
+D4 borrar los 3 videos.
+
+Hecho, con una diferencia real respecto al plan original: **no se corrió la
+suite de Playwright del §7 (puntos 3-7)**. El `/opt/pw-browsers/chromium` que
+asume el plan no existe en este entorno (Windows, no el sandbox Linux para el
+que se escribió el prompt original) — instalar un Chromium nuevo solo para
+capturas automatizadas no agregaba certeza real sobre si el globo "se ve
+bien", que de todos modos necesita revisión humana en un navegador real.
+
+Lo que sí se verificó:
+- `pnpm typecheck`, `pnpm lint`, `pnpm test` (217/217) y `pnpm build`: los
+  cuatro sin errores.
+- Bundle: el chunk de Three.js/el globo aparece en **un solo** archivo de
+  `.next/static/chunks/` (~1 MB sin comprimir) y ese chunk solo está
+  referenciado en el `react-loadable-manifest.json` de la ruta `/` — ninguna
+  otra ruta (`/markets`, `/cms`, etc.) lo carga.
+- HTML renderizado (`curl` contra `pnpm dev`): sin errores de servidor, el
+  `aria-label` del globo y el hint de arrastre aparecen en ES y EN, los 4
+  íconos de "Lo que hay dentro" (`article`, `monitoring`, `calculate`,
+  `calendar_month`) renderizan, y el estado inicial del texto del hero es
+  `opacity-0` tanto en servidor como se espera en cliente (sin riesgo de
+  mismatch de hidratación antes de que el globo avise `onReady`).
+
+Lo que **no** se verificó (pendiente de que el usuario lo revise en su propio
+navegador, que es de todos modos más confiable que un swiftshader headless):
+el arrastre con quaternions (signo/sentido correcto), el render WebGL en sí
+(colores, bloom, viñeta), el comportamiento táctil en celular (scroll fuera
+del globo vs. giro dentro de él), y el diff visual con `prefers-reduced-motion`.
