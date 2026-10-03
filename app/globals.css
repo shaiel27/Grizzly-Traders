@@ -33,6 +33,10 @@
   --surface-variant: #353534;
   /* Brand accent reserved for VIP/premium callouts — kept out of the main semantic palette on purpose */
   --brand-amber: #f7b955;
+  /* Acento del hero del globo holografico — scoped a esa seccion y a "Lo que hay dentro"
+     (ver plan 006, decision D2); el resto del sitio sigue usando --accent-blue. */
+  --accent-cyan: #4fc3ff;
+  --accent-cyan-glow: rgba(79, 195, 255, 0.25);
   /* Ticker (32px) + identity row (64px); the command strip (40px) only exists from md up */
   --header-height: 96px;
   --header-scroll-offset: 116px;
@@ -83,6 +87,7 @@
   --color-outline-variant: var(--outline-variant);
   --color-surface-variant: var(--surface-variant);
   --color-brand-amber: var(--brand-amber);
+  --color-accent-cyan: var(--accent-cyan);
   --font-sans: var(--font-inter), "Inter", system-ui, sans-serif;
   --font-serif: var(--font-source-serif), "Source Serif 4", Georgia, "Times New Roman", serif;
   --radius-sm: 0.5rem;
@@ -95,6 +100,10 @@
 @layer base {
   html {
     font-family: var(--font-sans);
+    /* "Ver más" en el hero del globo hace scroll a #lo-que-hay-dentro con un <a href="#...">
+       nativo; ya cubierto por el bloque global de prefers-reduced-motion mas abajo
+       (scroll-behavior: auto !important). */
+    scroll-behavior: smooth;
   }
   body {
     background: var(--canvas);
@@ -254,6 +263,26 @@
 .hero-fade-down { opacity: 0; animation: heroFadeDown 0.5s var(--ease-hero-entrance) forwards; }
 .hero-fade-scale { opacity: 0; animation: heroFadeScale 0.6s var(--ease-hero-entrance) forwards; }
 .hero-bar-grow { opacity: 0; transform-origin: bottom; animation: heroBarGrow 0.42s var(--ease-hero-entrance) forwards; }
+
+/* Fondo ambiental de la seccion del globo: dos glows lejos de el, en las esquinas — el campo de
+   estrellas en si vive dentro del Canvas de Three.js (components/globe/GloboHolografico.tsx,
+   <CampoEstrellas>), no aca. Esto solo evita que el negro fuera del canvas (bordes en mobile)
+   quede plano. */
+@keyframes heroGlowDriftA { 0%, 100% { opacity: 0.25; transform: translate(0, 0); } 50% { opacity: 0.4; transform: translate(3%, 2%); } }
+@keyframes heroGlowDriftB { 0%, 100% { opacity: 0.2; transform: translate(0, 0); } 50% { opacity: 0.32; transform: translate(-3%, -2%); } }
+
+.hero-glow-a { animation: heroGlowDriftA 22s var(--ease-in-out) infinite; }
+.hero-glow-b { animation: heroGlowDriftB 26s var(--ease-in-out) infinite; }
+
+/* Tarjetas de "Lo que hay dentro": una franja cian corta recorre el borde inferior en bucle
+   continuo (no solo al pasar el mouse) — un detalle vivo en vez de un adorno estatico. */
+@keyframes featureCardShimmer { from { background-position: -60% 0; } to { background-position: 160% 0; } }
+.feature-card-shimmer {
+  background-image: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+  background-size: 60% 100%;
+  background-repeat: no-repeat;
+  animation: featureCardShimmer 5s linear infinite;
+}
 
 /* Home loading screen's minimal splash mark — a slow, continuous breathe. Reduced
    motion is already handled by the global catch-all below (it matches `*`), so no
