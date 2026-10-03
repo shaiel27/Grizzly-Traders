@@ -1,9 +1,17 @@
-# 009: Globo vivo. Mapa de activos, sesiones de mercado y sentimiento
+# 009: Globo vivo y rediseño del portal de inicio
 
 - **Estado**: PLAN, sin implementar
 - **Base**: el globo que ya está en `feature/home-video-hero` (`components/globe/*`, planes 006–008)
-- **Objetivo**: que el globo deje de ser decorativo y muestre datos reales: dónde están los activos, qué mercados
-  están abiertos ahora y si el día es "risk-on" o "risk-off".
+- **Objetivo**:
+  - **Parte A (§1–7)**: que el globo deje de ser decorativo y muestre datos reales: dónde están los activos, qué
+    mercados están abiertos ahora y si el día es "risk-on" o "risk-off".
+  - **Parte B (§8–14)**: mejoras de todo el portal de inicio y corrección de bugs:
+    - transición difuminada entre el hero y la siguiente sección;
+    - fondo y estrellas animados en la sección del globo;
+    - rediseño de las 4 tarjetas;
+    - scroll suave de "Ver más" sin que el destino quede bajo el header;
+    - rediseño de las tarjetas "Pivot Points Diarios" y "VIP Terminal Ultra Algo";
+    - otros bugs encontrados al revisar el código.
 
 ## 0. Lo que ya existe y condiciona el diseño
 
@@ -237,6 +245,225 @@ lib/i18n/dictionaries/{es,en}.json   textos nuevos
 - Mostrarme las capturas: sesión asiática vs Londres/NY, tarjeta del oro abierta (escritorio y móvil) y heatmap en
   risk-on y en risk-off.
 
+---
+
+# Parte B: Mejoras del portal de inicio y corrección de bugs
+
+Revisado sobre `components/modules/HomeHero.tsx`, `components/modules/HomeFeatures.tsx`, `app/(site)/page.tsx`,
+`components/ui/Header.tsx`, `components/globe/GloboHolografico.tsx` y `app/globals.css` (commit `d055d54`).
+
+## 8. Bugs encontrados (causa → corrección)
+
+| # | Bug | Causa en el código | Corrección |
+|---|---|---|---|
+| B1 | **"Ver más" salta de golpe** en vez de desplazarse | Es un `<a href="#lo-que-hay-dentro">` que depende de `html { scroll-behavior: smooth }`. El bloque global de `prefers-reduced-motion` (globals.css) lo convierte en `scroll-behavior: auto !important`. **Windows con "efectos de animación" desactivados reporta `reduce`**: el propio globals.css lo advierte junto al ticker. En esas máquinas el salto siempre es instantáneo. | Scroll animado en JS (§9), independiente de `scroll-behavior` del CSS. |
+| B2 | **Después de "Ver más", el destino queda bajo el header** | `--header-height` está fijo en 136 px (md+) y `--header-scroll-offset` en 156 px, pero el header real mide 32 (ticker) + 64 + 40 + **3 bordes de 1 px** = 139 px, y crece más con zoom del navegador, fuentes del sistema más grandes o el menú móvil abierto. Además, el destino es el `div` de la cuadrícula, sin aire arriba. | Medir el header real (§9.1) y calcular el destino con ese valor. |
+| B3 | **El título del hero queda cortado bajo el header** (visto en las capturas) | Es la misma causa que B2: `mt-[var(--header-height)]` usa el valor fijo, no la altura real. | §9.1 corrige ambos. |
+| B4 | **Las estrellas acaban en un cuadrado** | `<CampoEstrellas>` vive dentro del `<Canvas>` del globo, que es una caja cuadrada de como máximo 780 px. Fuera de ella, la sección es negro plano y en pantallas anchas se nota el borde del campo de estrellas. Además gira a 0.004 rad/s, imperceptible: "no están animadas". | Llevar el fondo a una capa de toda la sección (§10). |
+| B5 | **Corte brusco entre el hero (#000) y el resto de la home (`--canvas` #090909)** | La sección termina en `bg-black` y `<main>` empieza en `canvas`, sin transición. | Difuminado inferior (§10.4). |
+| B6 | **Texto y globo se solapan en portátiles de 1280–1366 px** | El texto es `lg:absolute` con `max-w-2xl` desde la izquierda, y el globo `lg:absolute` en `left-[60%]` con ancho `min(82vh,780px)`. A 1280×720 el globo empieza en ~x=508 y el texto llega a ~x=712. | Grid de 2 columnas en vez de dos `absolute` (§11.1). |
+| B7 | **La tarjeta de Pivot Points tiene el adorno de la derecha desalineado** | `className="hidden lg:block … flex items-center justify-center"`: `lg:block` anula el `flex`, así que el contenido no se centra. | Se resuelve con el rediseño (§12.1). |
+| B8 | **La tarjeta VIP dice "Actualización de precios: cada 30 s"** | El ticker consulta `/api/ticker` cada **3 s** con un TTL de 2 s (lib/ticker.ts), así que el dato es falso. Además "el portal en cifras" muestra una sola cifra. | Usar cifras reales calculadas en el servidor (§12.2). |
+| B9 | **Textos en inglés dentro de `es.json`** | `vipCta` y `vipJoin` dicen "Join VIP Terminal" también en español, igual que el botón del header. | Traducirlos ("Unirse al VIP Terminal") y revisar el resto con un test que marque los valores idénticos en es y en, con lista blanca para nombres propios. |
+| B10 | **La tarjeta VIP puede quedarse sin ningún botón** | Si `NEXT_PUBLIC_VIP_URL` y `NEXT_PUBLIC_TELEGRAM_URL` están vacías, la tarjeta se muestra sin acción. | Fallback a la suscripción del newsletter (`NewsletterForm`, que ya existe) u ocultar la sección. |
+| B11 | **Recargar con `#lo-que-hay-dentro` en la URL abre la home a mitad del hero**, con el globo fuera de pantalla y la entrada a medias | El ancla deja el hash en la URL. | §9: el botón no deja el hash (`history.replaceState`), aunque el enlace sigue funcionando sin JS. |
+| B12 | **El globo se escala con el scroll y vuelve a escalar en cada `resize`** | El efecto del scroll lee `window.innerHeight`, que en móvil cambia al mostrar/ocultar la barra del navegador y produce saltos. | Usar `visualViewport` o un alto fijado al montar, y actualizarlo solo si el ancho cambia. |
+
+Antes de corregir cada bug, se reproduce con Playwright (§14) para dejar constancia de la causa.
+
+## 9. "Ver más": desplazamiento suave y destino correcto
+
+### 9.1 Altura real del header (corrige B2 y B3)
+
+- En `components/ui/Header.tsx`, un `ResizeObserver` sobre el `<header>` escribe la altura medida en
+  `document.documentElement.style.setProperty('--header-h-real', px)`. Se actualiza al abrir/cerrar el menú
+  móvil, al cambiar de breakpoint y con zoom.
+- En `globals.css`, el hero y `scroll-margin` usan `var(--header-h-real, var(--header-height))`, así el valor fijo
+  queda solo como respaldo antes de hidratar. `--header-scroll-offset` pasa a ser
+  `calc(var(--header-h-real, var(--header-height)) + 24px)`.
+- Además, `html { scroll-padding-top: var(--header-scroll-offset) }`, para que cualquier ancla del sitio (no solo esta)
+  respete el header.
+
+### 9.2 Scroll animado: `lib/scroll.ts` → `scrollSuaveA(elemento, { duracion, offset })`
+
+- `requestAnimationFrame` con easing `--ease-in-out` (cubic-bezier 0.77,0,0.175,1, implementado en JS). La duración
+  es proporcional a la distancia: `clamp(450, distancia * 0.6, 900)` ms.
+- Destino: `elemento.getBoundingClientRect().top + scrollY - alturaHeaderReal - 24`. **Se recalcula en cada frame**,
+  porque el globo se encoge con el scroll y las tarjetas entran con animación. Así no se pasa ni se queda corto.
+- Se cancela si el usuario toca la rueda, la pantalla o una tecla (`wheel`, `touchstart` y `keydown` con
+  `{ once: true }`), para no pelear con él.
+- Al terminar, el foco va al primer elemento de las tarjetas (`focus({ preventScroll: true })`) para teclado y lector
+  de pantalla, y se usa `history.replaceState` sin hash (B11).
+- **Movimiento reducido**: la animación pasa a 250 ms con easing suave, en vez de un salto, porque un salto
+  instantáneo desorienta más que un desplazamiento corto. Ver la decisión D5.
+- El botón sigue siendo `<a href="#lo-que-hay-dentro">` y el `onClick` hace `preventDefault()` + `scrollSuaveA`.
+  Sin JS, el ancla funciona igual.
+
+### 9.3 Mientras se desplaza
+
+- Mientras dura el desplazamiento, el `IntersectionObserver` de las tarjetas no debe dispararlas a medias: se
+  revelan cuando el scroll termina, o al 60 % del recorrido, para que se vea la entrada escalonada.
+- El globo pasa a `frameloop="demand"` durante el scroll programático, para liberar GPU y que el scroll vaya a 60 fps.
+
+## 10. Fondo de la sección del globo y estrellas animadas (corrige B4 y B5)
+
+Las estrellas salen del `<Canvas>` del globo y pasan a una capa de toda la sección. Es la versión acotada del
+fondo del plan 007 §3, a la que se suma el campo de estrellas.
+
+### 10.1 `components/globe/FondoHero.tsx`: un canvas 2D a pantalla completa de la sección
+
+- `absolute inset-0 -z-10`, `pointer-events: none`, `dpr` como máximo 1.5.
+- **Estrellas en 3 capas de profundidad** (lejos/medio/cerca): 120/60/25 en escritorio y la mitad en móvil. Tamaños
+  de 0.6, 1 y 1.6 px, en blanco y en `#7fd4ff`.
+  - **Titileo**: cada estrella tiene su fase y su periodo (2–6 s) y su opacidad oscila entre 0.2 y 1.
+  - **Deriva lenta** hacia la izquierda, más rápida cuanto más cerca está la capa (parallax): 2, 5 y 9 px/s.
+  - **Parallax con el puntero y con el arrastre del globo** (como máximo 6, 12 y 20 px por capa). Comparte el estado
+    de `useArrastreGlobo` a través de un ref.
+  - **Estrella fugaz** ocasional: una cada 8–15 s, una línea con estela cian de 300 ms, nunca sobre el texto.
+- **Polvo de datos**, opcional y del plan 007: unas pocas velas y una curva tenue con los colores del sitio, a menos
+  del 10 % de opacidad. Si recarga visualmente, se descarta.
+- Se pausa con `IntersectionObserver` y con `document.hidden`. PRNG con semilla, nada de `Math.random()` en el render.
+- `prefers-reduced-motion`: un único frame estático, sin titileo ni deriva.
+
+### 10.2 Quitar `<CampoEstrellas>` del canvas del globo
+
+El canvas vuelve a dibujar solo el globo. Se ahorran 2200 puntos más el bloom sobre ellos.
+
+### 10.3 Resplandores
+
+Los 2 glows de esquina (`hero-glow-a/b`) se conservan. Se añade un halo cian muy suave detrás del globo, que se mueve
+con él (su escala con el scroll) y respira a la vez que la base holográfica.
+
+### 10.4 Difuminado hacia la siguiente sección
+
+- El último tramo de la sección, de 220 px en escritorio y 140 px en móvil, lleva un degradado
+  `linear-gradient(to bottom, transparent, var(--canvas))`. Va por encima del fondo y de las estrellas y por debajo
+  de las tarjetas.
+- Las estrellas y el polvo se desvanecen hacia abajo con `mask-image: linear-gradient(to bottom, black 70%, transparent)`,
+  para que no "choquen" con el borde.
+- El `<main>` siguiente empieza en `--canvas` sin borde ni margen que delate el corte.
+- Las esquinas superiores del hero siguen en negro puro (verificación del plan 006).
+
+## 11. Hero: maquetación
+
+### 11.1 Grid en vez de posiciones absolutas (corrige B6)
+
+- Desde `lg`: `grid grid-cols-[minmax(0,5fr)_minmax(0,6fr)] items-center gap-8` dentro de `max-w-[1320px] mx-auto`,
+  con una altura mínima de `calc(100svh - var(--header-h-real))`.
+- El globo queda en su columna con `aspect-square w-full max-w-[min(78vh,720px)] justify-self-center`.
+- En móvil se mantiene el apilado actual.
+- Se comprueba que no haya solapes a 1280×720, 1366×768, 1440×900, 1920×1080 y 390×844.
+
+### 11.2 Indicador de scroll
+
+Al pie del hero, un pequeño "mouse" o chevron que baja suavemente. Al hacer clic, hace lo mismo que "Ver más" y
+desaparece en cuanto `scrollY > 40`.
+
+## 12. Rediseño de las 4 tarjetas ("Lo que hay dentro")
+
+Objetivo: tarjetas que **muestren** lo que hay dentro en vez de describirlo. Cada una lleva una mini vista previa
+viva, con estilo bento moderno coherente con el holograma.
+
+### 12.1 Estructura
+
+- **Bento** en escritorio: 2 tarjetas grandes y 2 medianas (`grid-cols-6`, con spans 3/3/2/4 o 4/2/2/4), para que no
+  sean 4 cajas iguales. En tablet van 2×2 y en móvil en una columna, o en un carrusel horizontal con `scroll-snap`
+  (decisión D6).
+- Cada tarjeta tiene:
+  1. cabecera con ícono, título y una flecha `arrow_outward` que se desplaza en hover;
+  2. una **vista previa animada** que ocupa ~55 % de la altura;
+  3. la descripción breve actual.
+
+| Tarjeta | Vista previa (datos reales del servidor, sin pedidos extra) |
+|---|---|
+| Noticias verificadas | Los 3 últimos titulares (de los `latest` que `page.tsx` ya carga) rotan cada 4 s con una transición vertical, cada uno con su chip de sentimiento (▲/▼/●) y hora relativa. |
+| Terminal de mercados | Mini-sparkline SVG de BTC, oro y S&P 500 con su % del día (datos del `getTickerSnapshot()` ya cacheado). La línea se dibuja con `stroke-dashoffset` al entrar en pantalla. |
+| Puntos pivote | Una "escalera" R3…S3 de BTC con el precio actual marcado entre niveles. Se reutiliza `calculatePivots` (lib/pivots.ts) con datos de `getPivotQuotes('D')` (cacheado). |
+| Calendario económico | El próximo evento de alto impacto, con su cuenta atrás en vivo (hh:mm:ss) y la bandera del país (de `/api/economic-calendar`, cacheado; si falla, se oculta la vista previa). |
+
+### 12.2 Estilo
+
+- Fondo `rgba(255,255,255,0.025)` con un degradado radial cian muy tenue desde la esquina del ícono, y borde de 1 px
+  con **borde animado en hover**: un `conic-gradient` cian que gira dentro de una máscara de borde (técnica
+  `mask-composite: exclude`). Así se sustituye la franja `feature-card-shimmer` en bucle, que distrae cuando las 4
+  se mueven a la vez.
+- **Spotlight** que sigue al cursor: un radial-gradient de 220 px en la posición del mouse (variables CSS `--mx/--my`
+  escritas en `pointermove`, sin re-renders).
+- En hover: un leve tilt 3D (como máximo 4°, con `perspective`), la tarjeta sube 4 px y la vista previa se acelera
+  un poco.
+- Entrada: aparición escalonada (80 ms) al quedar visibles. Se conserva el `IntersectionObserver` actual, con el
+  ajuste de §9.3.
+- Se eliminan los números "01–04" de fondo: con las vistas previas sobran.
+- Accesibilidad: toda la tarjeta sigue siendo un solo `<Link>`. Las vistas previas llevan `aria-hidden`, salvo el
+  titular, que se lee. Hay foco visible con anillo cian y, con movimiento reducido, todo es estático.
+
+## 13. Tarjetas del final: "Pivot Points Diarios" y "VIP Terminal Ultra Algo"
+
+### 13.1 Pivot Points Diarios (corrige B7)
+
+- Panel de 2 columnas:
+  - **izquierda**: título, descripción, chips de los 5 métodos (Clásico, Fibonacci, Camarilla, Woodie, DeMark),
+    seleccionables;
+  - **derecha**: una **escalera de niveles en vivo** para un activo seleccionable (BTC, EUR/USD, XAU/USD) con
+    pestañas tipo segmento.
+- La escalera muestra R3…S3 en una regla vertical, el pivote P resaltado y **el precio actual como un marcador que
+  se desplaza** entre niveles. Al cambiar de método, los niveles se reacomodan con una transición de 300 ms.
+- Se reutiliza `components/ui/PivotLadder.tsx`, si su API lo permite, en una variante compacta. Los datos son
+  `getPivotQuotes('D')` (cacheado) más el precio del ticker.
+- CTA principal "Abrir Pivot Points" → `/pivot-points?activo=…` con el activo y el método elegidos.
+- Si los datos fallan, se muestra la escalera con un ejemplo estático y la etiqueta "ejemplo", nunca una caja vacía.
+
+### 13.2 VIP Terminal Ultra Algo (corrige B8, B9 y B10)
+
+- Estética "premium": borde con degradado ámbar→magenta animado (conic, 8 s por vuelta), fondo oscuro con un halo
+  ámbar (`--brand-amber`) muy suave y la insignia "VIP Terminal Ultra Algo" con un brillo que pasa una vez al entrar
+  en pantalla.
+- Columna izquierda: título, lead y **3 beneficios con ícono** (alertas en tiempo real, análisis con IA, comunidad
+  privada), en vez de un solo párrafo.
+- Columna derecha: un **"terminal" de muestra**, una ventana tipo consola con 3–4 líneas de alertas de ejemplo que se
+  escriben solas, con efecto de typing (por ejemplo `▲ XAU/USD rompe R1 · 2,401.3`) y la etiqueta "Ejemplo".
+  Sustituye a la tabla "el portal en cifras".
+- Si se quieren cifras, que sean reales (B8): noticias publicadas, activos cubiertos y fuentes, con los conteos que
+  `page.tsx` ya calcula.
+- CTAs: "Unirse al VIP Terminal" (texto traducido, B9) y Telegram. **Sin URLs configuradas** (B10), se muestra el
+  formulario del newsletter como alternativa.
+- Movimiento reducido: sin typing (las líneas aparecen completas) y sin borde girando.
+
+## 14. Verificación de la Parte B
+
+- `pnpm lint`, `pnpm typecheck`, `pnpm test` y `pnpm build` sin errores. Se añaden tests de `scrollSuaveA` (cálculo
+  del destino) y del chequeo de i18n (B9).
+- Playwright a 1280×720, 1366×768, 1440×900, 1920×1080 y 390×844 (`hasTouch`):
+  - **B1**: con `reducedMotion: 'no-preference'` **y** con `'reduce'`, clic en "Ver más" → registrar `scrollY` cada
+    frame. Debe haber ≥ 10 valores intermedios distintos (no un salto), terminar en ≤ 900 ms y sin hash en la URL.
+  - **B2/B3**: al terminar, `tarjetas.getBoundingClientRect().top >= header.getBoundingClientRect().bottom + 16`,
+    también con zoom 125 % (`deviceScaleFactor` + CSS zoom) y con el menú móvil abierto. El `top` del H1 está por
+    debajo del `bottom` del header.
+  - **B4**: en 1920×1080 hay estrellas en las 4 franjas laterales fuera de la caja del globo, y dos capturas separadas
+    1 s difieren en la zona de estrellas (están animadas). Con `reduce`, son idénticas.
+  - **B5**: la columna central de píxeles de los últimos 220 px del hero pasa de forma monótona de #000 a #090909, sin
+    saltos de más de 2 niveles por fila.
+  - **B6**: las cajas del texto y del globo no se intersecan en ninguna resolución.
+  - Las tarjetas muestran sus vistas previas con datos (o su fallback) y el spotlight y el tilt responden al hover.
+  - Pivot: cambiar el método modifica los valores de la escalera. VIP: sin variables de entorno de URLs aparece el
+    newsletter.
+  - No hay scroll horizontal en ninguna resolución. La consola no muestra errores.
+- Rendimiento: con el globo + el fondo + las tarjetas animadas, el *Performance trace* de Chrome a 1440×900 sostiene
+  ≥ 55 fps en scroll. Si no, se reduce el fondo primero.
+- Mostrar capturas antes/después de: el hero completo, la transición hero→contenido, las tarjetas, Pivot y VIP, y un
+  GIF o secuencia del scroll de "Ver más".
+
+## 15. Orden de implementación (todo el plan)
+
+1. **Bugs de base**: altura real del header (B2/B3), scroll suave (B1/B11), grid del hero (B6), viewport (B12). Es
+   lo que más se nota y desbloquea el resto.
+2. **Fondo de la sección**: estrellas fuera del canvas (B4) y difuminado (B5).
+3. **Rediseño de las 4 tarjetas**.
+4. **Pivot y VIP** (B7–B10).
+5. **Parte A**: orientación → sesiones → pines → tarjeta de activo → sentimiento (ver §6).
+
+Un commit por paso, mensajes en español y sin push sin confirmación.
+
 ## Decisiones abiertas
 
 - **D1 — Activos en la base de datos.** ¿Existen `BRENT`, `WTI` y los índices en la tabla `activos` y tienen
@@ -247,3 +474,10 @@ lib/i18n/dictionaries/{es,en}.json   textos nuevos
   pero menos "vivo".
 - **D3 — China y Australia.** Añadir `SSE` (o `HSI`) y `XJO` solo para el globo. Recomiendo `SSE` + `XJO`.
 - **D4 — Terminador día/noche.** Probarlo y quedarse con él solo si no compite con las sesiones.
+- **D5 — Scroll con movimiento reducido.** Recomiendo un desplazamiento corto (250 ms) en vez de un salto, porque
+  en Windows "reduce" suele estar activo sin que el usuario lo sepa. La alternativa estricta es un salto
+  instantáneo pero con el destino ya bien calculado (B2).
+- **D6 — Tarjetas en móvil.** Recomiendo una columna (más legible). La alternativa es un carrusel horizontal con
+  scroll-snap (más compacto).
+- **D7 — Terminal VIP de muestra.** Confirmar que se pueden mostrar alertas de ejemplo, etiquetadas como "Ejemplo",
+  o si se prefieren solo los beneficios.
