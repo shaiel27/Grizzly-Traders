@@ -207,11 +207,12 @@ function AnilloHud({ config, reducedMotion }: { config: ConfigAnillo; reducedMot
   )
 }
 
-// 22k puntos (no 48k) y un sobremuestreo x24 (no x60): la primera carga ya no bloquea el
-// hilo principal de forma perceptible. Con PerformanceMonitor en baja, se dibuja solo un
-// subconjunto via setDrawRange — mucho mas barato que volver a muestrear.
-const PUNTOS_OBJETIVO = 22000
-const PUNTOS_OBJETIVO_BAJA = 11000
+// 36k puntos (antes 22k, el original sin tocar era 48k) y la mascara se lee a su resolucion
+// real (2048x1024, antes se reducia a 1024x512 antes de muestrear) — mas definicion en las
+// costas sin volver al x60 de sobremuestreo que si bloqueaba la carga. Con PerformanceMonitor
+// en baja, se dibuja solo un subconjunto via setDrawRange — mucho mas barato que remuestrear.
+const PUNTOS_OBJETIVO = 36000
+const PUNTOS_OBJETIVO_BAJA = 18000
 
 function PuntosTierraCapa({ urlMascara, calidadAlta }: { urlMascara: string; calidadAlta: boolean }) {
   const textura = useLoader(THREE.TextureLoader, urlMascara)
@@ -219,7 +220,7 @@ function PuntosTierraCapa({ urlMascara, calidadAlta }: { urlMascara: string; cal
 
   const puntos = useMemo(() => {
     const image = textura.image as CanvasImageSource
-    const datosImagen = extraerImageData(image, 1024, 512)
+    const datosImagen = extraerImageData(image, 2048, 1024)
     return muestrearPuntosTierra(datosImagen, PUNTOS_OBJETIVO, 1337)
   }, [textura])
 
@@ -526,6 +527,18 @@ export default function GloboHolografico({ datos, reducedMotion, ariaLabel, loca
   const posicionPinRef = useRef<PosicionPin>({ x: 0, y: 0, visible: false })
   const [seleccionId, setSeleccionId] = useState<string | null>(null)
   const [resaltadoId, setResaltadoId] = useState<string | null>(null)
+  // true si el pin se abrio por tap/clic/teclado (hay que llevar el foco a la tarjeta, es la
+  // unica forma de llegar a ella sin mouse); false si se abrio por hover (mover el foco ahi
+  // solo porque el mouse paso por encima seria robarle el foco a quien este navegando con
+  // teclado en otra parte de la pagina).
+  const [autoenfocar, setAutoenfocar] = useState(true)
+  // (hover:hover) refleja si el mecanismo de entrada PRINCIPAL puede hacer hover — en touch es
+  // false, y ahi el tap sigue siendo la unica forma de abrir un pin (pedido explicito: en touch
+  // no hay "pasar el mouse por encima").
+  const esHoverCapaz = useRef(false)
+  useEffect(() => {
+    esHoverCapaz.current = window.matchMedia('(hover: hover) and (pointer: fine)').matches
+  }, [])
 
   const registrarHit = useCallback((id: string, obj: THREE.Object3D | null) => {
     if (obj) hitsRef.current.set(id, obj)
@@ -535,6 +548,59 @@ export default function GloboHolografico({ datos, reducedMotion, ariaLabel, loca
   const onToque = useCallback((x: number, y: number) => {
     toqueClienteRef.current = { x, y }
   }, [])
+
+  // Abrir/cerrar por tap, clic o la lista de botones sr-only (teclado): lleva el foco.
+  const abrirPorAccion = useCallback((id: string | null) => {
+    setAutoenfocar(true)
+    setSeleccionId(id)
+  }, [])
+
+  // Hover (solo en dispositivos que pueden hacer hover de verdad): abre al instante, cierra con
+  // un respiro corto para poder mover el mouse del pin a la tarjeta sin que se cierre en el
+  // camino — sobreTarjetaRef cancela el cierre mientras el mouse esta sobre la tarjeta misma.
+  const cierreTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const sobreTarjetaRef = useRef(false)
+  const cancelarCierre = useCallback(() => {
+    if (cierreTimeoutRef.current) {
+      clearTimeout(cierreTimeoutRef.current)
+      cierreTimeoutRef.current = null
+    }
+  }, [])
+  // OJO: esto se llama desde el useFrame de Escena, una vez por frame, mientras el mouse este
+  // fuera de cualquier pin — si reprogramara el timeout cada vez (cancelarCierre + setTimeout
+  // de nuevo) nunca llegaria a cumplirse, se reinicia cada ~16ms. Por eso NO hace nada si ya
+  // hay un cierre pendiente: deja que ese corra su curso.
+  const programarCierre = useCallback(() => {
+    if (cierreTimeoutRef.current) return
+    cierreTimeoutRef.current = setTimeout(() => {
+      cierreTimeoutRef.current = null
+      if (!sobreTarjetaRef.current) setSeleccionId(null)
+    }, 220)
+  }, [])
+
+  const onResaltar = useCallback(
+    (id: string | null) => {
+      setResaltadoId(id)
+      if (!esHoverCapaz.current) return
+      if (id) {
+        cancelarCierre()
+        setAutoenfocar(false)
+        setSeleccionId(id)
+      } else {
+        programarCierre()
+      }
+    },
+    [cancelarCierre, programarCierre]
+  )
+
+  const onHoverTarjeta = useCallback(
+    (sobre: boolean) => {
+      sobreTarjetaRef.current = sobre
+      if (sobre) cancelarCierre()
+      else programarCierre()
+    },
+    [cancelarCierre, programarCierre]
+  )
 
   // Una sola instancia: el div de abajo recibe los Pointer Events y actualiza `estadoRef`;
   // `Escena`, dentro del Canvas, lee ese mismo `estadoRef` en su useFrame para rotar el grupo.
@@ -619,8 +685,8 @@ export default function GloboHolografico({ datos, reducedMotion, ariaLabel, loca
           hoverClienteRef={hoverClienteRef}
           seleccionId={seleccionId}
           resaltadoId={resaltadoId}
-          onSeleccionar={setSeleccionId}
-          onResaltar={setResaltadoId}
+          onSeleccionar={abrirPorAccion}
+          onResaltar={onResaltar}
           posicionPinRef={posicionPinRef}
           registrarHit={registrarHit}
           estadosSesion={estadosSesion}
@@ -668,7 +734,7 @@ export default function GloboHolografico({ datos, reducedMotion, ariaLabel, loca
             <button
               type="button"
               className="focus:not-sr-only focus:absolute focus:left-1/2 focus:top-1/2 focus:z-30 focus:-translate-x-1/2 focus:-translate-y-1/2 focus:rounded-full focus:bg-accent-cyan focus:px-3 focus:py-1.5 focus:text-micro focus:font-semibold focus:text-canvas"
-              onClick={() => setSeleccionId(m.id)}
+              onClick={() => abrirPorAccion(m.id)}
             >
               {dict.home.globoMarcadores[m.nombreClave as keyof typeof dict.home.globoMarcadores] ?? m.simbolo}
             </button>
@@ -683,6 +749,8 @@ export default function GloboHolografico({ datos, reducedMotion, ariaLabel, loca
           locale={locale}
           cotizacion={datos.cotizacionesPines[marcadorSeleccionado.simbolo]}
           posicionRef={posicionPinRef}
+          autoenfocar={autoenfocar}
+          onHover={onHoverTarjeta}
           onCerrar={cerrarTarjeta}
         />
       )}
