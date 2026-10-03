@@ -11,6 +11,7 @@ see the plan file itself for exact values; this file only tracks order and statu
 | [004](004-home-loading-terminal-boot.md) | Replace the home skeleton with a terminal boot sequence | N/A | SUPERSEDED by 005 |
 | [005](005-home-loading-minimal-splash.md) | Full-screen minimal splash for the home loading state | N/A | DONE |
 | [006](006-home-globo-holografico.md) | Hero de la home con globo 3D holográfico interactivo | N/A | PLAN |
+| [007](007-globo-carga-fondo-y-calidad.md) | Prompt: carga del globo, fondo animado y calidad visual | HIGH | PROMPT |
 
 ## Execution order
 
