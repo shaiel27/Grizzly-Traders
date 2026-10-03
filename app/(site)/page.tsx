@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { BreakingPost, NewsGrid } from '@/components/ui'
+import { BreakingPost, NewsGrid, NewsletterForm } from '@/components/ui'
 import { HomeHero, LatestByCategory } from '@/components/modules'
 import {
   getPublishedPosts,
@@ -223,6 +223,14 @@ export default async function HomePage({
                       {dict.home.vipTelegramJoin}
                     </a>
                   )}
+                </div>
+              )}
+              {/* Sin NEXT_PUBLIC_VIP_URL ni NEXT_PUBLIC_TELEGRAM_URL configuradas, la tarjeta se
+                  quedaba sin ninguna accion (plan 009 B10) — se ofrece el newsletter como
+                  alternativa en vez de un bloque sin salida. */}
+              {!VIP_URL && !TELEGRAM_URL && (
+                <div className="mt-6">
+                  <NewsletterForm />
                 </div>
               )}
             </div>

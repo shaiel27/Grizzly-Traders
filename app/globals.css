@@ -37,9 +37,14 @@
      (ver plan 006, decision D2); el resto del sitio sigue usando --accent-blue. */
   --accent-cyan: #4fc3ff;
   --accent-cyan-glow: rgba(79, 195, 255, 0.25);
-  /* Ticker (32px) + identity row (64px); the command strip (40px) only exists from md up */
+  /* Ticker (32px) + identity row (64px); the command strip (40px) only exists from md up.
+     --header-height es el valor de respaldo (antes de hidratar, o si ResizeObserver no esta
+     disponible); Header.tsx mide el <header> real y escribe --header-h-real encima — todo lo
+     que necesite la altura del header usa esta variable con fallback, nunca --header-height
+     sola (plan 009 B2/B3: fuentes del sistema mas grandes, zoom o el menu movil abierto hacen
+     que el header real mida distinto al valor fijo). */
   --header-height: 96px;
-  --header-scroll-offset: 116px;
+  --header-scroll-offset: calc(var(--header-h-real, var(--header-height)) + 24px);
   /* Wider container for data-dense terminals (markets, pivot points); editorial content uses section-container (1200px) */
   --container-wide: 1400px;
   /* Easing tokens: built-in `ease-out`/`ease-in-out` read as weak at this duration range */
@@ -53,7 +58,6 @@
 @media (min-width: 768px) {
   :root {
     --header-height: 136px;
-    --header-scroll-offset: 156px;
   }
 }
 
@@ -100,10 +104,14 @@
 @layer base {
   html {
     font-family: var(--font-sans);
-    /* "Ver más" en el hero del globo hace scroll a #lo-que-hay-dentro con un <a href="#...">
-       nativo; ya cubierto por el bloque global de prefers-reduced-motion mas abajo
-       (scroll-behavior: auto !important). */
+    /* "Ver más" ya NO depende de esto (usa lib/scroll.ts, scrollSuaveA, con su propio manejo de
+       reduced-motion — ver plan 009 B1: el catch-all de abajo pone `scroll-behavior:auto` en
+       Windows con "reducir movimiento" activado, que mucha gente tiene así sin saberlo, y ahí
+       el salto nativo quedaba instantáneo). Se deja smooth para cualquier otro `<a href="#...">`
+       del sitio que no pase por JS. */
     scroll-behavior: smooth;
+    /* Cualquier ancla del sitio (no solo "Ver más") respeta el header fijo al llegar. */
+    scroll-padding-top: var(--header-scroll-offset);
   }
   body {
     background: var(--canvas);
