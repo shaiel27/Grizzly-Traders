@@ -288,7 +288,12 @@
    el angulo del gradiente — asi no hace falta @property para animar un <angle>); el contenido
    real va encima con su propio fondo solido, tapando todo menos un borde fino de 1px (el
    padding del wrapper). Queda neutralizado solo bajo prefers-reduced-motion por el catch-all
-   global de mas abajo (no esta en la lista de exclusiones). */
+   global de mas abajo (no esta en la lista de exclusiones).
+
+   El ::before mide 2x el wrapper (inset:-50%) y gira: sin overflow-hidden en .vip-border-wrap
+   (components/modules/VipShowcase.tsx), ese cuadro girando se escapaba de su contenedor y
+   aparecia/desaparecia un scroll horizontal en toda la pagina segun el angulo de giro (la caja
+   de un elemento rotado crece y encoge en pantalla a medida que gira). */
 @keyframes vipBorderSpin { to { transform: rotate(360deg); } }
 .vip-border-wrap::before {
   content: '';

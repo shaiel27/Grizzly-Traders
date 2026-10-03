@@ -24,8 +24,6 @@ import type { EstadoSesion } from '@/lib/globe/sesiones'
 import { getDictionary, type Locale } from '@/lib/i18n/get-dictionary'
 import type { MutableRefObject } from 'react'
 
-const UP = new THREE.Vector3(0, 1, 0)
-const RIGHT = new THREE.Vector3(1, 0, 0)
 const COLOR_PUNTOS = '#7fd4ff'
 const COLOR_BORDE = '#4fc3ff'
 const COLOR_BASE = '#020a18'
@@ -315,8 +313,6 @@ function Escena({
   const materialBase = useRef<THREE.ShaderMaterial>(null)
   const materialHolograma = useRef<THREE.ShaderMaterial>(null)
 
-  const qY = useMemo(() => new THREE.Quaternion(), [])
-  const qX = useMemo(() => new THREE.Quaternion(), [])
   const ndcToque = useMemo(() => new THREE.Vector2(), [])
   const posicionMundoPin = useMemo(() => new THREE.Vector3(), [])
   const avisoListo = useRef(false)
@@ -373,11 +369,8 @@ function Escena({
     }
 
     stepArrastre(delta)
-    const { rotY, rotX } = estadoArrastreRef.current
-    qY.setFromAxisAngle(UP, rotY)
-    qX.setFromAxisAngle(RIGHT, rotX)
     if (grupoGlobo.current) {
-      grupoGlobo.current.quaternion.copy(qX).multiply(qY)
+      grupoGlobo.current.quaternion.copy(estadoArrastreRef.current.orientacion)
       grupoGlobo.current.scale.setScalar(escalaGlobo)
     }
 
