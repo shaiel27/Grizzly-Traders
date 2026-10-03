@@ -10,7 +10,8 @@ see the plan file itself for exact values; this file only tracks order and statu
 | [003](003-home-skeleton-diffuse-blur.md) | Diffuse/blurred treatment for the home loading skeleton | HIGH | SUPERSEDED by 004 |
 | [004](004-home-loading-terminal-boot.md) | Replace the home skeleton with a terminal boot sequence | N/A | SUPERSEDED by 005 |
 | [005](005-home-loading-minimal-splash.md) | Full-screen minimal splash for the home loading state | N/A | DONE |
-| [006](006-home-globo-holografico.md) | Hero de la home con globo 3D holográfico interactivo | N/A | PLAN |
+| [006](006-home-globo-holografico.md) | Hero de la home con globo 3D holográfico interactivo | N/A | DONE (ver nota de verificación en el plan — falta revisión visual en navegador) |
+| [007](007-home-starfield-tarjetas-anchor.md) | Estabilidad del globo + fondo estrellado + tarjetas estilo "Anchor AI" | N/A | EN CURSO |
 
 ## Execution order
 

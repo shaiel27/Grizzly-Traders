@@ -61,10 +61,12 @@
     "heroTitleLine2": "that only hedge funds used to have.",
     "heroLead": "Crypto, forex, commodities and equities — technical levels, sentiment and verified news, in one place.",
     "heroCtaPrimary": "See today's news",
-    "heroCtaSecondary": "Learn our methodology",
-    "heroPulseLabel": "Market pulse",
-    "heroPulseVs": "vs. yesterday's close ({price})",
-    "heroStatsLine": "{posts} news · {categories} categories · {assets} assets · {sources} sources",
+    "heroCtaMore": "See more",
+    "heroDragHint": "Drag to spin the globe",
+    "heroLiveKicker": "Live markets",
+    "globeAria": "Interactive globe. Use the arrow keys or drag to spin it.",
+    "globeLabelNoticias": "NEWS",
+    "globeLabelActivos": "ASSETS",
     "feedControlsAria": "Feed controls",
     "newsGridAria": "News set",
     "latestNewsTitle": "Latest News",
@@ -101,6 +103,26 @@
     "sentimentUnitSingular": "article",
     "sentimentUnitPlural": "articles",
     "sentimentBarAria": "Bullish {bullish}, neutral {neutral}, bearish {bearish}"
+  },
+  "features": {
+    "title": "What's inside",
+    "cta": "Explore the terminal",
+    "news": {
+      "title": "Verified news",
+      "body": "Crypto, forex, commodities and equities coverage, filtered and no filler."
+    },
+    "markets": {
+      "title": "Markets terminal",
+      "body": "Live quotes, charts and market sentiment in one panel."
+    },
+    "pivots": {
+      "title": "Pivot points",
+      "body": "Support and resistance levels with 5 methods, calculated in real time."
+    },
+    "calendar": {
+      "title": "Economic calendar",
+      "body": "The events that move the market, with expected impact and exact time."
+    }
   },
   "listings": {
     "articlesTitle": "Market News",

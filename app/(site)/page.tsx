@@ -1,16 +1,13 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { BreakingPost, FeedControls, NewsGrid } from '@/components/ui'
-import { HomeHero, LatestByCategory, SentimentSummary, StatsBar } from '@/components/modules'
+import { BreakingPost, NewsGrid } from '@/components/ui'
+import { HomeHero, LatestByCategory } from '@/components/modules'
 import {
   getPublishedPosts,
   getFeaturedPosts,
   getPostsByCategory,
   getPostCount,
-  getCategories,
   getAssets,
-  getSources,
-  getSentimentSummary,
   withFreshViewCounts,
 } from '@/lib/api'
 import { getServerLocale } from '@/lib/i18n/server'
@@ -25,7 +22,6 @@ export const metadata: Metadata = {
 
 const CATEGORY_SLUGS = ['criptomonedas', 'forex', 'materias-primas', 'acciones']
 
-const SENTIMENT_DAYS = 30
 const VIP_URL = process.env.NEXT_PUBLIC_VIP_URL
 const TELEGRAM_URL = process.env.NEXT_PUBLIC_TELEGRAM_URL
 
@@ -48,10 +44,7 @@ export default async function HomePage({
   let latest: PostWithRelations[] = []
   const categoryPosts: Record<string, PostWithRelations[]> = {}
   let postCount = 0
-  let categoryCount = 0
   let assetCount = 0
-  let sourceCount = 0
-  let sentiment = { bullish: 0, bearish: 0, neutral: 0, total: 0 }
   let sourceDown = false
 
   const last24h = last24hIso()
@@ -63,24 +56,18 @@ export default async function HomePage({
     .catch(() => null)
 
   try {
-    const [featuredPosts, latestPosts, postsByCategory, count, categories, assets, sources, sentimentSummary] = await Promise.all([
+    const [featuredPosts, latestPosts, postsByCategory, count, assets] = await Promise.all([
       getFeaturedPosts(1, locale),
       getPublishedPosts({ since: last24h, limit: 60, categorySlug: category || undefined, locale }),
       Promise.all(CATEGORY_SLUGS.map((slug) => getPostsByCategory(slug, 3, locale))),
       getPostCount(),
-      getCategories(),
       getAssets(),
-      getSources(),
-      getSentimentSummary(SENTIMENT_DAYS),
     ])
 
     featured = featuredPosts[0]
     latest = latestPosts
     postCount = count
-    categoryCount = categories.length
     assetCount = assets.length
-    sourceCount = sources.length
-    sentiment = sentimentSummary
 
     CATEGORY_SLUGS.forEach((slug, i) => {
       categoryPosts[slug] = postsByCategory[i]
@@ -103,21 +90,12 @@ export default async function HomePage({
 
   const breaking = featured
   const grid = latest
-  // StatsBar below is the single source for the post/asset/source counts — this box only
-  // surfaces information that lives nowhere else on the page.
   const specs = [{ icon: 'update', label: dict.home.vipSpecLabel, value: dict.home.vipSpecValue }]
 
   return (
     <>
 
-      <HomeHero
-        locale={locale}
-        postCount={postCount}
-        categoryCount={categoryCount}
-        assetCount={assetCount}
-        sourceCount={sourceCount}
-        btcPrice={btcPrice}
-      />
+      <HomeHero locale={locale} postCount={postCount} assetCount={assetCount} btcPrice={btcPrice} />
 
       <main id="main-content" tabIndex={-1} className="flex-grow pb-24 pt-10 max-w-[1200px] mx-auto px-6 md:px-8 w-full">
         {/* Only surfaces when something is actually wrong — same alert pattern as /markets */}
@@ -127,21 +105,11 @@ export default async function HomePage({
           </p>
         )}
 
-        {/* Stats bar — the single source of truth for post/asset/source counts on this page */}
-        <StatsBar postCount={postCount} categoryCount={categoryCount} assetCount={assetCount} sourceCount={sourceCount} locale={locale} />
-
         {/* Breaking alert */}
         {breaking && <div className="mb-8"><BreakingPost post={breaking} /></div>}
 
-        {/* Feed controls */}
-        <section className="mt-16 mb-4" aria-label={dict.home.feedControlsAria}>
-          <FeedControls category={category} locale={locale} />
-        </section>
-
-        <SentimentSummary {...sentiment} days={SENTIMENT_DAYS} locale={locale} />
-
         {/* News grid */}
-        <section className="mt-16" aria-label={dict.home.newsGridAria}>
+        <section className="mt-10" aria-label={dict.home.newsGridAria}>
           <div className="mb-4 flex flex-wrap items-end justify-between gap-x-6 gap-y-1">
             <h2 className="text-headline text-ink">{dict.home.latestNewsTitle}</h2>
             <p className="text-body-sm text-ink-muted">

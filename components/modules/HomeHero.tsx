@@ -1,174 +1,183 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { clsx } from 'clsx'
 import { Button } from '@/components/ui'
-import { getDictionary, t, type Locale } from '@/lib/i18n/get-dictionary'
+import { HeroGlobe } from '@/components/globe/HeroGlobe'
+import type { DatosGlobo } from '@/components/globe/GloboHolografico'
+import { HomeFeatures } from './HomeFeatures'
+import { getDictionary, type Locale } from '@/lib/i18n/get-dictionary'
 import type { PriceData } from '@/lib/prices'
 
 interface HomeHeroProps {
   locale: Locale
   postCount: number
-  categoryCount: number
   assetCount: number
-  sourceCount: number
   btcPrice: PriceData | null
 }
 
-const BAR_COUNT = 32
-const PROJECTED_FROM = BAR_COUNT - 4
-
-// Deterministic sparkline derived from the price itself — no Math.random()/Date.now(), so
-// server and client render the exact same bars (react-hooks/purity, no hydration mismatch).
-function sparklineBars(seed: number): number[] {
-  const bars: number[] = []
-  for (let i = 0; i < BAR_COUNT; i++) {
-    const wave = Math.sin((i + seed) * 0.45) * 16 + Math.sin((i + seed) * 0.17) * 9
-    bars.push(Math.max(10, Math.round(32 + wave + i * 1.4)))
-  }
-  return bars
-}
-
-export function HomeHero({ locale, postCount, categoryCount, assetCount, sourceCount, btcPrice }: HomeHeroProps) {
+export function HomeHero({ locale, postCount, assetCount, btcPrice }: HomeHeroProps) {
   const dict = getDictionary(locale).home
   const numberLocale = locale === 'en' ? 'en-US' : 'es-ES'
-  const videoRef = useRef<HTMLVideoElement>(null)
+  // El texto espera a que el globo avise que esta listo (o a su propio timeout de 2s si WebGL
+  // tarda/falla) para que ambos arranquen su secuencia de entrada juntos, en vez de que el
+  // texto aparezca mientras el canvas todavia esta cargando.
+  const [listo, setListo] = useState(false)
 
-  // prefers-reduced-motion covers CSS animations on its own (globals.css), but a <video> keeps
-  // playing regardless — this is the one thing that needs JS to actually stop.
+  // Encogimiento del globo con el scroll: muta el estilo via ref (nunca state), igual que el
+  // resto de las animaciones de components/globe/* — evita re-renderizar HomeHero 60 veces
+  // por segundo solo para escalar un div.
+  const globoEscalaRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    const video = videoRef.current
-    if (!video) return
-    const query = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const sync = () => {
-      if (query.matches) video.pause()
-      else video.play().catch(() => {})
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reducedMotion) return
+
+    let pidiendoFrame = false
+    const actualizar = () => {
+      pidiendoFrame = false
+      const alto = window.innerHeight || 800
+      const progreso = Math.min(1, Math.max(0, window.scrollY / (alto * 0.85)))
+      const escala = 1 - progreso * 0.32
+      if (globoEscalaRef.current) globoEscalaRef.current.style.transform = `scale(${escala})`
     }
-    sync()
-    query.addEventListener('change', sync)
-    return () => query.removeEventListener('change', sync)
+    const onScroll = () => {
+      if (pidiendoFrame) return
+      pidiendoFrame = true
+      requestAnimationFrame(actualizar)
+    }
+    actualizar()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
   const price = btcPrice?.price ?? null
   const changePercent = btcPrice?.changePercent24h ?? 0
-  const isUp = changePercent >= 0
-  const bars = sparklineBars(price !== null ? Math.round(price) % 97 : 42)
-  const maxBar = Math.max(...bars)
 
-  const intPart = price !== null ? Math.floor(price) : null
-  const centsPart = price !== null ? Math.round((price - Math.floor(price)) * 100).toString().padStart(2, '0') : null
-  const previousClose = price !== null && btcPrice ? price - btcPrice.change24h : null
+  const datosGlobo: DatosGlobo = {
+    precioBtc: price !== null ? price.toLocaleString(numberLocale, { maximumFractionDigits: 0 }) : '—',
+    deltaBtc: price !== null ? Math.abs(changePercent).toFixed(1) : '—',
+    deltaPositivo: changePercent >= 0,
+    posts: postCount,
+    assets: assetCount,
+    etiquetaNoticias: `${postCount.toLocaleString(numberLocale)} ${dict.globeLabelNoticias}`,
+    etiquetaActivos: `${assetCount.toLocaleString(numberLocale)} ${dict.globeLabelActivos}`,
+  }
 
   return (
-    <section className="relative isolate min-h-[600px] overflow-hidden bg-canvas md:min-h-[680px]" aria-label={dict.heroSectionAria}>
-      <video
-        ref={videoRef}
-        className="absolute inset-0 h-full w-full object-cover"
-        poster="/market-loop-poster.jpg"
-        autoPlay
-        muted
-        loop
-        playsInline
-        preload="auto"
-        aria-hidden="true"
-      >
-        <source src="/market-loop-1080p.webm" type="video/webm" />
-        <source src="/market-loop-1080p.mp4" type="video/mp4" />
-      </video>
+    <section className="relative isolate overflow-hidden bg-black" aria-label={dict.heroSectionAria}>
+      {/* Fondo: el campo de estrellas vive DENTRO del Canvas del globo (components/globe/
+          GloboHolografico.tsx, <CampoEstrellas>) — gira en el tiempo con el mismo render
+          pipeline, no es un patron CSS estatico aparte. Aqui solo quedan 2 glows de esquina
+          para que el negro fuera del canvas (los bordes en mobile) no quede absolutamente
+          plano. La seccion ya es bg-black de punta a punta, igual que "Lo que hay dentro" —
+          sin costura que disimular. */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0">
+        <div
+          className="hero-glow-a absolute -left-[10%] -top-[15%] size-[55vw] max-w-[640px] rounded-full blur-[110px]"
+          style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--gradient-violet) 55%, transparent) 0%, transparent 70%)' }}
+        />
+        <div
+          className="hero-glow-b absolute -bottom-[20%] -right-[8%] size-[50vw] max-w-[560px] rounded-full blur-[110px]"
+          style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--accent-cyan) 45%, transparent) 0%, transparent 70%)' }}
+        />
+      </div>
 
-      {/* Veil: keeps the headline legible over the footage and fades the hero into the canvas below */}
-      <div
-        aria-hidden="true"
-        className="absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(60% 50% at 20% 10%, color-mix(in srgb, var(--gradient-violet) 16%, transparent) 0%, transparent 60%), linear-gradient(180deg, rgba(9,9,9,0.55) 0%, rgba(9,9,9,0.72) 55%, var(--canvas) 100%)',
-        }}
-      />
+      {/* Zona util: todo lo que queda DEBAJO del header fijo, alto minimo = 1 viewport. Usa
+          margin-top (no padding-top): el globo/texto de adentro son `lg:absolute` y su
+          containing block es LA CAJA DE ESTE DIV — con padding-top, ese "top" se mide desde
+          afuera del padding (el contenido quedaba muy arriba, detras del header). Con
+          margin-top la caja entera se corre hacia abajo y el `top:50%` de adentro sigue dando
+          el centro real de esta zona. Ya no es `position:absolute` (como antes, pegado al
+          viewport): ahora esta en flujo normal para que las tarjetas de abajo puedan seguirlo
+          dentro de la misma seccion, en vez de vivir en una seccion aparte. */}
+      <div className="relative z-10 mt-[var(--header-height)] flex min-h-[calc(100svh_-_var(--header-height))] flex-col items-center px-6 pb-12 lg:block lg:px-0 lg:pb-0">
+        {/* Mas grande que antes (680px -> 780px tope) — con left-[60%] el borde derecho sigue
+            con margen hasta ~1070px de diametro, asi que 780 no se recorta en 1440px. */}
+        <div className="aspect-square w-[88vw] max-w-[420px] shrink-0 lg:absolute lg:left-[60%] lg:top-1/2 lg:w-[min(82vh,780px)] lg:max-w-none lg:-translate-x-1/2 lg:-translate-y-1/2">
+          <div ref={globoEscalaRef} className="size-full" style={{ willChange: 'transform' }}>
+            <HeroGlobe datos={datosGlobo} ariaLabel={dict.globeAria} onReady={() => setListo(true)} />
+          </div>
+        </div>
 
-      <div className="relative z-10 section-container pt-[calc(var(--header-height)+40px)] pb-16 md:pb-20">
-        <div className="flex flex-col gap-10 lg:flex-row lg:items-center lg:justify-between lg:gap-14">
-          <div className="max-w-xl">
+        <div className="relative z-10 mt-6 flex w-full max-w-2xl flex-col items-center text-center lg:absolute lg:inset-x-0 lg:bottom-12 lg:mt-0 lg:items-start lg:pl-[max(24px,calc((100vw-1200px)/2))] lg:text-left">
+          {/* pointer-events-none: el texto nunca debe tapar el arrastre del globo que tiene detras */}
+          <div className="pointer-events-none">
+            {/* Chip "en vivo": chrome neutro de vidrio — el cian se reserva para el globo y las
+                tarjetas de abajo, no compite por atencion con el titular. */}
+            <p
+              className={clsx(
+                'mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 font-mono text-micro uppercase tracking-[0.1em] text-ink-muted',
+                listo ? 'hero-fade-up' : 'opacity-0'
+              )}
+              style={listo ? { animationDelay: '0ms' } : undefined}
+            >
+              <span className="splash-mark size-1.5 rounded-full bg-semantic-success" aria-hidden="true" />
+              {dict.heroLiveKicker}
+            </p>
+            {/* display-xl (85px) partia el titulo en una palabra por linea en esta columna —
+                display-lg (62px) es el techo ahora. tracking mas cerrado: sensacion mas bold. */}
             <h1
-              className="hero-fade-up text-display-lg-mobile sm:text-display-lg md:text-display-xl tracking-tight text-ink"
-              style={{ animationDelay: '200ms' }}
+              className={clsx(
+                'text-display-lg-mobile font-bold tracking-[-0.02em] text-ink sm:text-display-lg',
+                listo ? 'hero-fade-up' : 'opacity-0'
+              )}
+              style={listo ? { animationDelay: '100ms' } : undefined}
             >
               <span className="block">{dict.heroTitleLine1}</span>
               <span className="block">{dict.heroTitleLine2}</span>
             </h1>
-            <p className="hero-fade-up mt-5 max-w-md text-body text-on-surface-variant" style={{ animationDelay: '360ms' }}>
+            <p
+              className={clsx('mt-5 max-w-md text-body text-on-surface-variant', listo ? 'hero-fade-up' : 'opacity-0')}
+              style={listo ? { animationDelay: '220ms' } : undefined}
+            >
               {dict.heroLead}
             </p>
-            <div className="hero-fade-up mt-7 flex flex-wrap gap-3" style={{ animationDelay: '520ms' }}>
-              <Button variant="primary" size="lg" asChild>
-                <Link href="/articulos">{dict.heroCtaPrimary}</Link>
-              </Button>
-              <Button variant="secondary" size="lg" asChild>
-                <Link href="/aprende">{dict.heroCtaSecondary}</Link>
-              </Button>
-            </div>
+            {/* Pastilla en vez de linea de texto suelta: ahora se lee como una pista de uso,
+                no como otro renglon de copy. */}
+            <p
+              className={clsx(
+                'mt-4 inline-flex items-center gap-1.5 rounded-full border border-hairline bg-white/[0.03] px-3 py-1.5 font-mono text-micro text-ink-muted',
+                listo ? 'hero-fade-up' : 'opacity-0'
+              )}
+              style={listo ? { animationDelay: '340ms' } : undefined}
+            >
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path
+                  d="M8 1.5 L8 11.5 M8 1.5 L5 4.5 M8 1.5 L11 4.5 M3 9 C3 12.5 5.2 14.5 8 14.5 C10.8 14.5 13 12.5 13 9"
+                  stroke="currentColor"
+                  strokeWidth="1.3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              {dict.heroDragHint}
+            </p>
           </div>
 
           <div
-            className="hero-fade-scale w-full max-w-[400px] rounded-xl border border-white/[0.12] p-7 md:p-8"
-            style={{
-              animationDelay: '680ms',
-              background:
-                'radial-gradient(140% 100% at 15% 0%, color-mix(in srgb, var(--gradient-violet) 30%, transparent) 0%, color-mix(in srgb, var(--gradient-magenta) 18%, transparent) 32%, var(--surface-1) 62%)',
-            }}
-          >
-            <p className="text-caption text-ink-subtle">{dict.heroPulseLabel}</p>
-            <p className="mt-1 text-body-lg font-semibold text-ink">BTC/USD</p>
-
-            <p className="mt-3 flex items-baseline gap-0.5 font-mono tabular-nums text-ink">
-              <span className="text-[36px] font-semibold">{intPart !== null ? intPart.toLocaleString(numberLocale) : '—'}</span>
-              {centsPart !== null && <span className="text-[36px] font-semibold text-ink-subtle">.{centsPart}</span>}
-            </p>
-
-            {price !== null && (
-              <div className="mb-7 mt-2 flex items-center gap-2.5">
-                <span
-                  className={
-                    isUp
-                      ? 'rounded-md border border-semantic-success/30 bg-semantic-success/10 px-2 py-1.5 text-caption font-semibold text-semantic-success'
-                      : 'rounded-md border border-semantic-danger/30 bg-semantic-danger/10 px-2 py-1.5 text-caption font-semibold text-semantic-danger'
-                  }
-                >
-                  {isUp ? '+' : ''}
-                  {changePercent.toFixed(1)}%
-                </span>
-                <span className="text-caption text-on-surface-variant/80">
-                  {t(dict.heroPulseVs, {
-                    price: previousClose !== null ? `$${Math.round(previousClose).toLocaleString(numberLocale)}` : '—',
-                  })}
-                </span>
-              </div>
+            className={clsx(
+              'pointer-events-auto mt-7 flex flex-wrap justify-center gap-3 lg:justify-start',
+              listo ? 'hero-fade-up' : 'opacity-0'
             )}
-
-            <div className="relative flex h-[90px] items-end gap-[2px]" aria-hidden="true">
-              {bars.map((height, i) => (
-                <div
-                  key={i}
-                  className="hero-bar-grow flex-1 rounded-[1px]"
-                  style={{
-                    height: `${Math.round((height / maxBar) * 100)}%`,
-                    backgroundColor: i >= PROJECTED_FROM ? 'rgba(255,255,255,0.14)' : 'var(--ink)',
-                    animationDelay: `${820 + i * 16}ms`,
-                  }}
-                />
-              ))}
-            </div>
-
-            <p className="mt-3 border-t border-hairline-soft pt-3 font-mono text-micro text-ink-subtle">
-              {t(dict.heroStatsLine, {
-                posts: postCount.toLocaleString(numberLocale),
-                categories: categoryCount,
-                assets: assetCount,
-                sources: sourceCount,
-              })}
-            </p>
+            style={listo ? { animationDelay: '460ms' } : undefined}
+          >
+            <Button variant="primary" size="lg" className="whitespace-nowrap" asChild>
+              <Link href="/articulos">{dict.heroCtaPrimary}</Link>
+            </Button>
+            <Button variant="secondary" size="lg" className="whitespace-nowrap" asChild>
+              <a href="#lo-que-hay-dentro">{dict.heroCtaMore}</a>
+            </Button>
           </div>
         </div>
+      </div>
+
+      {/* Tarjetas de "Lo que hay dentro", ahora dentro de la misma seccion del globo (sin
+          titulo ni CTA aparte — se pidio quitarlos) en vez de una seccion propia debajo. Sin
+          padding horizontal aca: HomeFeatures ya trae su propio section-container (16/20px +
+          max-w-1200), duplicarlo sumaria padding de mas en mobile. */}
+      <div className="relative z-10 pb-16 pt-4 md:pb-24">
+        <HomeFeatures locale={locale} />
       </div>
     </section>
   )

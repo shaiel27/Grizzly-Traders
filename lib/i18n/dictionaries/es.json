@@ -61,10 +61,12 @@
     "heroTitleLine2": "que antes solo tenían los fondos.",
     "heroLead": "Cripto, forex, materias primas y acciones — niveles técnicos, sentimiento y noticias verificadas, en un solo lugar.",
     "heroCtaPrimary": "Ver las noticias de hoy",
-    "heroCtaSecondary": "Conocer la metodología",
-    "heroPulseLabel": "Pulso del mercado",
-    "heroPulseVs": "vs. cierre de ayer ({price})",
-    "heroStatsLine": "{posts} noticias · {categories} categorías · {assets} activos · {sources} fuentes",
+    "heroCtaMore": "Ver más",
+    "heroDragHint": "Arrastra para girar el planeta",
+    "heroLiveKicker": "Mercados en vivo",
+    "globeAria": "Globo terráqueo interactivo. Usa las flechas del teclado o arrastra para girarlo.",
+    "globeLabelNoticias": "NOTICIAS",
+    "globeLabelActivos": "ACTIVOS",
     "feedControlsAria": "Controles del feed",
     "newsGridAria": "Conjunto de noticias",
     "latestNewsTitle": "Últimas Noticias",
@@ -101,6 +103,26 @@
     "sentimentUnitSingular": "artículo",
     "sentimentUnitPlural": "artículos",
     "sentimentBarAria": "Alcista {bullish}, neutral {neutral}, bajista {bearish}"
+  },
+  "features": {
+    "title": "Lo que hay dentro",
+    "cta": "Explorar el terminal",
+    "news": {
+      "title": "Noticias verificadas",
+      "body": "Cobertura de cripto, forex, materias primas y acciones, filtrada y sin relleno."
+    },
+    "markets": {
+      "title": "Terminal de mercados",
+      "body": "Cotizaciones en vivo, gráficos y sentimiento de mercado en un solo panel."
+    },
+    "pivots": {
+      "title": "Puntos pivote",
+      "body": "Niveles de soporte y resistencia con 5 métodos, calculados en tiempo real."
+    },
+    "calendar": {
+      "title": "Calendario económico",
+      "body": "Los eventos que mueven el mercado, con su impacto esperado y hora exacta."
+    }
   },
   "listings": {
     "articlesTitle": "Noticias del Mercado",
