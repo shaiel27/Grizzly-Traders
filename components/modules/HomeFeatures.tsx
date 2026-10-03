@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { clsx } from 'clsx'
 import { getDictionary, type Locale } from '@/lib/i18n/get-dictionary'
 
@@ -44,16 +44,6 @@ interface EventoCalendario {
   country: string
   event: string
   impact: string
-}
-
-// Mueve el puntero a variables CSS (--mx/--my) en vez de a React state: el spotlight de la
-// tarjeta se mueve en cada frame de pointermove y un setState ahi re-renderizaria las 4
-// tarjetas constantemente por nada.
-function onMoveSpotlight(e: ReactPointerEvent<HTMLElement>) {
-  const el = e.currentTarget
-  const r = el.getBoundingClientRect()
-  el.style.setProperty('--mx', `${e.clientX - r.left}px`)
-  el.style.setProperty('--my', `${e.clientY - r.top}px`)
 }
 
 function paisABandera(codigo: string): string {
@@ -210,55 +200,44 @@ function CalendarioPreview() {
   )
 }
 
-interface Tarjeta {
-  icon: string
+interface Canal {
+  codigo: string // identificador corto tipo terminal — a proposito sin traducir, mismo criterio
+  // que CATEGORY_LABELS en Header.tsx (jerga de trading, igual en es/en "by existing design").
   href: string
   title: string
   body: string
   preview: React.ReactNode
 }
 
-function TarjetaBento({ tarjeta, i, visible, className }: { tarjeta: Tarjeta; i: number; visible: boolean; className?: string }) {
+// Una sola consola con 4 canales separados por lineas finas, no 4 tarjetas flotando sueltas —
+// el sitio ya se llama a si mismo "Terminal" en el header; esto se parece a un panel real de
+// varias columnas en vez del kit-de-tarjetas-SaaS generico (icono + titulo + cuerpo, todas con
+// el mismo borde redondeado) de la version anterior.
+function ColumnaTerminal({ canal, i, visible }: { canal: Canal; i: number; visible: boolean }) {
   return (
     <Link
-      href={tarjeta.href}
-      onPointerMove={onMoveSpotlight}
+      href={canal.href}
       className={clsx(
-        'group relative isolate flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.025] p-6',
-        'transition-[border-color,box-shadow,transform] duration-300 ease-out',
-        'hover:-translate-y-1 hover:border-accent-cyan/35 hover:shadow-[0_0_36px_var(--accent-cyan-glow)]',
-        visible ? 'hero-fade-up' : 'opacity-0',
-        className
+        'group flex h-full flex-col gap-4 px-5 py-6 transition-colors duration-200 hover:bg-white/[0.025]',
+        visible ? 'hero-fade-up' : 'opacity-0'
       )}
-      style={visible ? { animationDelay: `${i * 80}ms` } : undefined}
+      style={visible ? { animationDelay: `${i * 70}ms` } : undefined}
     >
-      {/* Spotlight: radial-gradient tenue que sigue al cursor, via --mx/--my (sin re-render). */}
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-        style={{ background: 'radial-gradient(220px circle at var(--mx,50%) var(--my,50%), color-mix(in srgb, var(--accent-cyan) 10%, transparent), transparent 70%)' }}
-      />
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute -left-8 -top-8 -z-10 size-28 rounded-full bg-accent-cyan/10 blur-2xl"
-      />
-
-      <div className="flex items-center justify-between">
-        <span className="inline-flex size-10 items-center justify-center rounded-xl border border-accent-cyan/20 bg-accent-cyan/10 transition-transform duration-300 group-hover:scale-110">
-          <span className="material-symbols-outlined text-[20px] text-accent-cyan" aria-hidden="true">
-            {tarjeta.icon}
+      <div className="flex items-center justify-between border-b border-white/10 pb-3 font-mono text-micro">
+        <span className="flex items-center gap-1.5 text-ink-muted transition-colors group-hover:text-accent-cyan">
+          <span className="text-accent-cyan" aria-hidden="true">
+            ❯
           </span>
+          {canal.codigo}
         </span>
-        <span className="material-symbols-outlined text-[18px] text-ink-subtle transition-transform duration-300 group-hover:translate-x-1 group-hover:text-accent-cyan" aria-hidden="true">
-          arrow_outward
-        </span>
+        <span className="splash-mark size-1.5 rounded-full bg-semantic-success" aria-hidden="true" />
       </div>
 
-      <div className="mt-5 flex-1">{tarjeta.preview}</div>
+      <div className="min-h-[108px] flex-1">{canal.preview}</div>
 
-      <div className="mt-5">
-        <h3 className="text-body-lg font-semibold text-ink">{tarjeta.title}</h3>
-        <p className="mt-1.5 text-body-sm text-on-surface-variant">{tarjeta.body}</p>
+      <div>
+        <h3 className="text-body-sm font-semibold text-ink">{canal.title}</h3>
+        <p className="mt-1 text-micro text-ink-subtle">{canal.body}</p>
       </div>
     </Link>
   )
@@ -289,35 +268,49 @@ export function HomeFeatures({ locale, noticiasPreview, cotizacionesPreview, piv
     return () => observer.disconnect()
   }, [])
 
-  const tarjetas: Tarjeta[] = [
-    { icon: 'article', href: '/articulos', title: features.news.title, body: features.news.body, preview: <NoticiasRotator items={noticiasPreview} /> },
-    { icon: 'monitoring', href: '/markets', title: features.markets.title, body: features.markets.body, preview: <MercadosFilas items={cotizacionesPreview} locale={locale} /> },
-    { icon: 'calculate', href: '/pivot-points', title: features.pivots.title, body: features.pivots.body, preview: <PivoteEscalera datos={pivotePreview} /> },
-    { icon: 'calendar_month', href: '/calendario', title: features.calendar.title, body: features.calendar.body, preview: <CalendarioPreview /> },
+  const canales: Canal[] = [
+    { codigo: 'NEWS', href: '/articulos', title: features.news.title, body: features.news.body, preview: <NoticiasRotator items={noticiasPreview} /> },
+    { codigo: 'MKTS', href: '/markets', title: features.markets.title, body: features.markets.body, preview: <MercadosFilas items={cotizacionesPreview} locale={locale} /> },
+    { codigo: 'PVT', href: '/pivot-points', title: features.pivots.title, body: features.pivots.body, preview: <PivoteEscalera datos={pivotePreview} /> },
+    { codigo: 'CAL', href: '/calendario', title: features.calendar.title, body: features.calendar.body, preview: <CalendarioPreview /> },
   ]
-  // Bento 3/3/2/4 en columnas de 6: noticias y mercados grandes, pivotes y calendario medianas.
-  const spanDesktop = ['lg:col-span-3 min-h-[300px]', 'lg:col-span-3 min-h-[300px]', 'lg:col-span-2 min-h-[220px]', 'lg:col-span-4 min-h-[220px]']
 
   return (
     <div id="lo-que-hay-dentro" ref={sectionRef} className="scroll-mt-[var(--header-scroll-offset)]">
       <div className="section-container">
-        {/* Movil: carrusel horizontal con scroll-snap (una tarjeta a la vez, se desliza). */}
-        <ul className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 sm:hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label={features.title}>
-          {tarjetas.map((tarjeta, i) => (
-            <li key={tarjeta.href} className="w-[82vw] shrink-0 snap-center">
-              <TarjetaBento tarjeta={tarjeta} i={i} visible={visible} className="min-h-[360px]" />
-            </li>
-          ))}
-        </ul>
+        <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02]">
+          {/* Barra de estado: la unica pieza "audaz" del bloque — el resto se queda quieto y
+              disciplinado debajo. Nada de titulo editorial tipo "Lo que hay dentro": esto lee
+              como el encabezado de una consola real, no como un h2 decorativo. */}
+          <div className="flex items-center justify-between border-b border-white/10 px-5 py-2.5 font-mono text-[11px] text-ink-subtle">
+            <span className="flex items-center gap-2">
+              <span className="size-1.5 rounded-full bg-semantic-success" aria-hidden="true" />
+              GRIZZLY://TERMINAL
+            </span>
+            <span className="splash-mark text-accent-cyan" aria-hidden="true">
+              ▊
+            </span>
+          </div>
 
-        {/* Tablet+: grilla bento (2 columnas en tablet, 6 en escritorio). */}
-        <ul className="hidden grid-cols-2 gap-5 sm:grid lg:grid-cols-6" aria-label={features.title}>
-          {tarjetas.map((tarjeta, i) => (
-            <li key={tarjeta.href} className={spanDesktop[i]}>
-              <TarjetaBento tarjeta={tarjeta} i={i} visible={visible} className="h-full" />
-            </li>
-          ))}
-        </ul>
+          {/* Movil: carrusel horizontal con scroll-snap, un canal a la vez. */}
+          <ul className="flex snap-x snap-mandatory divide-x divide-white/10 overflow-x-auto sm:hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label={features.title}>
+            {canales.map((canal, i) => (
+              <li key={canal.href} className="w-[82vw] shrink-0 snap-center">
+                <ColumnaTerminal canal={canal} i={i} visible={visible} />
+              </li>
+            ))}
+          </ul>
+
+          {/* Tablet+: las 4 columnas side by side, separadas por hairlines — un panel, no 4
+              cajas sueltas. */}
+          <ul className="hidden sm:grid sm:grid-cols-2 sm:divide-x sm:divide-white/10 lg:grid-cols-4" aria-label={features.title}>
+            {canales.map((canal, i) => (
+              <li key={canal.href} className={clsx(i < 2 && 'sm:border-b sm:border-white/10 lg:border-b-0')}>
+                <ColumnaTerminal canal={canal} i={i} visible={visible} />
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </div>
   )
