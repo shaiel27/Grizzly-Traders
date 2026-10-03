@@ -8,9 +8,12 @@ import { HeroGlobe } from '@/components/globe/HeroGlobe'
 import type { DatosGlobo } from '@/components/globe/GloboHolografico'
 import { HomeFeatures, type NoticiaPreview, type CotizacionPreview, type PivotePreview } from './HomeFeatures'
 import { FondoHero } from '@/components/globe/FondoHero'
+import { LeyendaGlobo } from '@/components/globe/LeyendaGlobo'
+import { estadoSesiones, type EstadoSesion } from '@/lib/globe/sesiones'
 import { getDictionary, type Locale } from '@/lib/i18n/get-dictionary'
 import { scrollSuaveA } from '@/lib/scroll'
 import type { PriceData } from '@/lib/prices'
+import type { ResultadoSentimiento } from '@/lib/globe/sentimiento'
 
 interface HomeHeroProps {
   locale: Locale
@@ -20,15 +23,38 @@ interface HomeHeroProps {
   noticiasPreview: NoticiaPreview[]
   cotizacionesPreview: CotizacionPreview[]
   pivotePreview: PivotePreview | null
+  cotizacionesGlobo: Record<string, { precio: number; cambio: number | null }>
+  riesgo: ResultadoSentimiento | null
 }
 
-export function HomeHero({ locale, postCount, assetCount, btcPrice, noticiasPreview, cotizacionesPreview, pivotePreview }: HomeHeroProps) {
+export function HomeHero({
+  locale,
+  postCount,
+  assetCount,
+  btcPrice,
+  noticiasPreview,
+  cotizacionesPreview,
+  pivotePreview,
+  cotizacionesGlobo,
+  riesgo,
+}: HomeHeroProps) {
   const dict = getDictionary(locale).home
   const numberLocale = locale === 'en' ? 'en-US' : 'es-ES'
   // El texto espera a que el globo avise que esta listo (o a su propio timeout de 2s si WebGL
   // tarda/falla) para que ambos arranquen su secuencia de entrada juntos, en vez de que el
   // texto aparezca mientras el canvas todavia esta cargando.
   const [listo, setListo] = useState(false)
+
+  // Estado de sesiones del mercado (plan 009 §2): se recalcula cada 30s, no en cada frame — es
+  // la hora, no algo que necesite 60fps. Arranca vacio (nada de Date.now() en el render, la
+  // regla react-hooks/purity) y se llena en un efecto, despues de montar.
+  const [estadosSesion, setEstadosSesion] = useState<EstadoSesion[]>([])
+  useEffect(() => {
+    const actualizar = () => setEstadosSesion(estadoSesiones(new Date()))
+    actualizar()
+    const id = setInterval(actualizar, 30_000)
+    return () => clearInterval(id)
+  }, [])
 
   // Encogimiento del globo con el scroll: muta el estilo via ref (nunca state), igual que el
   // resto de las animaciones de components/globe/* — evita re-renderizar HomeHero 60 veces
@@ -99,6 +125,7 @@ export function HomeHero({ locale, postCount, assetCount, btcPrice, noticiasPrev
     assets: assetCount,
     etiquetaNoticias: `${postCount.toLocaleString(numberLocale)} ${dict.globeLabelNoticias}`,
     etiquetaActivos: `${assetCount.toLocaleString(numberLocale)} ${dict.globeLabelActivos}`,
+    cotizacionesPines: cotizacionesGlobo,
   }
 
   return (
@@ -200,20 +227,25 @@ export function HomeHero({ locale, postCount, assetCount, btcPrice, noticiasPrev
         </div>
 
         {/* Techo un poco mas chico que antes (780px/82vh -> 720px/78vh): con columnas reales ya
-            no hace falta exprimir el maximo posible para "llenar" el lado derecho. */}
-        <div className="order-1 aspect-square w-[88vw] max-w-[420px] justify-self-center lg:order-2 lg:w-full lg:max-w-[min(78vh,720px)]">
-          <div ref={globoEscalaRef} className="relative size-full" style={{ willChange: 'transform' }}>
-            {/* Halo detras del globo (plan 009 §10.3): vive dentro del mismo wrapper que se
-                escala con el scroll, asi se encoge junto con el globo sin logica aparte.
-                Reusa la respiracion de .splash-mark (ya definida en globals.css) en vez de un
-                keyframe nuevo solo para esto. */}
-            <div
-              aria-hidden="true"
-              className="splash-mark pointer-events-none absolute -inset-[8%] -z-10 rounded-full blur-[60px]"
-              style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--accent-cyan) 30%, transparent) 0%, transparent 72%)' }}
-            />
-            <HeroGlobe datos={datosGlobo} ariaLabel={dict.globeAria} onReady={() => setListo(true)} />
+            no hace falta exprimir el maximo posible para "llenar" el lado derecho. Envuelve el
+            cuadrado del globo + la leyenda de sesiones/riesgo debajo (plan 009 §2.2), para que
+            el grid siga viendo exactamente 2 columnas (texto + esto), no 3. */}
+        <div className="order-1 flex flex-col items-center gap-3 lg:order-2">
+          <div className="aspect-square w-[88vw] max-w-[420px] lg:w-full lg:max-w-[min(78vh,720px)]">
+            <div ref={globoEscalaRef} className="relative size-full" style={{ willChange: 'transform' }}>
+              {/* Halo detras del globo (plan 009 §10.3): vive dentro del mismo wrapper que se
+                  escala con el scroll, asi se encoge junto con el globo sin logica aparte.
+                  Reusa la respiracion de .splash-mark (ya definida en globals.css) en vez de un
+                  keyframe nuevo solo para esto. */}
+              <div
+                aria-hidden="true"
+                className="splash-mark pointer-events-none absolute -inset-[8%] -z-10 rounded-full blur-[60px]"
+                style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--accent-cyan) 30%, transparent) 0%, transparent 72%)' }}
+              />
+              <HeroGlobe datos={datosGlobo} ariaLabel={dict.globeAria} locale={locale} estadosSesion={estadosSesion} onReady={() => setListo(true)} />
+            </div>
           </div>
+          <LeyendaGlobo estados={estadosSesion} riesgo={riesgo} locale={locale} />
         </div>
       </div>
 

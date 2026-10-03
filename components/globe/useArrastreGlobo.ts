@@ -6,10 +6,19 @@ import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerE
 const LIMITE_INCLINACION = (60 * Math.PI) / 180 // ±60°
 const AUTO_GIRO_Y = 0.05 // rad/s, oeste a este, una vez en reposo
 const INCLINACION_REPOSO = 0.25 // rad
+// Con la orientacion de lib/globe/geo.ts, rotY=0 ya deja un meridiano de -90° (centro-oeste de
+// EEUU) mirando a camara. -PI/4 lo corre a -45°: America queda mas centrada hacia el Atlantico,
+// con un adelanto de Africa/Europa en el borde — el "America/Atlantico" que pide el plan 009
+// §1.0, sin quedar tan cerrado sobre un solo continente.
+const ROT_Y_INICIAL = -Math.PI / 4
 const FRICCION_POR_FRAME_60FPS = 0.95
 const EPSILON_VELOCIDAD = 0.0005
 const DURACION_RETORNO_S = 1.2
 const IMPULSO_TECLADO = 0.12
+// Un toque que se movio menos de esto y duro menos de esto es un tap (abre un pin), no un
+// arrastre — plan 009 §1.3.
+const TOQUE_DIST_MAX_PX = 6
+const TOQUE_DURACION_MAX_MS = 300
 
 export interface EstadoArrastreGlobo {
   rotY: number
@@ -20,11 +29,12 @@ export interface EstadoArrastreGlobo {
   retornando: boolean
   tRetorno: number
   rotXInicioRetorno: number
+  pausado: boolean
 }
 
 export function crearEstadoArrastreGlobo(): EstadoArrastreGlobo {
   return {
-    rotY: 0,
+    rotY: ROT_Y_INICIAL,
     rotX: INCLINACION_REPOSO,
     velY: 0,
     velX: 0,
@@ -32,6 +42,7 @@ export function crearEstadoArrastreGlobo(): EstadoArrastreGlobo {
     retornando: false,
     tRetorno: 0,
     rotXInicioRetorno: INCLINACION_REPOSO,
+    pausado: false,
   }
 }
 
@@ -41,16 +52,19 @@ export function crearEstadoArrastreGlobo(): EstadoArrastreGlobo {
  * que un componente dentro del Canvas lo lea en su propio useFrame y los `handlers` para el div.
  * `step(dt)` avanza la fisica un frame y se invoca tambien desde ese useFrame.
  */
-export function useArrastreGlobo(reducedMotionRef: { current: boolean }) {
+export function useArrastreGlobo(reducedMotionRef: { current: boolean }, onToque?: (clientX: number, clientY: number) => void) {
   const estadoRef = useRef<EstadoArrastreGlobo>(crearEstadoArrastreGlobo())
   const punteroAnterior = useRef<{ x: number; y: number } | null>(null)
+  const inicioToque = useRef<{ x: number; y: number; t: number } | null>(null)
 
   const onPointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId)
     punteroAnterior.current = { x: e.clientX, y: e.clientY }
+    inicioToque.current = { x: e.clientX, y: e.clientY, t: performance.now() }
     const estado = estadoRef.current
     estado.arrastrando = true
     estado.retornando = false
+    estado.pausado = false
     estado.velY = 0
     estado.velX = 0
   }, [])
@@ -71,12 +85,26 @@ export function useArrastreGlobo(reducedMotionRef: { current: boolean }) {
     estado.rotX = Math.max(-LIMITE_INCLINACION, Math.min(LIMITE_INCLINACION, estado.rotX + estado.velX))
   }, [])
 
-  const finalizarArrastre = useCallback(() => {
-    estadoRef.current.arrastrando = false
-    punteroAnterior.current = null
-  }, [])
+  const finalizarArrastre = useCallback(
+    (e?: ReactPointerEvent<HTMLDivElement>) => {
+      const estado = estadoRef.current
+      estado.arrastrando = false
 
-  const onPointerUp = useCallback(() => finalizarArrastre(), [finalizarArrastre])
+      const inicio = inicioToque.current
+      inicioToque.current = null
+      if (e && inicio && onToque) {
+        const dist = Math.hypot(e.clientX - inicio.x, e.clientY - inicio.y)
+        const duracion = performance.now() - inicio.t
+        if (dist < TOQUE_DIST_MAX_PX && duracion < TOQUE_DURACION_MAX_MS) {
+          onToque(e.clientX, e.clientY)
+        }
+      }
+      punteroAnterior.current = null
+    },
+    [onToque]
+  )
+
+  const onPointerUp = useCallback((e: ReactPointerEvent<HTMLDivElement>) => finalizarArrastre(e), [finalizarArrastre])
   const onPointerCancel = useCallback(() => finalizarArrastre(), [finalizarArrastre])
 
   const onKeyDown = useCallback((e: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -98,6 +126,7 @@ export function useArrastreGlobo(reducedMotionRef: { current: boolean }) {
         return
     }
     estado.retornando = false
+    estado.pausado = false
     e.preventDefault()
   }, [])
 
@@ -107,6 +136,10 @@ export function useArrastreGlobo(reducedMotionRef: { current: boolean }) {
   const step = useCallback((dt: number) => {
     const estado = estadoRef.current
     if (estado.arrastrando) return
+    // Con una tarjeta de activo abierta, el auto-giro se congela (plan 009 §1.3) — arrastrar
+    // (arriba, estado.arrastrando) retoma el control igual, eso cierra la tarjeta desde
+    // GloboHolografico.tsx, no desde aca.
+    if (estado.pausado) return
 
     if (reducedMotionRef.current) {
       // El giro de base sigue constante aun con prefers-reduced-motion: es un elemento
@@ -151,9 +184,18 @@ export function useArrastreGlobo(reducedMotionRef: { current: boolean }) {
     }
   }, [reducedMotionRef])
 
+  // Mutar estadoRef.current directo desde AFUERA del hook (p.ej. GloboHolografico.tsx pausando
+  // el auto-giro mientras una tarjeta de activo esta abierta) rompe react-hooks/immutability —
+  // el lint no deja modificar un valor que devolvio un hook desde afuera de el. Este setter
+  // hace la mutacion ADENTRO del hook, que es donde esta permitida.
+  const setPausado = useCallback((valor: boolean) => {
+    estadoRef.current.pausado = valor
+  }, [])
+
   return {
     estadoRef,
     step,
+    setPausado,
     handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onKeyDown },
   }
 }

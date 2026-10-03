@@ -4,6 +4,8 @@
 // el resultado es siempre el mismo entre renders (y entre servidor/cliente, si alguna vez
 // hiciera falta), sin tener que memorizar nada fuera de React.
 
+import { latLonAVector3 } from '@/lib/globe/geo'
+
 function mulberry32(seed: number) {
   let s = seed | 0
   return function random() {
@@ -83,8 +85,8 @@ export function muestrearPuntosTierra(mask: ImageData, cantidadObjetivo: number,
     const repeticiones = costa ? 2 + Math.floor(rand() * 2) : 1
 
     for (let r = 0; r < repeticiones && aceptados < cantidadObjetivo; r++) {
-      const cosLat = Math.cos(lat)
-      positions.push(radio * cosLat * Math.cos(lon), radio * Math.sin(lat), radio * cosLat * Math.sin(lon))
+      const p = latLonAVector3(lat, lon, radio)
+      positions.push(p.x, p.y, p.z)
       brillos.push(costa ? 0.85 + rand() * 0.15 : 0.35 + rand() * 0.35)
       fases.push(rand() * Math.PI * 2)
       velocidades.push(0.6 + rand() * 1.2)

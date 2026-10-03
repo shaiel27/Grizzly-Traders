@@ -17,8 +17,18 @@ import { getTickerSnapshot } from '@/lib/ticker'
 import { getPivotQuotes } from '@/lib/pivot-data'
 import { calculatePivots } from '@/lib/pivots'
 import { localizedPost, sentimentMeta, timeAgo } from '@/lib/feed'
+import { scanTradingView } from '@/lib/markets'
+import { calcularSentimiento, type ResultadoSentimiento } from '@/lib/globe/sentimiento'
 import type { PostWithRelations } from '@/lib/types'
 import type { NoticiaPreview, CotizacionPreview, PivotePreview } from '@/components/modules/HomeFeatures'
+
+// No estan en lib/ticker.ts (confirmado: esa lista cubre SPX/DAX/NIKKEI/FTSE/VIX pero no China
+// ni Australia) — se piden aparte, solo el % del dia, para el score de sentimiento del globo
+// (plan 009 §3.1, decision D3: SSE + XJO).
+const GLOBE_EXTRA = [
+  { symbol: 'SSE', tv: 'TVC:SHCOMP' },
+  { symbol: 'XJO', tv: 'TVC:XJO' },
+] as const
 
 export const metadata: Metadata = {
   description:
@@ -103,15 +113,47 @@ export default async function HomePage({
     return { titulo: title, href: `/articulos/${slug}`, sentimientoLabel: sentimiento.label, sentimientoClase: sentimiento.chip, fecha: timeAgo(post.published_at, locale) }
   })
 
-  const cotizacionesPreview: CotizacionPreview[] = await getTickerSnapshot()
-    .then((snap) => {
-      const simbolos = ['BTC', 'XAUUSD', 'SPX']
-      return simbolos
-        .map((s) => snap.quotes.find((q) => q.symbol === s))
-        .filter((q): q is NonNullable<typeof q> => q != null)
-        .map((q) => ({ simbolo: q.symbol, label: q.label, precio: q.price, cambio: q.changePercent, moneda: q.currency }))
+  // Un solo pedido al snapshot del ticker (ya cacheado 15s, lib/ticker.ts) alimenta tanto la
+  // vista previa de "Terminal de mercados" como los pines de materias primas del globo (plan
+  // 009 §1.4) — cubre BRENT/WTI/XAUUSD/XAGUSD/NG sin pedidos nuevos, ya estaban en TICKER_ASSETS.
+  let cotizacionesPreview: CotizacionPreview[] = []
+  let cotizacionesGlobo: Record<string, { precio: number; cambio: number | null }> = {}
+  try {
+    const snap = await getTickerSnapshot()
+    const porSimbolo = new Map(snap.quotes.map((q) => [q.symbol, q]))
+    cotizacionesPreview = ['BTC', 'XAUUSD', 'SPX']
+      .map((s) => porSimbolo.get(s))
+      .filter((q): q is NonNullable<typeof q> => q != null)
+      .map((q) => ({ simbolo: q.symbol, label: q.label, precio: q.price, cambio: q.changePercent, moneda: q.currency }))
+    cotizacionesGlobo = Object.fromEntries(snap.quotes.map((q) => [q.symbol, { precio: q.price, cambio: q.changePercent }]))
+  } catch {
+    // cotizacionesPreview/cotizacionesGlobo se quedan vacios — las tarjetas/pines que los usan
+    // simplemente no muestran precio, no tumban el resto de la home.
+  }
+
+  // Score risk-on/risk-off del globo (plan 009 §3.1): se completa China/Australia aparte
+  // (no estan en el ticker) y se delega el calculo a una funcion pura y testeada
+  // (lib/globe/sentimiento.ts), nunca inline aca.
+  let riesgo: ResultadoSentimiento | null = null
+  try {
+    const filas = await scanTradingView(GLOBE_EXTRA.map((a) => a.tv), ['change'])
+    const porTicker = new Map(filas.map((f) => [f.s, f.d]))
+    const cambioDe = (tv: string) => {
+      const d = porTicker.get(tv)
+      const v = d?.[0]
+      return typeof v === 'number' ? v : null
+    }
+    riesgo = calcularSentimiento({
+      spx: cotizacionesGlobo.SPX?.cambio ?? null,
+      dax: cotizacionesGlobo.DAX?.cambio ?? null,
+      nikkei: cotizacionesGlobo.NIKKEI?.cambio ?? null,
+      ftse: cotizacionesGlobo.FTSE?.cambio ?? null,
+      sse: cambioDe('TVC:SHCOMP'),
+      vix: cotizacionesGlobo.VIX?.cambio ?? null,
     })
-    .catch(() => [])
+  } catch {
+    // riesgo se queda null — el chip del globo simplemente no se muestra.
+  }
 
   const pivotePreview: PivotePreview | null = await getPivotQuotes('D')
     .then((quotes) => {
@@ -137,6 +179,8 @@ export default async function HomePage({
         noticiasPreview={noticiasPreview}
         cotizacionesPreview={cotizacionesPreview}
         pivotePreview={pivotePreview}
+        cotizacionesGlobo={cotizacionesGlobo}
+        riesgo={riesgo}
       />
 
       <main id="main-content" tabIndex={-1} className="flex-grow pb-24 pt-10 max-w-[1200px] mx-auto px-6 md:px-8 w-full">
