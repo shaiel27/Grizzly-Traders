@@ -255,6 +255,15 @@
 .hero-fade-scale { opacity: 0; animation: heroFadeScale 0.6s var(--ease-hero-entrance) forwards; }
 .hero-bar-grow { opacity: 0; transform-origin: bottom; animation: heroBarGrow 0.42s var(--ease-hero-entrance) forwards; }
 
+/* Home loading screen's minimal splash mark — a slow, continuous breathe. Reduced
+   motion is already handled by the global catch-all below (it matches `*`), so no
+   separate motion-reduce class is needed here. */
+@keyframes splashBreathe {
+  0%, 100% { opacity: 0.55; transform: scale(0.94); }
+  50% { opacity: 1; transform: scale(1); }
+}
+.splash-mark { animation: splashBreathe 1.8s var(--ease-in-out) infinite; }
+
 @utility text-display-xxl {
   @apply text-[110px] font-medium leading-[0.85] tracking-[-0.05em];
 }

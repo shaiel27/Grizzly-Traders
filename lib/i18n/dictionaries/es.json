@@ -9,6 +9,10 @@
       "previous": "Anterior",
       "next": "Siguiente",
       "page": "Página {n}"
+    },
+    "loadingSplash": {
+      "caption": "Cargando mercados...",
+      "srLabel": "Cargando portal..."
     }
   },
   "header": {

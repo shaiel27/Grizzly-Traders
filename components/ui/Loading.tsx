@@ -1,14 +1,17 @@
 'use client'
 
 import { clsx } from 'clsx'
+import Image from 'next/image'
+import { getDictionary, type Locale } from '@/lib/i18n/get-dictionary'
 
 interface LoadingProps {
-  variant?: 'spinner' | 'skeleton' | 'cards' | 'article' | 'home'
+  variant?: 'spinner' | 'skeleton' | 'cards' | 'article' | 'splash'
   count?: number
   className?: string
+  locale?: Locale
 }
 
-// Shared card shape for the 'home' and 'cards' variants
+// Shared card shape for the 'cards' variant
 function CardSkeleton() {
   return (
     <div className="card animate-pulse motion-reduce:animate-none" aria-hidden="true">
@@ -29,7 +32,7 @@ function Bar({ className }: { className: string }) {
   return <div className={clsx('animate-pulse motion-reduce:animate-none rounded bg-surface-2', className)} />
 }
 
-export function Loading({ variant = 'spinner', count = 3, className }: LoadingProps) {
+export function Loading({ variant = 'spinner', count = 3, className, locale = 'es' }: LoadingProps) {
   if (variant === 'spinner') {
     return (
       <div className={clsx('flex items-center justify-center py-12', className)} role="status" aria-live="polite">
@@ -69,62 +72,18 @@ export function Loading({ variant = 'spinner', count = 3, className }: LoadingPr
     )
   }
 
-  if (variant === 'home') {
-    // Mirrors app/(site)/page.tsx: hero text, stats bar, breaking post, news grid, one category row
+  if (variant === 'splash') {
+    // Full-screen takeover for the home route's loading state: covers the real
+    // Header/LiveTicker too (z-[60] is above the header's z-50, Header.tsx:207), not a
+    // box inside the page's normal flow. Minimal on purpose — one breathing mark.
+    const dict = getDictionary(locale).common.loadingSplash
     return (
-      <div className={clsx('w-full', className)} role="status" aria-live="polite">
-        <div aria-hidden="true">
-          {/* Hero */}
-          <div className="mb-8 flex flex-col gap-5">
-            <Bar className="h-10 w-full max-w-xl sm:h-12" />
-            <Bar className="h-4 w-full max-w-2xl" />
-            <Bar className="h-4 w-3/4 max-w-xl" />
-          </div>
-
-          {/* Stats bar */}
-          <div className="mb-8 rounded-xl border border-hairline-soft bg-surface-1/50 p-4">
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <Bar className="size-9 shrink-0 rounded-lg" />
-                  <div className="flex-1 space-y-1.5">
-                    <Bar className="h-4 w-12" />
-                    <Bar className="h-3 w-20" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Breaking post */}
-          <div className="mb-8 grid gap-0 overflow-hidden rounded-2xl border border-hairline lg:grid-cols-[1.1fr_1fr]">
-            <div className="flex flex-col gap-4 p-5 md:p-6">
-              <Bar className="h-5 w-24 rounded-full" />
-              <Bar className="h-8 w-full" />
-              <Bar className="h-4 w-2/3" />
-              <div className="grid grid-cols-3 gap-2">
-                {[...Array(3)].map((_, i) => <Bar key={i} className="h-14 rounded-lg" />)}
-              </div>
-            </div>
-            <Bar className="min-h-[220px] rounded-none" />
-          </div>
-
-          {/* News grid */}
-          <div className="mb-4 flex items-end justify-between">
-            <Bar className="h-6 w-40" />
-            <Bar className="h-4 w-24" />
-          </div>
-          <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {[...Array(6)].map((_, i) => <CardSkeleton key={i} />)}
-          </div>
-
-          {/* One category row, representative of "Explorar por Categoría" */}
-          <Bar className="mb-4 h-6 w-48" />
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            {[...Array(3)].map((_, i) => <CardSkeleton key={i} />)}
-          </div>
-        </div>
-        <span className="sr-only">Cargando portal…</span>
+      <div className={clsx('fixed inset-0 z-[60] flex flex-col items-center justify-center gap-4 bg-canvas', className)} role="status" aria-live="polite">
+        <Image src="/logo.png" alt="" width={48} height={48} className="splash-mark size-12 object-contain" aria-hidden="true" />
+        <p aria-hidden="true" className="text-caption text-ink-muted">
+          {dict.caption}
+        </p>
+        <span className="sr-only">{dict.srLabel}</span>
       </div>
     )
   }
