@@ -1,4 +1,4 @@
-# 007 — Estabilidad del globo + fondo estrellado + tarjetas estilo "Anchor AI"
+# 008 — Estabilidad del globo + fondo estrellado + tarjetas estilo "Anchor AI"
 
 - **Estado**: PLAN → se implementa en el mismo turno en que se escribe (igual que las rondas anteriores de esta
   sesión: no hay round-trip de aprobación, se revisa con capturas reales después).
