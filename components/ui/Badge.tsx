@@ -15,7 +15,7 @@ interface BadgeProps {
 const sentimentStyles = {
   bullish: 'text-semantic-success bg-semantic-success/10 border-semantic-success/30',
   bearish: 'text-semantic-danger bg-semantic-danger/10 border-semantic-danger/30',
-  neutral: 'text-semantic-warning bg-semantic-warning/10 border-semantic-warning/30',
+  neutral: 'text-ink-muted bg-surface-2/60 border-hairline',
 }
 
 const sentimentLabels = {

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { clsx } from 'clsx'
 
 const ZONES = [
   { max: 25, label: 'Miedo extremo', color: 'var(--semantic-danger)' },
@@ -43,8 +44,13 @@ export function FearGreedGauge() {
   return (
     <section aria-label="Miedo y codicia en cripto">
       <h3 className="mb-3 text-[13px] font-semibold text-ink">Miedo y codicia en cripto</h3>
-      <div className="flex items-center gap-4">
-        <svg viewBox="0 0 120 70" className="h-14 w-24 shrink-0" role="img" aria-label={value === null ? 'Índice de miedo y codicia' : `Índice de miedo y codicia: ${value} de 100`}>
+      <div className="flex items-center gap-4" role={value === null ? 'status' : undefined} aria-live={value === null ? 'polite' : undefined}>
+        <svg
+          viewBox="0 0 120 70"
+          className={clsx('h-14 w-24 shrink-0', value === null && 'animate-pulse motion-reduce:animate-none')}
+          role="img"
+          aria-label={value === null ? 'Índice de miedo y codicia' : `Índice de miedo y codicia: ${value} de 100`}
+        >
           <path d="M 10 60 A 50 50 0 0 1 110 60" fill="none" stroke="var(--hairline)" strokeWidth="8" strokeLinecap="round" />
           {value !== null && zone && (
             <path
@@ -63,7 +69,11 @@ export function FearGreedGauge() {
 
         <div>
           {value === null ? (
-            <p className="text-[13px] text-ink-muted">Cargando…</p>
+            <>
+              <div aria-hidden="true" className="h-7 w-10 animate-pulse motion-reduce:animate-none rounded bg-surface-2" />
+              <div aria-hidden="true" className="mt-1.5 h-3 w-20 animate-pulse motion-reduce:animate-none rounded bg-surface-2" />
+              <span className="sr-only">Cargando índice de miedo y codicia…</span>
+            </>
           ) : (
             <>
               <p className="text-[28px] font-semibold leading-none tabular-nums text-ink">{value}</p>

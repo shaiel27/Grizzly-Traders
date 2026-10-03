@@ -7,6 +7,8 @@ import { publishSchema, firstIssue } from '@/lib/validation'
 
 // Always assign to Grizzly Traders author
 const GRIZZLY_AUTHOR_ID = 5
+// Below this plain-text length, a post shows as a headline-only tile instead of getting its own detail page
+const BRIEF_TEXT_THRESHOLD = 350
 
 export async function POST(request: Request) {
   const auth = await requireEditor()
@@ -31,6 +33,7 @@ export async function POST(request: Request) {
   }
 
   const supabase = await createEditorClient()
+  const format = htmlToText(contentHtml).length < BRIEF_TEXT_THRESHOLD ? 'brief' : 'article'
 
   const { data: post, error: postError } = await supabase
     .from('posts')
@@ -38,6 +41,7 @@ export async function POST(request: Request) {
       title: input.title,
       slug: input.slug,
       content_html: contentHtml,
+      format,
       sentiment: input.sentiment ?? null,
       cover_image_url: input.cover_image_url,
       og_image_url: input.og_image_url,

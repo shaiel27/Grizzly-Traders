@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function ToolsPage() {
   return (
-    <main id="main-content" tabIndex={-1} className="flex-1 pb-24 pt-[104px]">
+    <main id="main-content" tabIndex={-1} className="flex-1 pb-24 pt-[var(--header-height)]">
       <div className="mx-auto max-w-[1200px] px-6 pt-8 md:px-8">
         <Breadcrumbs items={[{ label: 'Inicio', href: '/' }, { label: 'Herramientas' }]} />
 

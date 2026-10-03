@@ -12,6 +12,7 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, icon, className, id, ...rest }, ref) => {
     const inputId = id || label?.toLowerCase().replace(/\s+/g, '-')
+    const errorId = error ? `${inputId}-error` : undefined
 
     return (
       <div className="w-full">
@@ -29,8 +30,11 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           <input
             ref={ref}
             id={inputId}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={errorId}
             className={clsx(
-              'w-full rounded-full px-5 py-3 text-base text-ink placeholder-ink-subtle bg-canvas/70 border transition-all duration-150',
+              // Border-color + the focus ring (box-shadow), not transition-all: no layout/transform properties here
+              'w-full rounded-full px-5 py-3 text-base text-ink placeholder-ink-subtle bg-canvas/70 border transition-[border-color,box-shadow] duration-150',
               icon ? 'pl-12' : '',
               error
                 ? 'border-semantic-danger focus:border-semantic-danger focus:ring-semantic-danger/20'
@@ -41,7 +45,11 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             {...rest}
           />
         </div>
-        {error && <p className="mt-1.5 text-sm text-semantic-danger">{error}</p>}
+        {error && (
+          <p id={errorId} className="mt-1.5 text-sm text-semantic-danger">
+            {error}
+          </p>
+        )}
       </div>
     )
   }

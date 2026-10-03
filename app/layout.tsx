@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter, Source_Serif_4 } from 'next/font/google'
 import { SITE_URL } from '@/lib/site'
+import { getServerLocale } from '@/lib/i18n/server'
 import './globals.css'
 
 const inter = Inter({
@@ -57,9 +58,14 @@ export const viewport: Viewport = {
   maximumScale: 5,
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Only the <html lang> attribute is resolved dynamically here (Fase 5 MVP). title/description/openGraph.locale
+  // stay the static ES defaults on purpose — making those request-dependent would require converting this static
+  // `metadata` export into an async generateMetadata(), which is Fase 7 scope (SEO/hreflang), not MVP.
+  const locale = await getServerLocale()
+
   return (
-    <html lang="es" className={`${inter.variable} ${serif.variable} h-full antialiased`}>
+    <html lang={locale} className={`${inter.variable} ${serif.variable} h-full antialiased`}>
       <head>
         <link rel="preload" href="/fonts/material-symbols.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
       </head>

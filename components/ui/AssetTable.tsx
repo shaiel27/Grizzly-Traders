@@ -92,7 +92,7 @@ export function AssetTable({ assets, loading = false, selectedSymbol = null, emp
     return (
       <div className="space-y-1" aria-busy="true" aria-label="Cargando activos">
         {Array.from({ length: 8 }, (_, index) => (
-          <div key={index} className="h-11 animate-pulse rounded-[6px] bg-surface-1" />
+          <div key={index} className="h-11 animate-pulse rounded-sm bg-surface-1" />
         ))}
       </div>
     )
@@ -130,6 +130,7 @@ export function AssetTable({ assets, loading = false, selectedSymbol = null, emp
                 <span className="col-span-2 flex items-center gap-4 text-[12px] text-ink-muted">
                   <span>
                     RSI <span className="tabular-nums text-ink">{asset.rsi ? asset.rsi.toFixed(0) : '—'}</span>
+                    {asset.rsi ? <span className="sr-only"> ({rsiReading(asset.rsi).label})</span> : null}
                   </span>
                   <span>
                     1 mes <span className={clsx('tabular-nums', tone(asset.perf1M))}>{pct(asset.perf1M, 1)}</span>
@@ -206,6 +207,7 @@ export function AssetTable({ assets, loading = false, selectedSymbol = null, emp
                   <td className="px-3 py-2.5 text-right tabular-nums text-ink-muted">{asset.marketCap > 0 ? formatNumber(asset.marketCap, 0, 1) : '—'}</td>
                   <td className={clsx('px-3 py-2.5 text-right tabular-nums', asset.rsi ? TONE_TEXT[rsi.tone] : 'text-ink-subtle')} title={rsi.label}>
                     {asset.rsi ? asset.rsi.toFixed(1) : '—'}
+                    {asset.rsi ? <span className="sr-only"> ({rsi.label})</span> : null}
                   </td>
                   <td className={clsx('px-3 py-2.5 text-right tabular-nums', asset.adx >= 25 ? 'text-ink' : 'text-ink-muted')}>{asset.adx ? asset.adx.toFixed(1) : '—'}</td>
                   <td className={clsx('whitespace-nowrap px-3 py-2.5 text-right', TONE_TEXT[rec.tone])}>{rec.label}</td>

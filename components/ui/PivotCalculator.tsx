@@ -100,10 +100,10 @@ function InputField({
         aria-invalid={error ? true : undefined}
         aria-describedby={`${id}-note`}
         className={clsx(
-          'w-full rounded-lg border bg-surface-2 px-3 py-2.5 font-mono text-sm text-ink transition-colors placeholder:text-ink-subtle focus:outline-none focus:ring-1',
+          'w-full rounded-lg border bg-surface-2 px-3 py-2.5 font-mono text-sm text-ink transition-colors placeholder:text-ink-muted focus:outline-none focus:ring-1',
           error
             ? 'border-semantic-danger/60 focus:border-semantic-danger focus:ring-semantic-danger/30'
-            : 'border-outline-variant/40 focus:border-accent-blue focus:ring-accent-blue/30'
+            : 'border-outline-variant/70 focus:border-accent-blue focus:ring-accent-blue/30'
         )}
       />
       <p id={`${id}-note`} className={clsx('mt-1 text-[11px]', error ? 'text-semantic-danger' : 'text-ink-subtle')}>
@@ -217,7 +217,7 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
     <div className="overflow-hidden rounded-2xl border border-outline-variant/40 bg-surface-container-lowest">
       <div className="flex items-center justify-between gap-3 border-b border-outline-variant/40 bg-surface-container-low px-6 py-4">
         <div>
-          <h2 className="flex items-center gap-2 text-headline font-bold text-ink">
+          <h2 className="flex items-center gap-2 text-headline text-ink">
             <span className="material-symbols-outlined text-[20px] text-accent-blue" aria-hidden="true">
               calculate
             </span>
@@ -287,7 +287,7 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
               id="calc-asset-select"
               value=""
               onChange={(event) => event.target.value && loadAsset(event.target.value)}
-              className="rounded-xl border border-outline-variant/40 bg-surface-2/50 px-3 py-2 text-xs font-bold text-ink-muted transition-colors hover:border-outline-variant focus:border-accent-blue focus:outline-none"
+              className="rounded-xl border border-outline-variant/70 bg-surface-2/50 px-3 py-2 text-xs font-bold text-ink-muted transition-colors hover:border-outline-variant focus:border-accent-blue focus:outline-none"
             >
               <option value="">Más activos…</option>
               {PIVOT_CATEGORIES.map((category) => (
@@ -369,7 +369,7 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
                     aria-pressed={method === option}
                     onClick={() => setMethod(option)}
                     className={clsx(
-                      'flex-1 whitespace-nowrap rounded-lg px-4 py-2.5 text-xs font-bold uppercase tracking-wider transition-all',
+                      'flex-1 whitespace-nowrap rounded-lg px-4 py-2.5 text-xs font-bold uppercase tracking-wider transition-colors duration-150',
                       method === option ? 'bg-surface-container-lowest text-ink shadow-sm' : 'text-ink-muted hover:text-ink'
                     )}
                   >
@@ -459,7 +459,7 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
                     <select
                       value={tolerance}
                       onChange={(event) => setTolerance(Number(event.target.value))}
-                      className="rounded-lg border border-outline-variant/40 bg-surface-2 px-2 py-1 text-micro text-ink focus:border-accent-blue focus:outline-none"
+                      className="rounded-lg border border-outline-variant/70 bg-surface-2 px-2 py-1 text-micro text-ink focus:border-accent-blue focus:outline-none"
                     >
                       {TOLERANCES.map((value) => (
                         <option key={value} value={value}>

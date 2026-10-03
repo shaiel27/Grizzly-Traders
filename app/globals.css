@@ -31,6 +31,26 @@
   --surface-container-high: #2a2a2a;
   --outline-variant: #444748;
   --surface-variant: #353534;
+  /* Brand accent reserved for VIP/premium callouts — kept out of the main semantic palette on purpose */
+  --brand-amber: #f7b955;
+  /* Ticker (32px) + identity row (64px); the command strip (40px) only exists from md up */
+  --header-height: 96px;
+  --header-scroll-offset: 116px;
+  /* Wider container for data-dense terminals (markets, pivot points); editorial content uses section-container (1200px) */
+  --container-wide: 1400px;
+  /* Easing tokens: built-in `ease-out`/`ease-in-out` read as weak at this duration range */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  /* Reserved for the home hero's one-shot load sequence only — a distinct, slightly
+     snappier curve than --ease-out above, by design (not a drift/inconsistency). */
+  --ease-hero-entrance: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (min-width: 768px) {
+  :root {
+    --header-height: 136px;
+    --header-scroll-offset: 156px;
+  }
 }
 
 @theme inline {
@@ -62,6 +82,7 @@
   --color-surface-container-high: var(--surface-container-high);
   --color-outline-variant: var(--outline-variant);
   --color-surface-variant: var(--surface-variant);
+  --color-brand-amber: var(--brand-amber);
   --font-sans: var(--font-inter), "Inter", system-ui, sans-serif;
   --font-serif: var(--font-source-serif), "Source Serif 4", Georgia, "Times New Roman", serif;
   --radius-sm: 0.5rem;
@@ -86,7 +107,7 @@
     background: var(--accent-blue);
     color: var(--ink);
   }
-  :where(a, button, summary, [tabindex]):focus-visible {
+  :where(a, button, summary, input, select, textarea, [tabindex]):focus-visible {
     outline: 2px solid var(--accent-blue);
     outline-offset: 2px;
   }
@@ -114,16 +135,17 @@
 
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium text-primary-on bg-primary transition-all duration-150;
+    /* Also animates shadow + scale, so it keeps its own explicit property list instead of transition-colors */
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium text-primary-on bg-primary transition-[color,background-color,box-shadow,transform] duration-150;
     @apply hover:shadow-[0_0_20px_rgba(255,255,255,0.2)] active:scale-[0.98];
   }
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium text-ink bg-surface-1 border border-hairline transition-all duration-150;
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium text-ink bg-surface-1 border border-hairline transition-colors duration-150;
     @apply hover:border-[rgb(64,64,64)] hover:bg-surface-2;
   }
   .card {
-    @apply bg-surface-1 border border-hairline-soft rounded-xl p-5 transition-all duration-200;
-    @apply hover:border-hairline hover:-translate-y-0.5 hover:shadow-[0_12px_32px_rgba(0,0,0,0.6)];
+    @apply bg-surface-1 border border-hairline-soft rounded-xl p-5 transition-colors duration-200;
+    @apply hover:border-hairline;
   }
   .card-spotlight {
     @apply relative overflow-hidden bg-surface-1 rounded-2xl p-8 border border-white/10;
@@ -131,6 +153,9 @@
   }
   .section-container {
     @apply max-w-[1200px] mx-auto px-[16px] sm:px-[20px];
+  }
+  .container-wide {
+    @apply max-w-[1400px] mx-auto px-[16px] sm:px-[20px];
   }
 }
 
@@ -201,6 +226,34 @@
 }
 /* Deliberately no prefers-reduced-motion override: Windows with animations turned off reports it
    too, and the bar would stop being a ticker. Motion is optional through the pause button (WCAG 2.2.2). */
+
+/* Global reduced-motion safety net. Per-element animate-ping/-spin/-pulse already carry their own
+   motion-reduce:animate-none (Tailwind compiles those into this same media query); this is the
+   catch-all for everything else — CSS transitions (hover transforms, etc.) collapse to a same opacity-only
+   fade and any stray keyframe animation this pass missed gets shortened to effectively nothing.
+   `.ticker-track`/`.ticker-motion` are excluded on purpose: the ticker keeps scrolling exactly as it
+   does today, same as without this block — it has its own pause button (WCAG 2.2.2), not re-litigated here. */
+@media (prefers-reduced-motion: reduce) {
+  *:not(.ticker-track):not(.ticker-motion) {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-property: opacity !important;
+    transition-duration: 150ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Home hero entrance — one-shot on load, opacity:0 in markup, revealed by `forwards` fill.
+   Covered by the global prefers-reduced-motion block above (it matches `*`). */
+@keyframes heroFadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes heroFadeDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes heroFadeScale { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
+@keyframes heroBarGrow { from { transform: scaleY(0.15); opacity: 0; } to { transform: scaleY(1); opacity: 1; } }
+
+.hero-fade-up { opacity: 0; animation: heroFadeUp 0.6s var(--ease-hero-entrance) forwards; }
+.hero-fade-down { opacity: 0; animation: heroFadeDown 0.5s var(--ease-hero-entrance) forwards; }
+.hero-fade-scale { opacity: 0; animation: heroFadeScale 0.6s var(--ease-hero-entrance) forwards; }
+.hero-bar-grow { opacity: 0; transform-origin: bottom; animation: heroBarGrow 0.42s var(--ease-hero-entrance) forwards; }
 
 @utility text-display-xxl {
   @apply text-[110px] font-medium leading-[0.85] tracking-[-0.05em];

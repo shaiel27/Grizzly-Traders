@@ -61,7 +61,7 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
   const socials = SOCIAL_LINKS.filter((link) => author[link.key])
 
   return (
-    <main id="main-content" tabIndex={-1} className="flex-1 pt-[104px] pb-24">
+    <main id="main-content" tabIndex={-1} className="flex-1 pt-[var(--header-height)] pb-24">
       <div className="mx-auto max-w-[1200px] px-6 md:px-8">
         <Breadcrumbs items={[{ label: 'Inicio', href: '/' }, { label: 'Autores', href: '/autor' }, { label: author.full_name }]} />
 
@@ -84,16 +84,17 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
             )}
 
             <div className="flex-1">
-              <h1 className="mb-2 text-display-md font-bold text-ink">{author.full_name}</h1>
+              <h1 className="mb-2 font-serif text-display-md font-bold text-ink">{author.full_name}</h1>
               {author.role && <p className="mb-4 text-body font-bold text-accent-blue">{author.role}</p>}
               {author.bio && <p className="mb-6 max-w-2xl text-body text-ink-muted">{author.bio}</p>}
 
               {statItems.length > 0 && (
                 <dl className="flex flex-wrap items-center gap-8">
                   {statItems.map((item) => (
-                    <div key={item.label}>
-                      <dd className="text-display-sm font-bold text-ink">{item.value}</dd>
-                      <dt className="text-micro text-ink-muted">{item.label}</dt>
+                    <div key={item.label} className="flex flex-col">
+                      {/* dt before dd in the DOM (correct <dl> order); order-* keeps the number shown above the label */}
+                      <dt className="order-2 text-micro text-ink-muted">{item.label}</dt>
+                      <dd className="order-1 text-display-sm font-bold text-ink">{item.value}</dd>
                     </div>
                   ))}
                 </dl>
@@ -123,7 +124,7 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
         </section>
 
         <section aria-labelledby="author-articles-heading">
-          <h2 id="author-articles-heading" className="mb-6 text-headline font-bold text-ink">
+          <h2 id="author-articles-heading" className="mb-6 text-headline text-ink">
             Últimos Artículos
           </h2>
           {posts.length > 0 ? (

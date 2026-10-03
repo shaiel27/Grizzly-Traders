@@ -1,11 +1,14 @@
 'use client'
 
 import { useId, useState, type FormEvent } from 'react'
+import Link from 'next/link'
+import { useDictionary } from '@/lib/i18n/LocaleProvider'
 
 type Status = { kind: 'idle' } | { kind: 'loading' } | { kind: 'done' } | { kind: 'error'; message: string }
 
 export function NewsletterForm() {
   const id = useId()
+  const dict = useDictionary()
   const [email, setEmail] = useState('')
   const [website, setWebsite] = useState('')
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
@@ -65,6 +68,14 @@ export function NewsletterForm() {
       <p role="status" className="mt-2 min-h-5 text-micro">
         {status.kind === 'done' && <span className="text-semantic-success">¡Listo! Te avisaremos de las novedades.</span>}
         {status.kind === 'error' && <span className="text-semantic-danger">{status.message}</span>}
+      </p>
+
+      <p className="mt-2 text-micro text-ink-subtle">
+        {dict.footer.newsletterConsentPrefix}{' '}
+        <Link href="/legal/privacidad" className="font-medium text-ink-muted underline hover:text-ink">
+          {dict.footer.newsletterConsentLink}
+        </Link>
+        .
       </p>
     </form>
   )

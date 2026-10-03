@@ -94,7 +94,7 @@ export function RiskCalculator() {
                 value={values[field.key]}
                 onChange={(event) => setValues((prev) => ({ ...prev, [field.key]: event.target.value }))}
                 placeholder={field.placeholder}
-                className="w-full rounded-lg border border-outline-variant/40 bg-surface-2 px-3 py-2.5 font-mono text-sm text-ink placeholder:text-ink-subtle transition-colors focus:border-accent-blue focus:outline-none focus:ring-1 focus:ring-accent-blue/30"
+                className="w-full rounded-lg border border-outline-variant/70 bg-surface-2 px-3 py-2.5 font-mono text-sm text-ink placeholder:text-ink-muted transition-colors focus:border-accent-blue focus:outline-none focus:ring-1 focus:ring-accent-blue/30"
               />
             </div>
           ))}

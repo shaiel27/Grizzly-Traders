@@ -12,6 +12,9 @@ const STATIC_ROUTES: { path: string; changeFrequency: 'hourly' | 'daily' | 'week
   { path: '/autor', changeFrequency: 'weekly', priority: 0.4 },
   { path: '/herramientas', changeFrequency: 'monthly', priority: 0.5 },
   { path: '/aprende', changeFrequency: 'monthly', priority: 0.6 },
+  { path: '/legal/privacidad', changeFrequency: 'monthly', priority: 0.3 },
+  { path: '/legal/terminos', changeFrequency: 'monthly', priority: 0.3 },
+  { path: '/legal/cookies', changeFrequency: 'monthly', priority: 0.3 },
 ]
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

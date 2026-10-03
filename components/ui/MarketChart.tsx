@@ -308,7 +308,7 @@ export function MarketChart({
               aria-pressed={timeframe === option}
               onClick={() => setTimeframe(option)}
               className={clsx(
-                'h-7 min-w-9 rounded-[6px] px-2 text-[12px] font-medium tabular-nums transition-colors focus-visible:outline-2 focus-visible:outline-accent-blue',
+                'h-7 min-w-9 rounded-sm px-2 text-[12px] font-medium tabular-nums transition-colors focus-visible:outline-2 focus-visible:outline-accent-blue',
                 timeframe === option ? 'bg-surface-2 text-ink' : 'text-ink-muted hover:bg-surface-1 hover:text-ink'
               )}
             >
@@ -324,7 +324,7 @@ export function MarketChart({
               aria-pressed={levelsOn}
               onClick={() => setLevelsOn((value) => !value)}
               className={clsx(
-                'h-7 rounded-[6px] px-2.5 text-[12px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent-blue',
+                'h-7 rounded-sm px-2.5 text-[12px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent-blue',
                 levelsOn ? 'bg-surface-2 text-ink' : 'text-ink-muted hover:bg-surface-1 hover:text-ink'
               )}
             >
@@ -338,7 +338,7 @@ export function MarketChart({
               aria-expanded={menuOpen}
               aria-haspopup="true"
               onClick={() => setMenuOpen((value) => !value)}
-              className="flex h-7 items-center gap-1 rounded-[6px] px-2.5 text-[12px] font-medium text-ink-muted transition-colors hover:bg-surface-1 hover:text-ink focus-visible:outline-2 focus-visible:outline-accent-blue"
+              className="flex h-7 items-center gap-1 rounded-sm px-2.5 text-[12px] font-medium text-ink-muted transition-colors hover:bg-surface-1 hover:text-ink focus-visible:outline-2 focus-visible:outline-accent-blue"
             >
               Indicadores
               <span className="material-symbols-outlined text-[16px]" aria-hidden="true">

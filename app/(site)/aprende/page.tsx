@@ -25,7 +25,7 @@ export default function LearnPage() {
   }
 
   return (
-    <main id="main-content" tabIndex={-1} className="flex-1 pb-24 pt-[104px]">
+    <main id="main-content" tabIndex={-1} className="flex-1 pb-24 pt-[var(--header-height)]">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd) }} />
 
       <div className="mx-auto max-w-[1200px] px-6 pt-8 md:px-8">
@@ -58,7 +58,7 @@ export default function LearnPage() {
               <div
                 key={entry.slug}
                 id={entry.slug}
-                className="scroll-mt-[128px] rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-6"
+                className="scroll-mt-[var(--header-scroll-offset)] rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-6"
               >
                 <dt className="mb-2 text-subhead font-bold text-ink">{entry.term}</dt>
                 <dd className="text-body text-ink-muted">{entry.definition}</dd>

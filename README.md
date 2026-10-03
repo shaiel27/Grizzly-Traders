@@ -24,6 +24,7 @@ pnpm dev                     # http://localhost:3000
 | `CMS_ALLOWED_EMAILS` | Correos (separados por coma) de usuarios de Supabase Auth con acceso al CMS. Vacío = nadie. |
 | `FINNHUB_API_KEY` | Cotizaciones de acciones e índices. |
 | `N8N_MCP_TOKEN`, `N8N_MCP_URL`, `N8N_WORKFLOW_ID` | Pipeline de contenido en n8n (solo servidor). |
+| `N8N_API_KEY` | API REST de n8n (solo servidor). Permite pausar/reanudar la automatización desde el CMS (`/api/automation/*`). Sin definir, esos botones quedan deshabilitados. |
 | `NEXT_PUBLIC_VIP_URL`, `NEXT_PUBLIC_TELEGRAM_URL` | Botones de la home (se ocultan si están vacías). |
 
 Al arrancar el servidor, `instrumentation.ts` valida estas variables con `lib/env.ts`: si falta una obligatoria (las dos de Supabase) o alguna tiene un formato inválido, el servidor se detiene con un mensaje que las lista todas. Las variables vacías (`KEY=`) se tratan como no definidas.
@@ -64,3 +65,18 @@ Gráficos: `/api/candles?symbol=<ticker>&tf=<1m|5m|15m|1h|4h|1d|1w|1mo>` sirve v
 Pivot points (`/pivot-points`): el scanner devuelve el precio actual y el máximo, mínimo, apertura y cierre del período anterior (`high[1]`, `low[1]`…, con `|1W` y `|1M` para semanal y mensual); los cinco métodos se calculan en `lib/pivots.ts`. No se usan las columnas `Pivot.M.*` del scanner porque son pivotes mensuales sin importar el período. El catálogo de activos está en `lib/pivot-assets.ts` (cada ticker se comprobó contra el scanner: uno desconocido desaparece en silencio) y los futuros de Brent, WTI y gas natural no tienen datos semanales ni mensuales.
 
 Barra de mercados (encima del header): `/api/ticker` devuelve ~34 activos (cripto, forex, materias primas, índices y acciones) desde el scanner de TradingView, con los proveedores anteriores como respaldo si el scanner no devuelve un activo. El navegador la consulta cada 3 s mientras la pestaña está visible (con espera creciente si falla), así que se actualiza sin recargar. El servidor comparte una sola consulta al scanner, renovada como máximo cada 2 s, entre todos los visitantes, y sigue sirviendo el último dato bueno hasta 60 s si el scanner falla. El primer pintado (layout) usa una caché aparte de 15 s para no regenerar las páginas estáticas. La lista y el orden están en `lib/ticker.ts`.
+
+## Pipeline de noticias (n8n)
+
+El contenido de `/articulos` no se escribe a mano: un workflow en n8n Cloud (`Pipeline Noticias Financieras -> Supabase + Telegram/Discord`, fuera de este repo) lo genera y publica solo. Dos ramas independientes en el mismo workflow:
+
+- **Noticias** (cada 30 min): junta 4 fuentes (RSS de Cointelegraph/Investing.com, scrape de OTC Financial y Reuters vía Firecrawl), filtra duplicados y calidad, y procesa los candidatos nuevos uno por uno: chequeo semántico de duplicado (OpenAI `gpt-4o-mini`) → scrape del artículo completo (Firecrawl) → redacción en español + prompt de imagen (OpenAI `gpt-4o-mini`) → portada (OpenAI `gpt-image-1-mini`) → publicación en Supabase.
+- **Calendario económico** (cada 5 horas): sincroniza el calendario de ForexFactory vía Apify hacia la tabla `economic_events`, que alimenta `/calendario`.
+
+**Límite duro de la plataforma**: esta instancia de n8n Cloud corta cualquier ejecución a los 180s (`executionTimeout`), sin excepción — no es configurable más alto. La llamada más lenta de toda la cadena es "OpenAI - Imagen GPT" (generación de portada), muy por encima de cualquier otro paso pagado. Para no pagar el scrape + análisis de un candidato que de todas formas no va a alcanzar a generar su imagen antes del corte, hay un gate de presupuesto de tiempo (`$getWorkflowStaticData`, umbral de 65s restantes) antes de arrancar la cadena cara de cada candidato — si no alcanza, se salta limpio (se loguea en `pipeline_logs` con `status: 'skipped_budget'`) y ese mismo candidato tiene otra oportunidad en la corrida siguiente si sigue vigente.
+
+**Visibilidad de costo**: `pipeline_logs` (una fila por candidato: `success` / `error` / `skipped_budget`) y `pipeline_runs` (una fila por corrida, con `started_at`/`finished_at`) permiten cruzar cuánto tardó cada corrida con qué pasó en ella.
+
+**Alertas**: el workflow tiene un `errorWorkflow` (workflow separado "Grizzly - Alertas de Pipeline", con un Error Trigger) que avisa por Telegram ante cualquier fallo, más un chequeo de salud horario ("Grizzly - Chequeo de salud") que avisa si no hubo ninguna publicación exitosa en las últimas 2 horas — pensado para el caso en que el trigger siga disparando pero algo se rompa silenciosamente sin que el Error Trigger llegue a activarse (ej. una ejecución cortada por el límite de 180s).
+
+**Pausar/reanudar**: el botón en el CMS (pestaña Artículos) queda deshabilitado hasta definir `N8N_API_KEY` (ver tabla de variables de entorno); mientras tanto, se pausa/reanuda directamente desde el editor de n8n.

@@ -8,12 +8,18 @@ const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY ?? ''
 
 const REQUEST_TIMEOUT_MS = 8_000
 
+class HttpError extends Error {
+  constructor(public status: number) {
+    super(`HTTP ${status}`)
+  }
+}
+
 async function fetchJson(url: string) {
   const response = await fetch(url, {
     next: { revalidate: 10 },
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
-  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  if (!response.ok) throw new HttpError(response.status)
   return response.json()
 }
 
@@ -35,8 +41,15 @@ export interface PriceData {
   timestamp: number
 }
 
+// CoinGecko's free tier rate-limits aggressively; once we hit a 429 we stop knocking for a while
+// instead of retrying every call and piling up more 429s while the window resets.
+const COINGECKO_COOLDOWN_MS = 60_000
+let coinGeckoCooldownUntil = 0
+
 // CoinGecko: Crypto + Gold (pax-gold tracks XAU/USD)
 async function fetchCoinGeckoPrices(): Promise<PriceData[]> {
+  if (Date.now() < coinGeckoCooldownUntil) return fetchYahooFallbackPrices()
+
   try {
     const data = await fetchJson(
       `${COINGECKO_BASE}/simple/price?ids=bitcoin,ethereum,solana,pax-gold&vs_currencies=usd&include_24hr_change=true`
@@ -66,7 +79,14 @@ async function fetchCoinGeckoPrices(): Promise<PriceData[]> {
       ]
     })
   } catch (error) {
-    console.error('CoinGecko prices failed, using Yahoo fallback:', error)
+    // A 429 is CoinGecko's normal free-tier behavior, not a bug — the Yahoo fallback covers it,
+    // so this is a warning, not an error, and it earns a cooldown so we stop asking for a while.
+    if (error instanceof HttpError && error.status === 429) {
+      coinGeckoCooldownUntil = Date.now() + COINGECKO_COOLDOWN_MS
+      console.warn('CoinGecko rate-limited (429); pausing 60s and using Yahoo fallback')
+    } else {
+      console.warn('CoinGecko prices failed, using Yahoo fallback:', error)
+    }
     return fetchYahooFallbackPrices()
   }
 }
@@ -128,7 +148,7 @@ async function fetchForexPrices(): Promise<PriceData[]> {
 
   return results.flatMap((result) => {
     if (result.status === 'rejected') {
-      console.error('Forex prices failed:', result.reason)
+      console.warn('Forex prices failed:', result.reason)
       return []
     }
     return result.value ? [result.value] : []
@@ -174,7 +194,7 @@ async function fetchFinnhubPrices(): Promise<PriceData[]> {
 
     return results.filter((r): r is PriceData => r !== null && r.price > 0)
   } catch (error) {
-    console.error('Finnhub prices failed:', error)
+    console.warn('Finnhub prices failed:', error)
     return []
   }
 }

@@ -2,6 +2,8 @@
 
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { Chip } from './Chip'
+import { categoryMeta } from '@/lib/feed'
+import { useDictionary, useLocale } from '@/lib/i18n/LocaleProvider'
 import type { Category, Tag, Asset } from '@/lib/types'
 
 interface CategoryFilterProps {
@@ -14,6 +16,8 @@ export function CategoryFilter({ categories, tags = [], assets = [] }: CategoryF
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
+  const { locale } = useLocale()
+  const dict = useDictionary()
 
   const currentCategory = searchParams.get('categoria')
   const currentTag = searchParams.get('tag')
@@ -39,25 +43,25 @@ export function CategoryFilter({ categories, tags = [], assets = [] }: CategoryF
   return (
     <div className="section-container py-4">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-subhead font-bold text-ink">Filtros</h2>
+        <h2 className="text-subhead font-bold text-ink">{dict.feedControls.filtersTitle}</h2>
         {hasFilters && (
           <button
             onClick={clearAll}
             className="text-body-sm text-accent-blue hover:text-accent-blue-hover transition-colors"
           >
-            Limpiar todo
+            {dict.feedControls.clearAll}
           </button>
         )}
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Categorías">
+        <div className="flex flex-wrap gap-2" role="group" aria-label={dict.feedControls.categoriesAria}>
           <Chip
             active={!currentCategory}
             onClick={() => updateParams('categoria', null)}
             className="bg-surface-2"
           >
-            Todas
+            {dict.feedControls.allCategories}
           </Chip>
           {categories.map((cat) => (
             <Chip
@@ -65,19 +69,19 @@ export function CategoryFilter({ categories, tags = [], assets = [] }: CategoryF
               active={currentCategory === cat.slug}
               onClick={() => updateParams('categoria', currentCategory === cat.slug ? null : cat.slug)}
             >
-              {cat.name}
+              {categoryMeta(cat, locale).name}
             </Chip>
           ))}
         </div>
 
         {tags.length > 0 && (
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Tags">
+          <div className="flex flex-wrap gap-2" role="group" aria-label={dict.feedControls.tagsAria}>
             <Chip
               active={!currentTag}
               onClick={() => updateParams('tag', null)}
               className="bg-surface-2"
             >
-              Todos los tags
+              {dict.feedControls.allTags}
             </Chip>
             {tags.slice(0, 10).map((tag) => (
               <Chip
@@ -92,20 +96,19 @@ export function CategoryFilter({ categories, tags = [], assets = [] }: CategoryF
         )}
 
         {assets.length > 0 && (
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Activos">
+          <div className="flex flex-wrap gap-2" role="group" aria-label={dict.feedControls.assetsAria}>
             <Chip
               active={!currentAsset}
               onClick={() => updateParams('activo', null)}
               className="bg-surface-2"
             >
-              Todos los activos
+              {dict.feedControls.allAssets}
             </Chip>
             {assets.slice(0, 8).map((asset) => (
               <Chip
                 key={asset.symbol}
                 active={currentAsset === asset.symbol}
                 onClick={() => updateParams('activo', currentAsset === asset.symbol ? null : asset.symbol)}
-                className="bg-surface-2 border-accent-blue/30 text-accent-blue"
               >
                 {asset.symbol}
               </Chip>

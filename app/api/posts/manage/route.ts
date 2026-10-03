@@ -5,6 +5,9 @@ import { createEditorClient } from '@/lib/supabase/admin'
 import { sanitizeArticleHtml, htmlToText } from '@/lib/sanitize'
 import { patchPostSchema, postIdSchema, updatePostSchema, firstIssue } from '@/lib/validation'
 
+// Below this plain-text length, a post shows as a headline-only tile instead of getting its own detail page
+const BRIEF_TEXT_THRESHOLD = 350
+
 // Full post, both translations and related ids, so the editor form can be repopulated for editing
 export async function GET(request: Request) {
   const auth = await requireEditor()
@@ -166,6 +169,7 @@ export async function PUT(request: Request) {
     scheduled_at: input.scheduled_at,
     category_id: input.category_id,
     is_featured: input.is_featured,
+    format: htmlToText(contentHtml).length < BRIEF_TEXT_THRESHOLD ? 'brief' : 'article',
     reading_time_minutes: Math.max(1, Math.ceil(htmlToText(contentHtml).split(' ').length / 200)),
   }
   if (input.status === 'published' && !current.published_at) postUpdate.published_at = new Date().toISOString()

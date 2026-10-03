@@ -82,6 +82,7 @@ export type Post = {
   source_url: string | null
   source_id: number | null
   status: 'draft' | 'published' | 'scheduled'
+  format: 'article' | 'brief'
   embedding: unknown | null
   search_vector: unknown | null
   view_count: number

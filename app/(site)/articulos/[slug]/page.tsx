@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation'
 import { after } from 'next/server'
 import { ArticleCard, Badge, Chip, Breadcrumbs } from '@/components/ui'
 import { ShareButtons } from '@/components/ui/ShareButtons'
-import { getPostBySlug, getRelatedPosts, incrementViewCount } from '@/lib/api'
+import { getPostBySlug, getPostViewCount, getRelatedPosts, incrementViewCount } from '@/lib/api'
 import { htmlToText, sanitizeArticleHtml } from '@/lib/sanitize'
 import { SITE_NAME, SITE_URL } from '@/lib/site'
 import { jsonLdString } from '@/lib/json-ld'
@@ -79,6 +79,11 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
     after(() => incrementViewCount(postId))
   }
 
+  // getPostBySlug is cached for 5 minutes; view_count would look frozen for that whole window
+  // (and never reflect this same request's own increment, which runs after the response anyway).
+  const liveViewCount = await getPostViewCount(post.id)
+  const viewCount = liveViewCount ?? post.view_count
+
   const translation = post.translations?.find((t) => t.locale === 'es') || post.translations?.[0]
   const title = translation?.title || post.title
   const content = sanitizeArticleHtml(translation?.content_html || post.content_html)
@@ -111,7 +116,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
         dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd) }}
       />
 
-      <main id="main-content" tabIndex={-1} className="flex-1 pt-[104px] pb-24">
+      <main id="main-content" tabIndex={-1} className="flex-1 pt-[var(--header-height)] pb-24">
         <article className="section-container max-w-4xl pt-8">
           <Breadcrumbs
             items={[
@@ -164,7 +169,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
                 </>
               )}
               <span>•</span>
-              <span>{post.view_count.toLocaleString()} vistas</span>
+              <span>{viewCount.toLocaleString()} vistas</span>
             </div>
           </header>
 
@@ -173,8 +178,9 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
             <div className="relative aspect-video mb-8 rounded-2xl overflow-hidden">
               <Image
                 src={post.cover_image_url}
-                alt={title}
+                alt=""
                 fill
+                sizes="(min-width: 896px) 896px, 100vw"
                 className="object-cover"
                 priority
               />
@@ -220,11 +226,13 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           {relatedPosts.length > 0 && (
             <section className="mt-16" aria-labelledby="related-heading">
               <h2 id="related-heading" className="text-display-md font-bold text-ink mb-6">Artículos Relacionados</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <ul className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {relatedPosts.map((relatedPost) => (
-                  <ArticleCard key={relatedPost.id} post={relatedPost} />
+                  <li key={relatedPost.id}>
+                    <ArticleCard post={relatedPost} />
+                  </li>
                 ))}
-              </div>
+              </ul>
             </section>
           )}
         </article>

@@ -6,7 +6,6 @@ import dynamic from 'next/dynamic'
 import { AssetDetailPanel } from '@/components/ui/AssetDetailPanel'
 import { AssetTable } from '@/components/ui/AssetTable'
 import { CryptoRankings } from '@/components/ui/CryptoRankings'
-import { EconomicCalendar } from '@/components/ui/EconomicCalendar'
 import { MarketAssetHeader } from '@/components/ui/MarketAssetHeader'
 import type { ChartLevel } from '@/components/ui/MarketChart'
 import { MarketOverview } from '@/components/ui/MarketOverview'
@@ -20,7 +19,11 @@ import { useWatchlist } from '@/lib/watchlist'
 // lightweight-charts touches the DOM, so it is loaded on the client only and kept out of the initial bundle
 const MarketChart = dynamic(() => import('@/components/ui/MarketChart').then((mod) => mod.MarketChart), {
   ssr: false,
-  loading: () => <div className="h-[520px] animate-pulse bg-surface-1" aria-hidden="true" />,
+  loading: () => (
+    <div className="h-[520px] animate-pulse motion-reduce:animate-none bg-surface-1" role="status" aria-live="polite">
+      <span className="sr-only">Cargando gráfico…</span>
+    </div>
+  ),
 })
 
 const PIVOT_COLOR = { resistance: '#22c55e', pivot: '#0099ff', support: '#ff3b30' } as const
@@ -143,8 +146,8 @@ export function MarketsClient({ initialAssets, initialSymbol = null }: MarketsCl
   }
 
   return (
-    <main id="main-content" tabIndex={-1} className="flex-1 pt-[104px] pb-24">
-      <div className="mx-auto max-w-[1400px] px-6 pt-8 md:px-8">
+    <main id="main-content" tabIndex={-1} className="flex-1 pt-[var(--header-height)] pb-24">
+      <div className="container-wide pt-8">
         <header className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
           <div>
             <h1 className="text-[32px] font-semibold leading-tight tracking-tight text-ink">Terminal de mercados</h1>
@@ -152,7 +155,7 @@ export function MarketsClient({ initialAssets, initialSymbol = null }: MarketsCl
           </div>
           <p className="flex items-center gap-2 text-[13px] text-ink-muted">
             <span className="relative flex size-1.5" aria-hidden="true">
-              {!error && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-semantic-success opacity-70" />}
+              {!error && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-semantic-success opacity-70 motion-reduce:animate-none" />}
               <span className={error ? 'relative inline-flex size-1.5 rounded-full bg-semantic-warning' : 'relative inline-flex size-1.5 rounded-full bg-semantic-success'} />
             </span>
             {lastUpdate ? `Actualizado a las ${lastUpdate.toLocaleTimeString('es-ES')}` : 'Datos en vivo'}
@@ -165,7 +168,7 @@ export function MarketsClient({ initialAssets, initialSymbol = null }: MarketsCl
           </p>
         )}
 
-        <section ref={terminalRef} aria-label="Terminal" className="scroll-mt-[124px] flex flex-col gap-4 xl:grid xl:grid-cols-[340px_minmax(0,1fr)] xl:gap-6">
+        <section ref={terminalRef} aria-label="Terminal" className="scroll-mt-[var(--header-scroll-offset)] flex flex-col gap-4 xl:grid xl:grid-cols-[340px_minmax(0,1fr)] xl:gap-6">
           <div className="relative order-2 overflow-hidden rounded-[10px] border border-hairline bg-surface-container-lowest xl:order-1">
             <div className="flex max-h-[460px] min-h-0 flex-col xl:absolute xl:inset-0 xl:max-h-none">
               <MarketWatchlist
@@ -184,7 +187,7 @@ export function MarketsClient({ initialAssets, initialSymbol = null }: MarketsCl
             </div>
           </div>
 
-          <div ref={chartRef} className="order-1 min-w-0 scroll-mt-[124px] overflow-hidden rounded-[10px] border border-hairline bg-surface-container-lowest xl:order-2">
+          <div ref={chartRef} className="order-1 min-w-0 scroll-mt-[var(--header-scroll-offset)] overflow-hidden rounded-[10px] border border-hairline bg-surface-container-lowest xl:order-2">
             {selectedAsset ? (
               <>
                 <MarketAssetHeader asset={selectedAsset} isFavorite={favorites.includes(selectedAsset.symbol)} onToggleFavorite={() => toggleFavorite(selectedAsset.symbol)} />
@@ -203,7 +206,9 @@ export function MarketsClient({ initialAssets, initialSymbol = null }: MarketsCl
                 <AssetDetailPanel key={selectedAsset.symbol} asset={selectedAsset} />
               </>
             ) : (
-              <div className="h-[720px] animate-pulse bg-surface-1" aria-hidden="true" />
+              <div className="h-[720px] animate-pulse motion-reduce:animate-none bg-surface-1" role="status" aria-live="polite">
+                <span className="sr-only">Cargando activo…</span>
+              </div>
             )}
           </div>
         </section>
@@ -218,10 +223,6 @@ export function MarketsClient({ initialAssets, initialSymbol = null }: MarketsCl
 
         <section className="mt-20">
           <CryptoRankings />
-        </section>
-
-        <section className="mt-20">
-          <EconomicCalendar />
         </section>
 
         <section className="mt-20" aria-labelledby="screener-heading">

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { clsx } from 'clsx'
 import { Header, Button, Card, Footer } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
 import type { Category, Tag, Asset, AssetType, Source } from '@/lib/types'
@@ -71,6 +72,12 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
   const [saveMsg, setSaveMsg] = useState('')
   const [pipelineRunning, setPipelineRunning] = useState(false)
   const [pipelineMsg, setPipelineMsg] = useState('')
+  const [automation, setAutomation] = useState<{ configured: boolean; active: boolean | null; loading: boolean; toggling: boolean }>({
+    configured: false,
+    active: null,
+    loading: true,
+    toggling: false,
+  })
   const [postsList, setPostsList] = useState<PostListItem[]>([])
   const [loadingPosts, setLoadingPosts] = useState(false)
   const [loadingEdit, setLoadingEdit] = useState(false)
@@ -108,6 +115,37 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
   const selectTab = (tab: 'editor' | 'posts' | 'settings') => {
     setActiveTab(tab)
     if (tab === 'posts') loadPosts()
+  }
+
+  // Automation state is fetched once on mount so the switch is ready before the Posts tab is opened
+  useEffect(() => {
+    fetch('/api/automation/status')
+      .then((res) => res.json())
+      .then((data) => setAutomation((prev) => ({ ...prev, configured: !!data.configured, active: data.active ?? null, loading: false })))
+      .catch(() => setAutomation((prev) => ({ ...prev, loading: false })))
+  }, [])
+
+  const handleToggleAutomation = async () => {
+    if (automation.active === null) return
+    const nextActive = !automation.active
+    setAutomation((prev) => ({ ...prev, toggling: true }))
+    try {
+      const res = await fetch('/api/automation/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: nextActive }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setAutomation((prev) => ({ ...prev, active: data.active }))
+      } else {
+        window.alert(data.error ?? 'No se pudo cambiar el estado de la automatización')
+      }
+    } catch {
+      window.alert('Error de conexión')
+    } finally {
+      setAutomation((prev) => ({ ...prev, toggling: false }))
+    }
   }
 
   const resetForm = () => {
@@ -350,7 +388,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
     <div className="min-h-screen bg-canvas flex flex-col">
       <Header />
 
-      <main className="flex-1 pt-[104px] pb-24">
+      <main className="flex-1 pt-[var(--header-height)] pb-24">
         <div className="max-w-[1200px] mx-auto px-6 md:px-8">
           {/* Tabs */}
           <div className="flex items-center justify-between mb-8">
@@ -363,7 +401,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                 <button
                   key={tab.key}
                   onClick={() => selectTab(tab.key)}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-colors duration-150 ${
                     activeTab === tab.key
                       ? 'bg-surface-container-lowest text-ink shadow-sm'
                       : 'text-ink-muted hover:text-ink'
@@ -413,7 +451,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                     key={loc}
                     type="button"
                     onClick={() => setPostData((prev) => ({ ...prev, locale: loc }))}
-                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors duration-150 ${
                       postData.locale === loc
                         ? 'bg-accent-blue text-white'
                         : 'bg-surface-2 text-ink-muted hover:text-ink'
@@ -427,228 +465,240 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                 ))}
               </div>
 
-              {/* Title */}
-              <div>
-                <label className={labelClass}>Título</label>
-                <input
-                  type="text"
-                  value={current.title}
-                  onChange={(e) => handleTitleChange(e.target.value)}
-                  placeholder="Título del artículo..."
-                  className="w-full rounded-xl border border-outline-variant/40 bg-surface-2 px-4 py-3 text-lg font-bold text-ink placeholder:text-ink-subtle focus:border-accent-blue focus:ring-1 focus:ring-accent-blue/30 focus:outline-none"
-                />
-                {current.slug && <p className="mt-1.5 text-[11px] text-ink-subtle">/articulos/{current.slug}</p>}
-              </div>
+              {/* Content on the left, publishing controls on the right — a wall of undifferentiated
+                  fields makes it hard to tell what shapes the article from what shapes its metadata. */}
+              <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_320px] lg:items-start">
+                <div className="space-y-6 min-w-0">
+                  {/* Title */}
+                  <div>
+                    <label className={labelClass}>Título</label>
+                    <input
+                      type="text"
+                      value={current.title}
+                      onChange={(e) => handleTitleChange(e.target.value)}
+                      placeholder="Título del artículo..."
+                      className="w-full rounded-xl border border-outline-variant/40 bg-surface-2 px-4 py-3 text-lg font-bold text-ink placeholder:text-ink-subtle focus:border-accent-blue focus:ring-1 focus:ring-accent-blue/30 focus:outline-none"
+                    />
+                    {current.slug && <p className="mt-1.5 text-[11px] text-ink-subtle">/articulos/{current.slug}</p>}
+                  </div>
 
-              {/* Content */}
-              <div>
-                <label className={labelClass}>Contenido (HTML)</label>
-                <textarea
-                  value={current.content_html}
-                  onChange={(e) => updateTranslationField('content_html', e.target.value)}
-                  placeholder="<p>Escribe tu artículo aquí...</p>"
-                  rows={15}
-                  className="w-full rounded-xl border border-outline-variant/40 bg-surface-2 px-4 py-3 text-sm text-ink font-mono placeholder:text-ink-subtle focus:border-accent-blue focus:ring-1 focus:ring-accent-blue/30 focus:outline-none resize-y"
-                />
-              </div>
+                  {/* Content */}
+                  <div>
+                    <label className={labelClass}>Contenido (HTML)</label>
+                    <textarea
+                      value={current.content_html}
+                      onChange={(e) => updateTranslationField('content_html', e.target.value)}
+                      placeholder="<p>Escribe tu artículo aquí...</p>"
+                      rows={18}
+                      className="w-full rounded-xl border border-outline-variant/40 bg-surface-2 px-4 py-3 text-sm text-ink font-mono placeholder:text-ink-subtle focus:border-accent-blue focus:ring-1 focus:ring-accent-blue/30 focus:outline-none resize-y"
+                    />
+                  </div>
 
-              {/* Meta */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className={labelClass}>Meta Title</label>
-                  <input
-                    type="text"
-                    value={current.meta_title}
-                    onChange={(e) => updateTranslationField('meta_title', e.target.value)}
-                    placeholder="SEO title..."
-                    className={inputClass}
-                  />
+                  {/* SEO meta rides along with the content it describes, at lower visual weight */}
+                  <div className="rounded-xl border border-outline-variant/30 p-4">
+                    <p className="mb-3 text-xs font-bold text-ink-muted">SEO</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className={labelClass}>Meta Title</label>
+                        <input
+                          type="text"
+                          value={current.meta_title}
+                          onChange={(e) => updateTranslationField('meta_title', e.target.value)}
+                          placeholder="SEO title..."
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Meta Description</label>
+                        <input
+                          type="text"
+                          value={current.meta_description}
+                          onChange={(e) => updateTranslationField('meta_description', e.target.value)}
+                          placeholder="SEO description..."
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className={labelClass}>Meta Description</label>
-                  <input
-                    type="text"
-                    value={current.meta_description}
-                    onChange={(e) => updateTranslationField('meta_description', e.target.value)}
-                    placeholder="SEO description..."
-                    className={inputClass}
-                  />
-                </div>
-              </div>
 
-              {/* Sentiment + Status + Category */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className={labelClass}>Sentimiento</label>
-                  <select
-                    value={postData.sentiment}
-                    onChange={(e) => setPostData({ ...postData, sentiment: e.target.value as typeof postData.sentiment })}
-                    className={inputClass}
-                  >
-                    <option value="bullish">Alcista</option>
-                    <option value="bearish">Bajista</option>
-                    <option value="neutral">Neutral</option>
-                  </select>
-                </div>
-                <div>
-                  <label className={labelClass}>Estado</label>
-                  <select
-                    value={postData.status}
-                    onChange={(e) => setPostData({ ...postData, status: e.target.value as typeof postData.status })}
-                    className={inputClass}
-                  >
-                    <option value="draft">Borrador</option>
-                    <option value="published">Publicado</option>
-                    <option value="scheduled">Programado</option>
-                  </select>
-                </div>
-                <div>
-                  <label className={labelClass}>Categoría</label>
-                  <select
-                    value={postData.category_id}
-                    onChange={(e) => setPostData({ ...postData, category_id: e.target.value })}
-                    className={inputClass}
-                  >
-                    <option value="">Sin categoría</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+                {/* Publishing sidebar: everything that decides where/how the article goes live, in one place */}
+                <aside className="space-y-6 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 lg:sticky lg:top-[calc(var(--header-height)+24px)]">
+                  <div className="space-y-4">
+                    <div>
+                      <label className={labelClass}>Estado</label>
+                      <select
+                        value={postData.status}
+                        onChange={(e) => setPostData({ ...postData, status: e.target.value as typeof postData.status })}
+                        className={inputClass}
+                      >
+                        <option value="draft">Borrador</option>
+                        <option value="published">Publicado</option>
+                        <option value="scheduled">Programado</option>
+                      </select>
+                    </div>
 
-              {postData.status === 'scheduled' && (
-                <div>
-                  <label className={labelClass}>Fecha de publicación</label>
-                  <input
-                    type="datetime-local"
-                    value={postData.scheduled_at}
-                    onChange={(e) => setPostData({ ...postData, scheduled_at: e.target.value })}
-                    className={`${inputClass} max-w-xs`}
-                  />
-                </div>
-              )}
+                    {postData.status === 'scheduled' && (
+                      <div>
+                        <label className={labelClass}>Fecha de publicación</label>
+                        <input
+                          type="datetime-local"
+                          value={postData.scheduled_at}
+                          onChange={(e) => setPostData({ ...postData, scheduled_at: e.target.value })}
+                          className={inputClass}
+                        />
+                      </div>
+                    )}
 
-              {/* Images */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className={labelClass}>Cover Image URL</label>
-                  <input
-                    type="text"
-                    value={postData.cover_image_url}
-                    onChange={(e) => setPostData({ ...postData, cover_image_url: e.target.value })}
-                    placeholder="https://..."
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <label className={labelClass}>OG Image URL</label>
-                  <input
-                    type="text"
-                    value={postData.og_image_url}
-                    onChange={(e) => setPostData({ ...postData, og_image_url: e.target.value })}
-                    placeholder="https://... (para compartir en redes)"
-                    className={inputClass}
-                  />
-                </div>
-              </div>
+                    <div>
+                      <label className={labelClass}>Categoría</label>
+                      <select
+                        value={postData.category_id}
+                        onChange={(e) => setPostData({ ...postData, category_id: e.target.value })}
+                        className={inputClass}
+                      >
+                        <option value="">Sin categoría</option>
+                        {categories.map((cat) => (
+                          <option key={cat.id} value={cat.id}>{cat.name}</option>
+                        ))}
+                      </select>
+                    </div>
 
-              {/* Source */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className={labelClass}>Fuente</label>
-                  <select
-                    value={postData.source_id}
-                    onChange={(e) => setPostData({ ...postData, source_id: e.target.value })}
-                    className={inputClass}
-                  >
-                    <option value="">Sin fuente</option>
-                    {sources.map((src) => (
-                      <option key={src.id} value={src.id}>{src.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className={labelClass}>Source URL</label>
-                  <input
-                    type="text"
-                    value={postData.source_url}
-                    onChange={(e) => setPostData({ ...postData, source_url: e.target.value })}
-                    placeholder="https://..."
-                    className={inputClass}
-                  />
-                </div>
-              </div>
+                    <div>
+                      <label className={labelClass}>Sentimiento</label>
+                      <select
+                        value={postData.sentiment}
+                        onChange={(e) => setPostData({ ...postData, sentiment: e.target.value as typeof postData.sentiment })}
+                        className={inputClass}
+                      >
+                        <option value="bullish">Alcista</option>
+                        <option value="bearish">Bajista</option>
+                        <option value="neutral">Neutral</option>
+                      </select>
+                    </div>
 
-              {/* Assets */}
-              <div>
-                <label className={labelClass}>Activos relacionados</label>
-                <div className="flex flex-wrap gap-2">
-                  {assets.map((asset) => (
-                    <button
-                      key={asset.id}
-                      type="button"
-                      onClick={() => setPostData({ ...postData, asset_ids: toggleArrayItem(postData.asset_ids, String(asset.id)) })}
-                      className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all ${
-                        postData.asset_ids.includes(String(asset.id))
-                          ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
-                          : 'border-outline-variant/40 bg-surface-2/50 text-ink-muted hover:text-ink'
-                      }`}
-                    >
-                      {asset.symbol}
-                    </button>
-                  ))}
-                </div>
-              </div>
+                    <label className="flex items-center gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={postData.is_featured}
+                        onChange={(e) => setPostData({ ...postData, is_featured: e.target.checked })}
+                        className="w-4 h-4 rounded border-hairline bg-surface-2 accent-accent-blue"
+                      />
+                      <span className="text-body-sm text-ink">Marcar como destacado</span>
+                    </label>
+                  </div>
 
-              {/* Tags */}
-              <div>
-                <label className={labelClass}>Tags</label>
-                <div className="flex flex-wrap gap-2">
-                  {tags.map((tag) => (
-                    <button
-                      key={tag.id}
-                      type="button"
-                      onClick={() => setPostData({ ...postData, tag_ids: toggleArrayItem(postData.tag_ids, String(tag.id)) })}
-                      className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all ${
-                        postData.tag_ids.includes(String(tag.id))
-                          ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
-                          : 'border-outline-variant/40 bg-surface-2/50 text-ink-muted hover:text-ink'
-                      }`}
-                    >
-                      {tag.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
+                  <div className="space-y-4 border-t border-outline-variant/30 pt-4">
+                    <p className="text-xs font-bold text-ink-muted">Imágenes</p>
+                    <div>
+                      <label className={labelClass}>Cover Image URL</label>
+                      <input
+                        type="text"
+                        value={postData.cover_image_url}
+                        onChange={(e) => setPostData({ ...postData, cover_image_url: e.target.value })}
+                        placeholder="https://..."
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>OG Image URL</label>
+                      <input
+                        type="text"
+                        value={postData.og_image_url}
+                        onChange={(e) => setPostData({ ...postData, og_image_url: e.target.value })}
+                        placeholder="https://... (para compartir en redes)"
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
 
-              {/* Featured */}
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={postData.is_featured}
-                  onChange={(e) => setPostData({ ...postData, is_featured: e.target.checked })}
-                  className="w-5 h-5 rounded border-hairline bg-surface-2 accent-accent-blue"
-                />
-                <span className="text-body text-ink">Marcar como destacado</span>
-              </label>
+                  <div className="space-y-4 border-t border-outline-variant/30 pt-4">
+                    <p className="text-xs font-bold text-ink-muted">Fuente</p>
+                    <div>
+                      <label className={labelClass}>Fuente</label>
+                      <select
+                        value={postData.source_id}
+                        onChange={(e) => setPostData({ ...postData, source_id: e.target.value })}
+                        className={inputClass}
+                      >
+                        <option value="">Sin fuente</option>
+                        {sources.map((src) => (
+                          <option key={src.id} value={src.id}>{src.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelClass}>Source URL</label>
+                      <input
+                        type="text"
+                        value={postData.source_url}
+                        onChange={(e) => setPostData({ ...postData, source_url: e.target.value })}
+                        placeholder="https://..."
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
 
-              {/* Submit */}
-              <div className="flex items-center gap-4 pt-4 border-t border-outline-variant/40">
-                <Button type="submit" variant="accent" disabled={saving}>
-                  {saving
-                    ? 'Guardando...'
-                    : editingId
-                      ? 'Guardar cambios'
-                      : postData.status === 'published'
-                        ? 'Publicar Ahora'
-                        : 'Guardar Borrador'}
-                </Button>
-                {saveMsg && (
-                  <span className={`text-sm font-medium ${saveMsg.startsWith('✓') ? 'text-semantic-success' : 'text-semantic-danger'}`}>
-                    {saveMsg}
-                  </span>
-                )}
+                  <div className="space-y-4 border-t border-outline-variant/30 pt-4">
+                    <div>
+                      <label className={labelClass}>Activos relacionados</label>
+                      <div className="flex flex-wrap gap-2">
+                        {assets.map((asset) => (
+                          <button
+                            key={asset.id}
+                            type="button"
+                            onClick={() => setPostData({ ...postData, asset_ids: toggleArrayItem(postData.asset_ids, String(asset.id)) })}
+                            className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors duration-150 ${
+                              postData.asset_ids.includes(String(asset.id))
+                                ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
+                                : 'border-outline-variant/40 bg-surface-2/50 text-ink-muted hover:text-ink'
+                            }`}
+                          >
+                            {asset.symbol}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className={labelClass}>Tags</label>
+                      <div className="flex flex-wrap gap-2">
+                        {tags.map((tag) => (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            onClick={() => setPostData({ ...postData, tag_ids: toggleArrayItem(postData.tag_ids, String(tag.id)) })}
+                            className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors duration-150 ${
+                              postData.tag_ids.includes(String(tag.id))
+                                ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
+                                : 'border-outline-variant/40 bg-surface-2/50 text-ink-muted hover:text-ink'
+                            }`}
+                          >
+                            {tag.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Submit */}
+                  <div className="space-y-3 border-t border-outline-variant/30 pt-4">
+                    <Button type="submit" variant="accent" disabled={saving} className="w-full">
+                      {saving
+                        ? 'Guardando...'
+                        : editingId
+                          ? 'Guardar cambios'
+                          : postData.status === 'published'
+                            ? 'Publicar Ahora'
+                            : 'Guardar Borrador'}
+                    </Button>
+                    {saveMsg && (
+                      <p className={`text-sm font-medium ${saveMsg.startsWith('✓') ? 'text-semantic-success' : 'text-semantic-danger'}`}>
+                        {saveMsg}
+                      </p>
+                    )}
+                  </div>
+                </aside>
               </div>
             </form>
           )}
@@ -656,6 +706,52 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
           {/* POSTS TAB */}
           {activeTab === 'posts' && (
             <div>
+              {/* System-wide control, kept visually apart from the per-article actions below it:
+                  pausing here stops every future scheduled run, not just one post. */}
+              <div
+                className={clsx(
+                  'mb-6 flex flex-col gap-3 rounded-xl border px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between',
+                  automation.active ? 'border-semantic-success/30 bg-semantic-success/5' : 'border-semantic-warning/30 bg-semantic-warning/5'
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <span
+                    className={clsx(
+                      'flex size-8 shrink-0 items-center justify-center rounded-full',
+                      automation.active ? 'bg-semantic-success/15 text-semantic-success' : 'bg-semantic-warning/15 text-semantic-warning'
+                    )}
+                  >
+                    <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+                      {automation.active ? 'bolt' : 'pause_circle'}
+                    </span>
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold text-ink">Automatización de publicación</p>
+                    <p className="text-[12px] text-ink-muted">
+                      {automation.loading
+                        ? 'Consultando estado...'
+                        : !automation.configured
+                          ? 'No conectada: falta configurar N8N_API_KEY para controlarla desde acá.'
+                          : automation.active
+                            ? 'Activa: publica artículos nuevos automáticamente.'
+                            : 'Pausada: no va a publicar nada hasta que la reanudes.'}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant={automation.active ? 'secondary' : 'accent'}
+                  size="sm"
+                  onClick={handleToggleAutomation}
+                  disabled={!automation.configured || automation.loading || automation.toggling || automation.active === null}
+                  title={!automation.configured ? 'Configura N8N_API_KEY para habilitar este control' : undefined}
+                >
+                  <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
+                    {automation.active ? 'pause' : 'play_arrow'}
+                  </span>
+                  {automation.toggling ? 'Aplicando...' : automation.active ? 'Pausar' : 'Reanudar'}
+                </Button>
+              </div>
+
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-headline font-bold text-ink">Artículos ({postsList.length})</h2>
                 <div className="flex items-center gap-2">
@@ -727,14 +823,19 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                           </p>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1 shrink-0">
+                          {/* Edit is the action taken on almost every row, so it gets real weight instead of matching the others */}
                           <button
                             onClick={() => handleEditPost(post.id)}
-                            className="p-2 rounded-lg text-ink-muted hover:text-accent-blue transition-colors"
+                            className="flex items-center gap-1.5 rounded-lg bg-accent-blue/10 px-2.5 py-2 text-accent-blue transition-colors hover:bg-accent-blue/20"
                             title="Editar"
                           >
-                            <span className="material-symbols-outlined text-[18px]">edit</span>
+                            <span className="material-symbols-outlined text-[16px]" aria-hidden="true">edit</span>
+                            <span className="hidden text-xs font-bold lg:inline">Editar</span>
                           </button>
+
+                          <span className="mx-1 h-5 w-px bg-hairline" aria-hidden="true" />
+
                           <button
                             onClick={() => handleToggleFeatured(post.id, post.is_featured)}
                             className={`p-2 rounded-lg transition-colors ${
@@ -763,9 +864,13 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                           >
                             <span className="material-symbols-outlined text-[18px]">open_in_new</span>
                           </a>
+
+                          <span className="mx-1 h-5 w-px bg-hairline" aria-hidden="true" />
+
+                          {/* Destructive, so it stays visually apart from the rest and never blends into a row of neutral icons */}
                           <button
                             onClick={() => handleDeletePost(post.id)}
-                            className="p-2 rounded-lg text-ink-muted hover:text-semantic-danger transition-colors"
+                            className="p-2 rounded-lg text-semantic-danger/70 transition-colors hover:bg-semantic-danger/10 hover:text-semantic-danger"
                             title="Eliminar"
                           >
                             <span className="material-symbols-outlined text-[18px]">delete</span>

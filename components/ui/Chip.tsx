@@ -14,7 +14,7 @@ interface ChipProps {
 export function Chip({ children, className, active = false, onClick, href, icon }: ChipProps) {
   const interactive = Boolean(onClick || href)
   const classes = clsx(
-    'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-all duration-150',
+    'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors duration-150',
     'bg-surface-1 border border-hairline-soft text-ink-muted',
     active && 'border-accent-blue text-ink bg-accent-blue/10',
     !active && interactive && 'hover:border-accent-blue hover:text-ink',

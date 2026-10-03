@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ArticleCard, BreakingPost, FeedControls } from '@/components/ui'
-import { LatestByCategory, SentimentSummary, StatsBar } from '@/components/modules'
+import { BreakingPost, FeedControls, NewsGrid } from '@/components/ui'
+import { HomeHero, LatestByCategory, SentimentSummary, StatsBar } from '@/components/modules'
 import {
   getPublishedPosts,
   getFeaturedPosts,
@@ -11,7 +11,11 @@ import {
   getAssets,
   getSources,
   getSentimentSummary,
+  withFreshViewCounts,
 } from '@/lib/api'
+import { getServerLocale } from '@/lib/i18n/server'
+import { getDictionary, t } from '@/lib/i18n/get-dictionary'
+import { getCachedPrices, type PriceData } from '@/lib/prices'
 import type { PostWithRelations } from '@/lib/types'
 
 export const metadata: Metadata = {
@@ -19,16 +23,16 @@ export const metadata: Metadata = {
     'Noticias financieras y análisis de mercados: criptomonedas, forex, materias primas y acciones, con niveles técnicos y cotizaciones.',
 }
 
-const CATEGORIES = [
-  { slug: 'criptomonedas', name: 'Criptomonedas' },
-  { slug: 'forex', name: 'Forex' },
-  { slug: 'materias-primas', name: 'Materias Primas' },
-  { slug: 'acciones', name: 'Acciones' },
-]
+const CATEGORY_SLUGS = ['criptomonedas', 'forex', 'materias-primas', 'acciones']
 
 const SENTIMENT_DAYS = 30
 const VIP_URL = process.env.NEXT_PUBLIC_VIP_URL
 const TELEGRAM_URL = process.env.NEXT_PUBLIC_TELEGRAM_URL
+
+// Rolling last 24h instead of a UTC calendar-day cutoff, so the section doesn't go empty right after midnight UTC
+function last24hIso(): string {
+  return new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+}
 
 export default async function HomePage({
   searchParams,
@@ -37,6 +41,8 @@ export default async function HomePage({
 }) {
   const params = await searchParams
   const category = params.categoria ?? ''
+  const locale = await getServerLocale()
+  const dict = getDictionary(locale)
 
   let featured: PostWithRelations | undefined
   let latest: PostWithRelations[] = []
@@ -48,11 +54,19 @@ export default async function HomePage({
   let sentiment = { bullish: 0, bearish: 0, neutral: 0, total: 0 }
   let sourceDown = false
 
+  const last24h = last24hIso()
+
+  // Separate from the posts try/catch below on purpose: a price-provider hiccup shouldn't
+  // flip the whole page into sourceDown — the hero just falls back to "—" for that one figure.
+  const btcPrice: PriceData | null = await getCachedPrices()
+    .then((prices) => prices.find((p) => p.symbol === 'BTC') ?? null)
+    .catch(() => null)
+
   try {
     const [featuredPosts, latestPosts, postsByCategory, count, categories, assets, sources, sentimentSummary] = await Promise.all([
-      getFeaturedPosts(1),
-      getPublishedPosts({ limit: 6, categorySlug: category || undefined }),
-      Promise.all(CATEGORIES.map((cat) => getPostsByCategory(cat.slug, 3))),
+      getFeaturedPosts(1, locale),
+      getPublishedPosts({ since: last24h, limit: 60, categorySlug: category || undefined, locale }),
+      Promise.all(CATEGORY_SLUGS.map((slug) => getPostsByCategory(slug, 3, locale))),
       getPostCount(),
       getCategories(),
       getAssets(),
@@ -68,85 +82,82 @@ export default async function HomePage({
     sourceCount = sources.length
     sentiment = sentimentSummary
 
-    CATEGORIES.forEach((cat, i) => {
-      categoryPosts[cat.slug] = postsByCategory[i]
+    CATEGORY_SLUGS.forEach((slug, i) => {
+      categoryPosts[slug] = postsByCategory[i]
     })
+
+    // getPublishedPosts/getPostsByCategory/getFeaturedPosts are cached for 5 minutes — view_count
+    // on the posts they return can lag behind real visits by that long. Overwrite it with a live
+    // read in one batched query, so the displayed counts and the "Más vistas hoy" sort are accurate.
+    const uniqueByid = <T extends { id: string }>(items: T[]) => items.filter((p, i, arr) => arr.findIndex((q) => q.id === p.id) === i)
+    const fresh = await withFreshViewCounts(uniqueByid([...(featured ? [featured] : []), ...latest, ...postsByCategory.flat()]))
+    const freshById = new Map(fresh.map((p) => [p.id, p]))
+    if (featured) featured = freshById.get(featured.id) ?? featured
+    latest = latest.map((p) => freshById.get(p.id) ?? p)
+    for (const slug of Object.keys(categoryPosts)) {
+      categoryPosts[slug] = categoryPosts[slug].map((p) => freshById.get(p.id) ?? p)
+    }
   } catch {
     sourceDown = true
   }
 
   const breaking = featured
   const grid = latest
-  const specs = [
-    { icon: 'article', label: 'Artículos publicados', value: postCount.toLocaleString('es-ES') },
-    { icon: 'candlestick_chart', label: 'Activos rastreados', value: assetCount.toString() },
-    { icon: 'hub', label: 'Fuentes monitoreadas', value: sourceCount.toString() },
-    { icon: 'update', label: 'Actualización de precios', value: 'cada 30 s' },
-  ]
+  // StatsBar below is the single source for the post/asset/source counts — this box only
+  // surfaces information that lives nowhere else on the page.
+  const specs = [{ icon: 'update', label: dict.home.vipSpecLabel, value: dict.home.vipSpecValue }]
 
   return (
     <>
 
-      <main id="main-content" tabIndex={-1} className="flex-grow pt-[104px] pb-24 max-w-[1200px] mx-auto px-6 md:px-8 w-full">
-        {/* Hero header */}
-        <section className="relative mt-6 mb-6 flex flex-col gap-5" aria-label="Titular de la terminal">
-          <div className="flex items-center gap-2 font-mono text-[11px] tracking-tight text-ink-muted">
-            {sourceDown ? (
-              <span className="text-semantic-warning">[&nbsp;ERR&nbsp;] Datos no disponibles temporalmente</span>
-            ) : (
-              <>
-                <span className="text-semantic-success">[&nbsp;OK&nbsp;]</span>
-                <span>{postCount.toLocaleString('es-ES')} artículos publicados</span>
-                <span className="size-1 rounded-full bg-hairline" aria-hidden="true" />
-                <span>{assetCount} activos rastreados</span>
-                <span className="size-1 rounded-full bg-hairline" aria-hidden="true" />
-                <span>{sourceCount} fuentes monitoreadas</span>
-              </>
-            )}
-          </div>
+      <HomeHero
+        locale={locale}
+        postCount={postCount}
+        categoryCount={categoryCount}
+        assetCount={assetCount}
+        sourceCount={sourceCount}
+        btcPrice={btcPrice}
+      />
 
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <h1 className="text-display-lg-mobile sm:text-display-lg md:text-display-xl font-bold tracking-tight text-ink">
-              Inteligencia de Mercado en Vivo
-            </h1>
-          </div>
-
-          <p className="max-w-2xl text-body text-on-surface-variant">
-            Noticias y análisis de los mercados financieros, con cotizaciones y niveles de soporte y resistencia para
-            operar con más contexto.
+      <main id="main-content" tabIndex={-1} className="flex-grow pb-24 pt-10 max-w-[1200px] mx-auto px-6 md:px-8 w-full">
+        {/* Only surfaces when something is actually wrong — same alert pattern as /markets */}
+        {sourceDown && (
+          <p role="alert" className="mb-6 rounded-[8px] border border-semantic-warning/40 bg-semantic-warning/10 px-4 py-3 text-body-sm text-ink">
+            {dict.home.sourceDownAlert}
           </p>
-        </section>
+        )}
 
-        {/* Stats bar */}
-        <StatsBar postCount={postCount} categoryCount={categoryCount} assetCount={assetCount} sourceCount={sourceCount} />
-
-        <SentimentSummary {...sentiment} days={SENTIMENT_DAYS} />
+        {/* Stats bar — the single source of truth for post/asset/source counts on this page */}
+        <StatsBar postCount={postCount} categoryCount={categoryCount} assetCount={assetCount} sourceCount={sourceCount} locale={locale} />
 
         {/* Breaking alert */}
-        {breaking && <BreakingPost post={breaking} />}
+        {breaking && <div className="mb-8"><BreakingPost post={breaking} /></div>}
 
         {/* Feed controls */}
-        <section className="mt-6 mb-4" aria-label="Controles del feed">
-          <FeedControls category={category} />
+        <section className="mt-16 mb-4" aria-label={dict.home.feedControlsAria}>
+          <FeedControls category={category} locale={locale} />
         </section>
 
+        <SentimentSummary {...sentiment} days={SENTIMENT_DAYS} locale={locale} />
+
         {/* News grid */}
-        <section className="mb-10" aria-label="Conjunto de noticias">
-          <h2 className="text-headline font-bold text-ink mb-4">Últimas Noticias</h2>
+        <section className="mt-16" aria-label={dict.home.newsGridAria}>
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-x-6 gap-y-1">
+            <h2 className="text-headline text-ink">{dict.home.latestNewsTitle}</h2>
+            <p className="text-body-sm text-ink-muted">
+              {t(dict.home.newsCount, { n: grid.length, unit: grid.length === 1 ? dict.home.newsUnitSingular : dict.home.newsUnitPlural })}
+            </p>
+          </div>
           {grid.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {grid.map((post) => (
-                <ArticleCard key={post.id} post={post} />
-              ))}
-            </div>
+            <NewsGrid posts={grid} />
           ) : (
             <div className="rounded-2xl border border-dashed border-hairline px-6 py-16 text-center">
-              <p className="text-body text-ink-muted">No hay publicaciones en este flujo todavía.</p>
+              <p className="text-body text-ink-muted">{dict.home.emptyGridMessage}</p>
               <Link
                 href="/articulos"
                 className="mt-3 inline-block text-body-sm font-medium text-accent-blue hover:text-accent-blue-hover"
               >
-                Ver todas las noticias
+                {dict.home.viewAllNews}
               </Link>
             </div>
           )}
@@ -154,80 +165,67 @@ export default async function HomePage({
 
         {/* Posts by category */}
         {!sourceDown && (
-          <section aria-label="Noticias por categoría">
-            <div className="flex items-center gap-2 mb-6">
+          <section className="mt-16" aria-label={dict.home.exploreByCategoryAria}>
+            <div className="flex items-center gap-2 mb-4">
               <span className="material-symbols-outlined text-[20px] text-accent-blue" aria-hidden="true">
                 folder_open
               </span>
-              <h2 className="text-headline font-bold text-ink">Explorar por Categoría</h2>
+              <h2 className="text-headline text-ink">{dict.home.exploreByCategoryTitle}</h2>
             </div>
-            {CATEGORIES.map((cat) => (
-              <LatestByCategory
-                key={cat.slug}
-                categorySlug={cat.slug}
-                categoryName={cat.name}
-                posts={categoryPosts[cat.slug] ?? []}
-              />
+            {CATEGORY_SLUGS.map((slug) => (
+              <LatestByCategory key={slug} categorySlug={slug} posts={categoryPosts[slug] ?? []} locale={locale} />
             ))}
           </section>
         )}
 
         {/* Pivot Points CTA */}
-        <section className="mt-10 mb-2 rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-6 md:p-8" aria-label="Pivot Points">
+        <section className="mt-16 rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-6 md:p-8" aria-label={dict.home.pivotSectionAria}>
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-3">
                 <span className="material-symbols-outlined text-[24px] text-accent-blue" aria-hidden="true">
                   functions
                 </span>
-                <h2 className="text-headline font-bold text-ink">Pivot Points Diarios</h2>
+                <h2 className="text-headline text-ink">{dict.home.pivotTitle}</h2>
               </div>
               <p className="text-body text-on-surface-variant max-w-xl">
-                Niveles de soporte y resistencia calculados con 5 métodos (Clásico, Fibonacci, Camarilla, Woodie, DeMark). Datos en tiempo real de TradingView.
+                {dict.home.pivotDesc}
               </p>
               <div className="flex flex-wrap gap-3 mt-4">
                 <Link
                   href="/pivot-points"
-                  className="inline-flex items-center gap-2 rounded-full bg-accent-blue px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-blue-hover"
+                  className="inline-flex items-center gap-2 rounded-full bg-accent-blue px-5 py-2.5 text-sm font-semibold text-canvas transition-colors hover:bg-accent-blue-hover"
                 >
                   <span className="material-symbols-outlined text-[16px]" aria-hidden="true">candlestick_chart</span>
-                  Ver Pivot Points
+                  {dict.home.pivotCta}
                 </Link>
               </div>
             </div>
             <div className="hidden lg:block w-48 h-32 rounded-xl border border-outline-variant/40 bg-surface-2/50 flex items-center justify-center">
               <div className="text-center">
                 <span className="material-symbols-outlined text-[32px] text-accent-blue/60" aria-hidden="true">stacked_line_chart</span>
-                <p className="text-micro text-ink-muted mt-1">5 Métodos</p>
-                <p className="text-micro text-ink-muted">S1-S3 · R1-R3</p>
+                <p className="text-micro text-ink-muted mt-1">{dict.home.pivotMethodsLabel}</p>
+                <p className="text-micro text-ink-muted">{dict.home.pivotLevelsLabel}</p>
               </div>
             </div>
           </div>
         </section>
 
         {/* VIP banner */}
-        <section id="vip" className="relative mt-10 mb-2 overflow-hidden rounded-2xl border border-hairline bg-surface-container-lowest p-6 md:p-8" aria-label="Unirse al VIP Terminal">
-          <div
-            className="absolute inset-0 opacity-70 pointer-events-none"
-            style={{
-              background:
-                'radial-gradient(50% 120% at 0% 50%, rgba(255,122,61,0.14), transparent 60%), radial-gradient(50% 120% at 100% 50%, rgba(106,76,245,0.16), transparent 60%)',
-            }}
-            aria-hidden="true"
-          />
+        <section id="vip" className="relative mt-16 overflow-hidden rounded-2xl border border-hairline bg-surface-container-lowest p-6 md:p-8" aria-label={dict.home.vipSectionAria}>
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center">
             <div className="flex-1">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-gradient-orange/40 bg-gradient-orange/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-gradient-orange">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-hairline px-3 py-1 text-micro font-semibold uppercase tracking-wide text-brand-amber">
                 <span className="material-symbols-outlined text-[13px]" aria-hidden="true">
                   workspace_premium
                 </span>
-                VIP Terminal Ultra Algo
+                {dict.home.vipBadge}
               </span>
-              <h2 className="mt-3 text-headline font-bold tracking-tight text-ink">
-                Desbloquea el poder de la inteligencia artificial
+              <h2 className="mt-3 text-headline tracking-tight text-ink">
+                {dict.home.vipTitle}
               </h2>
               <p className="mt-2 max-w-xl text-body text-ink-subtle">
-                Recibe análisis y alertas de Grizzly Traders para tomar decisiones más informadas.
+                {dict.home.vipLead}
               </p>
               {(VIP_URL || TELEGRAM_URL) && (
                 <div className="mt-6 flex flex-wrap gap-3">
@@ -236,9 +234,9 @@ export default async function HomePage({
                       href={VIP_URL}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 rounded-full bg-accent-blue px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-blue-hover"
+                      className="inline-flex items-center gap-2 rounded-full bg-accent-blue px-5 py-2.5 text-sm font-semibold text-canvas transition-colors hover:bg-accent-blue-hover"
                     >
-                      Join VIP Terminal
+                      {dict.home.vipJoin}
                       <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
                         arrow_outward
                       </span>
@@ -254,7 +252,7 @@ export default async function HomePage({
                       <span className="material-symbols-outlined text-[16px] text-accent-blue" aria-hidden="true">
                         send
                       </span>
-                      Unirse por Telegram
+                      {dict.home.vipTelegramJoin}
                     </a>
                   )}
                 </div>
@@ -263,14 +261,14 @@ export default async function HomePage({
 
             <div className="w-full lg:w-[340px] shrink-0 overflow-hidden rounded-xl border border-hairline bg-surface-1/70">
               <div className="flex items-center justify-between border-b border-hairline-soft bg-white/[0.02] px-4 py-2.5">
-                <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-muted">
-                  el portal en cifras
+                <span className="font-mono text-micro font-semibold uppercase tracking-[0.18em] text-ink-muted">
+                  {dict.home.vipStatsHeader}
                 </span>
               </div>
               <div className="divide-y divide-hairline-soft">
                 {specs.map((spec) => (
                   <div key={spec.label} className="flex items-center justify-between gap-6 px-4 py-3">
-                    <span className="flex items-center gap-2 text-[13px] text-ink-muted">
+                    <span className="flex items-center gap-2 text-caption text-ink-muted">
                       <span className="material-symbols-outlined text-[15px] text-ink-subtle" aria-hidden="true">
                         {spec.icon}
                       </span>

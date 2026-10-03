@@ -59,7 +59,7 @@ function Segmented<T extends string>({
           aria-pressed={value === option.key}
           onClick={() => onChange(option.key)}
           className={clsx(
-            'whitespace-nowrap rounded-lg px-3.5 py-2 text-[11px] font-bold uppercase tracking-wider transition-all',
+            'whitespace-nowrap rounded-lg px-3.5 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors duration-150',
             value === option.key ? 'bg-surface-container-lowest text-ink shadow-sm' : 'text-ink-muted hover:text-ink'
           )}
         >
@@ -183,8 +183,8 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
   }
 
   return (
-    <main id="main-content" tabIndex={-1} className="flex-1 pt-[104px] pb-24">
-      <div className="section-container mx-auto max-w-[1400px] pt-8">
+    <main id="main-content" tabIndex={-1} className="flex-1 pt-[var(--header-height)] pb-24">
+      <div className="container-wide pt-8">
         <header className="mb-8">
           <div className="mb-3 flex items-center gap-3">
             <span className="material-symbols-outlined text-[28px] text-accent-blue" aria-hidden="true">
@@ -198,7 +198,7 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
           </p>
           <p className="mt-2 flex items-center gap-2 text-micro text-ink-subtle">
             <span className="relative flex size-1.5" aria-hidden="true">
-              {!error && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-semantic-success opacity-75" />}
+              {!error && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-semantic-success opacity-75 motion-reduce:animate-none" />}
               <span className={clsx('relative inline-flex size-1.5 rounded-full', error ? 'bg-semantic-warning' : 'bg-semantic-success')} />
             </span>
             {updatedAt ? `Actualizado ${formatUtcTime(updatedAt)} UTC` : initialQuotes.length > 0 ? 'Datos cargados' : 'Cargando datos…'} · Fuente: TradingView
@@ -249,7 +249,7 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
                   aria-pressed={category === option.key}
                   onClick={() => setCategory(option.key)}
                   className={clsx(
-                    'rounded-full border px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-all',
+                    'rounded-full border px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-colors duration-150',
                     category === option.key
                       ? 'border-accent-blue bg-accent-blue text-white'
                       : 'border-outline-variant/40 text-ink-muted hover:border-outline-variant hover:text-ink'
@@ -266,7 +266,7 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
                 aria-pressed={onlyFavorites}
                 onClick={() => setOnlyFavorites((value) => !value)}
                 className={clsx(
-                  'flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-all',
+                  'flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-colors duration-150',
                   onlyFavorites
                     ? 'border-semantic-warning/60 bg-semantic-warning/10 text-semantic-warning'
                     : 'border-outline-variant/40 text-ink-muted hover:border-outline-variant hover:text-ink'
@@ -285,7 +285,7 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
                 id="pivot-sort"
                 value={sort}
                 onChange={(event) => setSort(event.target.value as SortKey)}
-                className="rounded-full border border-outline-variant/40 bg-surface-2 px-3.5 py-1.5 text-[11px] font-bold text-ink-muted focus:border-accent-blue focus:outline-none"
+                className="rounded-full border border-outline-variant/70 bg-surface-2 px-3.5 py-1.5 text-[11px] font-bold text-ink-muted focus:border-accent-blue focus:outline-none"
               >
                 {SORT_OPTIONS.map((option) => (
                   <option key={option.key} value={option.key}>
@@ -322,7 +322,7 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Buscar por nombre o símbolo"
                   autoComplete="off"
-                  className="w-full rounded-full border border-outline-variant/40 bg-surface-2 py-2 pl-10 pr-4 text-body-sm text-ink placeholder:text-ink-subtle focus:border-accent-blue focus:outline-none"
+                  className="w-full rounded-full border border-outline-variant/70 bg-surface-2 py-2 pl-10 pr-4 text-body-sm text-ink placeholder:text-ink-muted focus:border-accent-blue focus:outline-none"
                 />
               </div>
             </div>
@@ -377,7 +377,9 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
                 periodLabel={timeframeInfo.period}
               />
             ) : (
-              <div className="h-[560px] animate-pulse rounded-2xl bg-surface-2" aria-hidden="true" />
+              <div className="h-[560px] animate-pulse motion-reduce:animate-none rounded-2xl bg-surface-2" role="status" aria-live="polite">
+                <span className="sr-only">Cargando niveles del activo…</span>
+              </div>
             )}
           </div>
         </div>

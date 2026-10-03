@@ -22,6 +22,7 @@ const schema = z.object({
   N8N_MCP_TOKEN: optionalText,
   N8N_MCP_URL: z.url().optional(),
   N8N_WORKFLOW_ID: optionalText,
+  N8N_API_KEY: optionalText,
   NEXT_PUBLIC_VIP_URL: z.url().optional(),
   NEXT_PUBLIC_TELEGRAM_URL: z.url().optional(),
 })

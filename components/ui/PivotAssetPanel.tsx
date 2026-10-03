@@ -14,7 +14,11 @@ import { PivotLadder } from './PivotLadder'
 // lightweight-charts touches the DOM, so it stays out of the server render and the initial bundle
 const MarketChart = dynamic(() => import('./MarketChart').then((mod) => mod.MarketChart), {
   ssr: false,
-  loading: () => <div className="h-[480px] animate-pulse rounded-xl bg-surface-2" aria-hidden="true" />,
+  loading: () => (
+    <div className="h-[480px] animate-pulse motion-reduce:animate-none rounded-xl bg-surface-2" role="status" aria-live="polite">
+      <span className="sr-only">Cargando gráfico…</span>
+    </div>
+  ),
 })
 
 // Candle size that lets a few periods of the chosen pivot timeframe show up on screen
@@ -72,7 +76,7 @@ export function PivotAssetPanel({ asset, quote, method, timeframe, periodLabel, 
           </p>
         </div>
         <div className="text-right">
-          <p className="font-mono text-headline font-bold tabular-nums text-ink">{formatLevel(price, price, asset.tv)}</p>
+          <p className="font-mono text-headline tabular-nums text-ink">{formatLevel(price, price, asset.tv)}</p>
           <p className={clsx('font-mono text-micro font-semibold tabular-nums', changeUp ? 'text-semantic-success' : 'text-semantic-danger')}>
             {signed(quote.change)} hoy
           </p>

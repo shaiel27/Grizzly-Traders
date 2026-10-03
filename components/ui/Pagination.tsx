@@ -1,14 +1,17 @@
 import Link from 'next/link'
+import { getDictionary, t, type Locale } from '@/lib/i18n/get-dictionary'
 
 interface PaginationProps {
   basePath: string
   params: Record<string, string | undefined>
   page: number
   hasMore: boolean
+  locale?: Locale
 }
 
-export function Pagination({ basePath, params, page, hasMore }: PaginationProps) {
+export function Pagination({ basePath, params, page, hasMore, locale = 'es' }: PaginationProps) {
   if (page <= 1 && !hasMore) return null
+  const dict = getDictionary(locale).common.pagination
 
   const hrefFor = (target: number) => {
     const search = new URLSearchParams()
@@ -21,18 +24,18 @@ export function Pagination({ basePath, params, page, hasMore }: PaginationProps)
   }
 
   return (
-    <nav aria-label="Paginación" className="flex items-center justify-center gap-2 mt-10">
+    <nav aria-label={dict.nav} className="flex items-center justify-center gap-2 mt-10">
       {page > 1 && (
         <Link href={hrefFor(page - 1)} rel="prev" className="btn-secondary">
-          Anterior
+          {dict.previous}
         </Link>
       )}
       <span className="text-body text-ink-muted px-4" aria-current="page">
-        Página {page}
+        {t(dict.page, { n: page })}
       </span>
       {hasMore && (
         <Link href={hrefFor(page + 1)} rel="next" className="btn-secondary">
-          Siguiente
+          {dict.next}
         </Link>
       )}
     </nav>

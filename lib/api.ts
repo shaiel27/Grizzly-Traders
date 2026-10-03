@@ -39,6 +39,13 @@ function normalizePost(raw: Record<string, unknown>): PostWithRelations {
 
 // `!inner` makes PostgREST filter the parent posts instead of only trimming the embedded rows.
 // The *_filter aliases keep the displayed tags/assets complete while filtering.
+//
+// `translations` is intentionally a LEFT join (no `!inner`): with `!inner` + `.eq('translations.locale', locale)`,
+// requesting the 'en' locale would exclude every post that has no 'en' translations.posts_translations row —
+// and today the DB only has 'es' rows, so that would zero out every listing in EN. Left join + the same
+// `.eq` filter instead just narrows the embedded `translations` array (empty when there's no match for the
+// active locale), which is exactly what lib/feed.ts's localizedPost() needs to fall back to the base
+// post.title/post.slug (Fase 5.3).
 function postListSelect({ category = false, tag = false, asset = false } = {}) {
   return [
     '*',
@@ -47,7 +54,7 @@ function postListSelect({ category = false, tag = false, asset = false } = {}) {
     'source:fuentes(*)',
     'assets:post_activos(asset:activos(*))',
     'tags:post_tags(tag:tags(*))',
-    'translations:posts_translations!inner(*)',
+    'translations:posts_translations(*)',
     tag ? 'tag_filter:post_tags!inner(tag:tags!inner(slug))' : null,
     asset ? 'asset_filter:post_activos!inner(asset:activos!inner(symbol))' : null,
   ]
@@ -67,6 +74,7 @@ async function getPublishedPostsRaw({
   assetSymbol,
   search,
   locale = 'es',
+  since,
 }: {
   limit?: number
   offset?: number
@@ -75,6 +83,8 @@ async function getPublishedPostsRaw({
   assetSymbol?: string
   search?: string
   locale?: 'es' | 'en'
+  // ISO timestamp: only posts published at or after this instant (used for "today's news")
+  since?: string
 } = {}) {
   const supabase = createPublicClient()
 
@@ -85,6 +95,10 @@ async function getPublishedPostsRaw({
     .eq('translations.locale', locale)
     .order('published_at', { ascending: false })
     .range(offset, offset + limit - 1)
+
+  if (since) {
+    query = query.gte('published_at', since)
+  }
 
   if (categorySlug) {
     query = query.eq('category.slug', categorySlug)
@@ -231,7 +245,7 @@ async function getSourcesRaw() {
   return data as Source[]
 }
 
-async function getRelatedPostsRaw(postId: string, categoryId: number | null, assetIds: number[], limit = 4) {
+async function getRelatedPostsRaw(postId: string, categoryId: number | null, assetIds: number[], limit = 4, locale: 'es' | 'en' = 'es') {
   const supabase = createPublicClient()
 
   const relatedFilters: string[] = []
@@ -255,7 +269,7 @@ async function getRelatedPostsRaw(postId: string, categoryId: number | null, ass
     .from('posts')
     .select(postListSelect())
     .eq('status', 'published')
-    .eq('translations.locale', 'es')
+    .eq('translations.locale', locale)
     .neq('id', postId)
     .or(relatedFilters.join(','))
     .order('published_at', { ascending: false })
@@ -268,6 +282,36 @@ async function getRelatedPostsRaw(postId: string, categoryId: number | null, ass
 export async function incrementViewCount(postId: string) {
   const { error } = await createPublicClient().rpc('increment_view_count', { post_id: postId })
   if (error) console.error('Failed to increment view count:', error)
+}
+
+// Uncached on purpose: view_count changes on every visit, and getPostBySlug's 5-minute cache would
+// otherwise show a stale count long after the DB (and other visitors' pages) have moved on.
+export async function getPostViewCount(postId: string): Promise<number | null> {
+  const { data, error } = await createPublicClient().from('posts').select('view_count').eq('id', postId).single()
+  if (error) {
+    console.error('Failed to fetch view count:', error)
+    return null
+  }
+  return (data as { view_count: number }).view_count
+}
+
+// Batched version of getPostViewCount for lists (home grid, category sections, search results).
+// Also uncached: the posts themselves come from a 5-minute cache, but their view counts shouldn't.
+async function getViewCounts(postIds: string[]): Promise<Record<string, number>> {
+  if (postIds.length === 0) return {}
+  const { data, error } = await createPublicClient().from('posts').select('id, view_count').in('id', postIds)
+  if (error) {
+    console.error('Failed to fetch view counts:', error)
+    return {}
+  }
+  return Object.fromEntries((data as { id: string; view_count: number }[]).map((row) => [row.id, row.view_count]))
+}
+
+// Overwrites each post's (possibly 5-minutes-stale) view_count with a fresh one in a single query,
+// so "most viewed" sorting and the count shown on cards reflect reality instead of the list cache.
+export async function withFreshViewCounts<T extends { id: string; view_count: number }>(posts: T[]): Promise<T[]> {
+  const counts = await getViewCounts(posts.map((p) => p.id))
+  return posts.map((post) => (post.id in counts ? { ...post, view_count: counts[post.id] } : post))
 }
 
 async function getPostsByCategoryRaw(categorySlug: string, limit = 3, locale: 'es' | 'en' = 'es') {

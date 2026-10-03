@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { NewsletterForm } from './NewsletterForm'
+import { LocaleSwitcher } from './LocaleSwitcher'
+import { getDictionary, t, type Dictionary, type Locale } from '@/lib/i18n/get-dictionary'
 
 interface CategoryData {
   id: number
@@ -24,9 +26,14 @@ const FALLBACK_LINKS = [
 
 interface FooterProps {
   categories?: CategoryData[]
+  // Footer has no 'use client' directive (no hooks), so — unlike Header — it can't read LocaleContext
+  // itself; app/(site)/layout.tsx resolves these server-side and passes them down as props.
+  locale?: Locale
+  dictionary?: Dictionary
 }
 
-export function Footer({ categories = [] }: FooterProps) {
+export function Footer({ categories = [], locale = 'es', dictionary }: FooterProps) {
+  const dict = dictionary ?? getDictionary(locale)
   const navLinks = categories.length > 0
     ? categories.map((cat) => ({
         label: CATEGORY_LABELS[cat.slug] ?? cat.name,
@@ -39,8 +46,8 @@ export function Footer({ categories = [] }: FooterProps) {
       <div className="border-b border-hairline-soft">
         <div className="section-container relative flex flex-col items-start justify-between gap-6 py-8 md:flex-row md:items-center">
           <div>
-            <p className="text-body font-bold text-ink">Mantente al día con los mercados</p>
-            <p className="mt-1 text-body-sm text-ink-muted">Análisis y noticias financieras directamente en tu bandeja de entrada.</p>
+            <p className="text-body font-bold text-ink">{dict.footer.newsletterTitle}</p>
+            <p className="mt-1 text-body-sm text-ink-muted">{dict.footer.newsletterSubtitle}</p>
           </div>
           <NewsletterForm />
         </div>
@@ -49,20 +56,20 @@ export function Footer({ categories = [] }: FooterProps) {
         <div className="flex items-center gap-2">
           <Image
             src="/logo.png"
-            alt="Grizzly Traders Logo"
+            alt=""
             width={28}
             height={28}
             className="size-7 object-contain"
           />
-          <span className="bg-[#f7b955] text-[#0b0b0c] text-[9px] font-bold tracking-[0.18em] px-1.5 py-[3px] rounded-[4px] uppercase leading-none">
+          <span className="bg-brand-amber text-canvas text-[9px] font-bold tracking-[0.18em] px-1.5 py-[3px] rounded uppercase leading-none">
             Terminal
           </span>
           <span className="ml-2 text-[11px] text-ink-subtle">
-            © {new Date().getFullYear()} Grizzly Traders. Todos los derechos reservados.
+            {t(dict.footer.copyright, { year: new Date().getFullYear() })}
           </span>
         </div>
 
-        <nav className="flex flex-wrap items-center gap-6" aria-label="Navegación de pie de página">
+        <nav className="flex flex-wrap items-center gap-6" aria-label={dict.footer.navAria}>
           {navLinks.map((item) => (
             <Link
               key={item.href}
@@ -76,37 +83,51 @@ export function Footer({ categories = [] }: FooterProps) {
             href="/autor"
             className="text-body-sm font-medium text-ink-muted transition-colors hover:text-ink"
           >
-            Autor
+            {dict.footer.navAuthor}
           </Link>
           <Link
             href="/markets"
             className="text-body-sm font-medium text-ink-muted transition-colors hover:text-ink"
           >
-            Terminal
+            {dict.footer.navMarkets}
           </Link>
           <Link
             href="/herramientas"
             className="text-body-sm font-medium text-ink-muted transition-colors hover:text-ink"
           >
-            Herramientas
+            {dict.footer.navTools}
           </Link>
           <Link
             href="/aprende"
             className="text-body-sm font-medium text-ink-muted transition-colors hover:text-ink"
           >
-            Glosario
+            {dict.footer.navLearn}
           </Link>
           <a href="/feed.xml" className="text-body-sm font-medium text-ink-muted transition-colors hover:text-ink">
-            RSS
+            {dict.footer.rss}
           </a>
+          <LocaleSwitcher />
         </nav>
       </div>
       <div className="border-t border-hairline-soft">
+        <div className="section-container flex flex-col items-start justify-between gap-4 py-6 sm:flex-row sm:items-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-subtle">{dict.legal.sectionLabel}</p>
+          <nav className="flex flex-wrap items-center gap-6" aria-label={dict.footer.legalAria}>
+            <Link href="/legal/privacidad" className="text-body-sm font-medium text-ink-muted transition-colors hover:text-ink">
+              {dict.footer.navPrivacy}
+            </Link>
+            <Link href="/legal/terminos" className="text-body-sm font-medium text-ink-muted transition-colors hover:text-ink">
+              {dict.footer.navTerms}
+            </Link>
+            <Link href="/legal/cookies" className="text-body-sm font-medium text-ink-muted transition-colors hover:text-ink">
+              {dict.footer.navCookies}
+            </Link>
+          </nav>
+        </div>
+      </div>
+      <div className="border-t border-hairline-soft">
         <p className="section-container py-4 text-[11px] leading-relaxed text-ink-muted">
-          Aviso de riesgo: el contenido de este sitio es informativo y no constituye asesoramiento financiero ni una
-          recomendación de compra o venta. Operar con criptomonedas, forex, materias primas y acciones conlleva un alto
-          riesgo de pérdida de capital. Las cotizaciones provienen de proveedores externos, pueden tener retraso y no se
-          garantiza su exactitud.
+          {dict.footer.riskNotice}
         </p>
       </div>
     </footer>

@@ -44,7 +44,48 @@ export function CryptoRankings() {
       <p className="mb-8 mt-1 max-w-2xl text-[14px] text-ink-muted">Las 50 criptomonedas de mayor capitalización de mercado.</p>
 
       {coins === null ? (
-        <p className="text-[13px] text-ink-muted">Cargando…</p>
+        <div role="status" aria-live="polite" className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-left" aria-hidden="true">
+            <thead>
+              <tr className="border-b border-hairline text-[12px] text-ink-muted">
+                <th scope="col" className="py-2 pr-4 font-normal">#</th>
+                <th scope="col" className="py-2 pr-4 font-normal">Nombre</th>
+                <th scope="col" className="py-2 pr-4 text-right font-normal">Precio</th>
+                <th scope="col" className="py-2 pr-4 text-right font-normal">24h</th>
+                <th scope="col" className="py-2 pr-4 text-right font-normal">Cap. de mercado</th>
+                <th scope="col" className="py-2 text-right font-normal">Volumen 24h</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...Array(8)].map((_, i) => (
+                <tr key={i} className="border-b border-hairline-soft last:border-b-0">
+                  <td className="py-2.5 pr-4">
+                    <div className="h-3 w-4 animate-pulse motion-reduce:animate-none rounded bg-surface-2" />
+                  </td>
+                  <td className="py-2.5 pr-4">
+                    <span className="flex items-center gap-2">
+                      <span className="size-[18px] shrink-0 animate-pulse motion-reduce:animate-none rounded-full bg-surface-2" />
+                      <span className="h-3 w-24 animate-pulse motion-reduce:animate-none rounded bg-surface-2" />
+                    </span>
+                  </td>
+                  <td className="py-2.5 pr-4 text-right">
+                    <div className="ml-auto h-3 w-16 animate-pulse motion-reduce:animate-none rounded bg-surface-2" />
+                  </td>
+                  <td className="py-2.5 pr-4 text-right">
+                    <div className="ml-auto h-3 w-12 animate-pulse motion-reduce:animate-none rounded bg-surface-2" />
+                  </td>
+                  <td className="py-2.5 pr-4 text-right">
+                    <div className="ml-auto h-3 w-20 animate-pulse motion-reduce:animate-none rounded bg-surface-2" />
+                  </td>
+                  <td className="py-2.5 text-right">
+                    <div className="ml-auto h-3 w-20 animate-pulse motion-reduce:animate-none rounded bg-surface-2" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <span className="sr-only">Cargando ranking cripto…</span>
+        </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left">

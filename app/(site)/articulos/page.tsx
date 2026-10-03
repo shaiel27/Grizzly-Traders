@@ -1,7 +1,9 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
 import { CategoryFilter, ArticleCard, Pagination } from '@/components/ui'
-import { getPublishedPosts, getCategories, getTags, getAssets } from '@/lib/api'
+import { getPublishedPosts, getCategories, getTags, getAssets, withFreshViewCounts } from '@/lib/api'
+import { getServerLocale } from '@/lib/i18n/server'
+import { getDictionary } from '@/lib/i18n/get-dictionary'
 
 interface ArticlesPageProps {
   searchParams: Promise<{ categoria?: string; tag?: string; activo?: string; q?: string; page?: string }>
@@ -17,6 +19,8 @@ export default async function ArticlesPage({ searchParams }: ArticlesPageProps) 
   const page = Math.max(1, Number.parseInt(params.page ?? '1', 10) || 1)
   const limit = 12
   const offset = (page - 1) * limit
+  const locale = await getServerLocale()
+  const dict = getDictionary(locale)
 
   const [fetched, categories, tags, assets] = await Promise.all([
     getPublishedPosts({
@@ -26,6 +30,7 @@ export default async function ArticlesPage({ searchParams }: ArticlesPageProps) 
       tagSlug: params.tag,
       assetSymbol: params.activo,
       search: params.q,
+      locale,
     }),
     getCategories(),
     getTags(),
@@ -33,31 +38,34 @@ export default async function ArticlesPage({ searchParams }: ArticlesPageProps) 
   ])
 
   const hasMore = fetched.length > limit
-  const posts = fetched.slice(0, limit)
+  // getPublishedPosts is cached for 5 minutes; view_count shown here would otherwise lag real visits by that long.
+  const posts = await withFreshViewCounts(fetched.slice(0, limit))
   const hasFilters = params.categoria || params.tag || params.activo || params.q
 
   return (
     <>
 
-      <main id="main-content" tabIndex={-1} className="flex-1 pt-[104px] pb-24">
+      <main id="main-content" tabIndex={-1} className="flex-1 pt-[var(--header-height)] pb-24">
         <div className="section-container mb-8 pt-8">
-          <h1 className="text-display-lg-mobile sm:text-display-lg font-bold text-ink mb-2">Noticias del Mercado</h1>
+          <h1 className="font-serif text-display-lg-mobile sm:text-display-lg font-bold text-ink mb-2">{dict.listings.articlesTitle}</h1>
           <p className="text-body text-on-surface-variant">
-            {hasFilters ? 'Resultados filtrados' : 'Todas las noticias publicadas, ordenadas por fecha.'}
+            {hasFilters ? dict.listings.articlesSubtitleFiltered : dict.listings.articlesSubtitleAll}
           </p>
         </div>
 
-        <section className="mb-8" aria-label="Filtros">
+        <section className="mb-8" aria-label={dict.listings.filtersAria}>
           <CategoryFilter categories={categories} tags={tags} assets={assets} />
         </section>
 
-        <section aria-label="Artículos">
+        <section aria-label={dict.listings.articlesAria}>
           <div className="section-container">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {posts.map((post) => (
-                <ArticleCard key={post.id} post={post} />
+                <li key={post.id}>
+                  <ArticleCard post={post} locale={locale} />
+                </li>
               ))}
-            </div>
+            </ul>
 
             {posts.length === 0 && (
               <div className="text-center py-16 text-on-surface-variant">
@@ -65,17 +73,17 @@ export default async function ArticlesPage({ searchParams }: ArticlesPageProps) 
                   <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
                   <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
                 </svg>
-                <p className="text-body-lg">No se encontraron artículos con los filtros actuales.</p>
+                <p className="text-body-lg">{dict.listings.emptyArticles}</p>
                 <Link
                   href="/articulos"
                   className="mt-4 inline-block text-accent-blue hover:text-accent-blue-hover text-body-sm font-medium"
                 >
-                  Ver todas las noticias
+                  {dict.listings.viewAllNews}
                 </Link>
               </div>
             )}
 
-            <Pagination basePath="/articulos" params={params} page={page} hasMore={hasMore} />
+            <Pagination basePath="/articulos" params={params} page={page} hasMore={hasMore} locale={locale} />
           </div>
         </section>
       </main>

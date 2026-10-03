@@ -99,7 +99,7 @@ export function MarketWatchlist({
               type="button"
               aria-pressed={sort === option.key}
               onClick={() => onSortChange(option.key)}
-              className={clsx('rounded-[4px] px-1.5 py-0.5 transition-colors', sort === option.key ? 'text-ink' : 'hover:text-ink')}
+              className={clsx('rounded px-1.5 py-0.5 transition-colors', sort === option.key ? 'text-ink' : 'hover:text-ink')}
             >
               {option.label}
             </button>

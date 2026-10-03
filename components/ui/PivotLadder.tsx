@@ -105,7 +105,7 @@ export function PivotLadder({ levels, price, symbol = '', height = 400, classNam
             style={{ borderColor: biasColor }}
           >
             <span className="relative flex size-1.5" aria-hidden="true">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ backgroundColor: biasColor }} />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 motion-reduce:animate-none" style={{ backgroundColor: biasColor }} />
               <span className="relative inline-flex size-1.5 rounded-full" style={{ backgroundColor: biasColor }} />
             </span>
             {formatLevel(price, price, symbol)}

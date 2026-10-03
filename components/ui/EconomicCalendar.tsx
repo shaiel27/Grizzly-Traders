@@ -80,7 +80,26 @@ export function EconomicCalendar() {
       <p className="mb-8 mt-1 max-w-2xl text-[14px] text-ink-muted">Próximos eventos macroeconómicos de mayor impacto para los próximos 7 días.</p>
 
       {events === null ? (
-        <p className="text-[13px] text-ink-muted">Cargando…</p>
+        <div role="status" aria-live="polite" className="space-y-8">
+          {[...Array(2)].map((_, groupIdx) => (
+            <div key={groupIdx} aria-hidden="true">
+              <div className="mb-2 h-4 w-28 animate-pulse motion-reduce:animate-none rounded bg-surface-2" />
+              <ul>
+                {[...Array(4)].map((_, i) => (
+                  <li
+                    key={i}
+                    className="grid grid-cols-[4.5rem_1fr_auto] items-center gap-4 border-b border-hairline-soft py-3 last:border-b-0"
+                  >
+                    <div className="h-3 w-10 animate-pulse motion-reduce:animate-none rounded bg-surface-2" />
+                    <div className="h-3 w-full max-w-[220px] animate-pulse motion-reduce:animate-none rounded bg-surface-2" />
+                    <div className="h-3 w-14 animate-pulse motion-reduce:animate-none rounded bg-surface-2" />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+          <span className="sr-only">Cargando calendario económico…</span>
+        </div>
       ) : (
         <div className="space-y-8">
           {[...groups.entries()].map(([day, dayEvents]) => (

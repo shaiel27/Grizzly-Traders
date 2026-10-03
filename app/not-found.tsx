@@ -6,7 +6,7 @@ export default function NotFound() {
     <>
       <Header />
 
-      <main id="main-content" tabIndex={-1} className="flex flex-1 items-center justify-center px-4 pt-[104px] text-center">
+      <main id="main-content" tabIndex={-1} className="flex flex-1 items-center justify-center px-4 pt-[var(--header-height)] text-center">
         <div className="max-w-md py-16">
           <div className="mb-4 text-9xl font-bold text-ink/10">404</div>
           <h1 className="mb-4 text-display-lg-mobile font-bold text-ink sm:text-display-lg">Página no encontrada</h1>
