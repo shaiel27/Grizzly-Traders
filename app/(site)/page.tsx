@@ -1,7 +1,9 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { BreakingPost, NewsGrid, NewsletterForm } from '@/components/ui'
+import { BreakingPost, NewsGrid } from '@/components/ui'
 import { HomeHero, LatestByCategory } from '@/components/modules'
+import { PivotShowcase, type ActivoPivote } from '@/components/modules/PivotShowcase'
+import { VipShowcase } from '@/components/modules/VipShowcase'
 import {
   getPublishedPosts,
   getFeaturedPosts,
@@ -155,18 +157,36 @@ export default async function HomePage({
     // riesgo se queda null — el chip del globo simplemente no se muestra.
   }
 
-  const pivotePreview: PivotePreview | null = await getPivotQuotes('D')
-    .then((quotes) => {
-      const btc = quotes.find((q) => q.symbol === 'BINANCE:BTCUSDT')
-      if (!btc) return null
-      const niveles = calculatePivots(btc.previous.high, btc.previous.low, btc.previous.close, btc.previous.open).classic
-      return { s3: niveles.s3, s2: niveles.s2, s1: niveles.s1, pivot: niveles.pivot, r1: niveles.r1, r2: niveles.r2, r3: niveles.r3, precioActual: btc.price }
-    })
-    .catch(() => null)
+  // Un solo pedido a getPivotQuotes('D') alimenta la vista previa chica del hero (BTC, classic
+  // solamente) Y la escalera interactiva de la seccion "Pivot Points Diarios" de mas abajo (los
+  // 3 activos, los 5 metodos — se calculan todos de una vez, cambiar de metodo/activo ahi es
+  // solo re-renderizar con datos que ya estan en el cliente, sin pedir de nuevo).
+  let pivotePreview: PivotePreview | null = null
+  let pivotesHome: ActivoPivote[] = []
+  try {
+    const quotes = await getPivotQuotes('D')
+    const porTv: Record<string, string> = { 'BINANCE:BTCUSDT': 'BTC/USD', 'FX:EURUSD': 'EUR/USD', 'OANDA:XAUUSD': 'XAU/USD' }
+    pivotesHome = Object.entries(porTv)
+      .map(([tv, label]) => {
+        const q = quotes.find((x) => x.symbol === tv)
+        if (!q) return null
+        const result = calculatePivots(q.previous.high, q.previous.low, q.previous.close, q.previous.open)
+        return { tv, label, result, price: q.price }
+      })
+      .filter((a): a is ActivoPivote => a != null)
+
+    const btc = pivotesHome.find((a) => a.tv === 'BINANCE:BTCUSDT')
+    if (btc) {
+      const { classic } = btc.result
+      pivotePreview = { s3: classic.s3, s2: classic.s2, s1: classic.s1, pivot: classic.pivot, r1: classic.r1, r2: classic.r2, r3: classic.r3, precioActual: btc.price }
+    }
+  } catch {
+    // pivotePreview se queda null y pivotesHome vacio — PivotShowcase muestra su propio ejemplo
+    // estatico en vez de una caja vacia (plan 009 §13.1).
+  }
 
   const breaking = featured
   const grid = latest
-  const specs = [{ icon: 'update', label: dict.home.vipSpecLabel, value: dict.home.vipSpecValue }]
 
   return (
     <>
@@ -232,117 +252,17 @@ export default async function HomePage({
           </section>
         )}
 
-        {/* Pivot Points CTA */}
-        <section className="mt-16 rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-6 md:p-8" aria-label={dict.home.pivotSectionAria}>
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="material-symbols-outlined text-[24px] text-accent-blue" aria-hidden="true">
-                  functions
-                </span>
-                <h2 className="text-headline text-ink">{dict.home.pivotTitle}</h2>
-              </div>
-              <p className="text-body text-on-surface-variant max-w-xl">
-                {dict.home.pivotDesc}
-              </p>
-              <div className="flex flex-wrap gap-3 mt-4">
-                <Link
-                  href="/pivot-points"
-                  className="inline-flex items-center gap-2 rounded-full bg-accent-blue px-5 py-2.5 text-sm font-semibold text-canvas transition-colors hover:bg-accent-blue-hover"
-                >
-                  <span className="material-symbols-outlined text-[16px]" aria-hidden="true">candlestick_chart</span>
-                  {dict.home.pivotCta}
-                </Link>
-              </div>
-            </div>
-            <div className="hidden lg:flex w-48 h-32 rounded-xl border border-outline-variant/40 bg-surface-2/50 items-center justify-center">
-              <div className="text-center">
-                <span className="material-symbols-outlined text-[32px] text-accent-blue/60" aria-hidden="true">stacked_line_chart</span>
-                <p className="text-micro text-ink-muted mt-1">{dict.home.pivotMethodsLabel}</p>
-                <p className="text-micro text-ink-muted">{dict.home.pivotLevelsLabel}</p>
-              </div>
-            </div>
-          </div>
-        </section>
+        {/* Pivot Points Diarios: escalera interactiva real (plan 009 §13.1), no una caja con un
+            icono decorativo y un boton — metodo y activo se eligen ahi mismo, sin salir de la
+            home. Si getPivotQuotes() fallo, PivotShowcase se encarga de mostrar su propio
+            ejemplo etiquetado en vez de una seccion vacia. */}
+        <PivotShowcase activos={pivotesHome} locale={locale} />
 
-        {/* VIP banner */}
-        <section id="vip" className="relative mt-16 overflow-hidden rounded-2xl border border-hairline bg-surface-container-lowest p-6 md:p-8" aria-label={dict.home.vipSectionAria}>
-          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center">
-            <div className="flex-1">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-hairline px-3 py-1 text-micro font-semibold uppercase tracking-wide text-brand-amber">
-                <span className="material-symbols-outlined text-[13px]" aria-hidden="true">
-                  workspace_premium
-                </span>
-                {dict.home.vipBadge}
-              </span>
-              <h2 className="mt-3 text-headline tracking-tight text-ink">
-                {dict.home.vipTitle}
-              </h2>
-              <p className="mt-2 max-w-xl text-body text-ink-subtle">
-                {dict.home.vipLead}
-              </p>
-              {(VIP_URL || TELEGRAM_URL) && (
-                <div className="mt-6 flex flex-wrap gap-3">
-                  {VIP_URL && (
-                    <a
-                      href={VIP_URL}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 rounded-full bg-accent-blue px-5 py-2.5 text-sm font-semibold text-canvas transition-colors hover:bg-accent-blue-hover"
-                    >
-                      {dict.home.vipJoin}
-                      <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
-                        arrow_outward
-                      </span>
-                    </a>
-                  )}
-                  {TELEGRAM_URL && (
-                    <a
-                      href={TELEGRAM_URL}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 rounded-full border border-hairline bg-white/[0.04] px-5 py-2.5 text-sm font-medium text-ink transition-colors hover:border-hairline hover:bg-white/[0.08]"
-                    >
-                      <span className="material-symbols-outlined text-[16px] text-accent-blue" aria-hidden="true">
-                        send
-                      </span>
-                      {dict.home.vipTelegramJoin}
-                    </a>
-                  )}
-                </div>
-              )}
-              {/* Sin NEXT_PUBLIC_VIP_URL ni NEXT_PUBLIC_TELEGRAM_URL configuradas, la tarjeta se
-                  quedaba sin ninguna accion (plan 009 B10) — se ofrece el newsletter como
-                  alternativa en vez de un bloque sin salida. */}
-              {!VIP_URL && !TELEGRAM_URL && (
-                <div className="mt-6">
-                  <NewsletterForm />
-                </div>
-              )}
-            </div>
-
-            <div className="w-full lg:w-[340px] shrink-0 overflow-hidden rounded-xl border border-hairline bg-surface-1/70">
-              <div className="flex items-center justify-between border-b border-hairline-soft bg-white/[0.02] px-4 py-2.5">
-                <span className="font-mono text-micro font-semibold uppercase tracking-[0.18em] text-ink-muted">
-                  {dict.home.vipStatsHeader}
-                </span>
-              </div>
-              <div className="divide-y divide-hairline-soft">
-                {specs.map((spec) => (
-                  <div key={spec.label} className="flex items-center justify-between gap-6 px-4 py-3">
-                    <span className="flex items-center gap-2 text-caption text-ink-muted">
-                      <span className="material-symbols-outlined text-[15px] text-ink-subtle" aria-hidden="true">
-                        {spec.icon}
-                      </span>
-                      {spec.label}
-                    </span>
-                    <span className="font-mono text-sm font-semibold tabular-nums text-ink">{spec.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
+        {/* VIP Terminal Ultra Algo: rediseño completo (plan 009 §13.2) — 3 beneficios reales en
+            vez de un parrafo, consola de alertas de ejemplo (tipeando, etiquetada) en vez de la
+            tabla "el portal en cifras" (ese "cada 30s" no era verdad: el ticker real consulta
+            cada 3s, lib/ticker.ts — B8). */}
+        <VipShowcase locale={locale} vipUrl={VIP_URL} telegramUrl={TELEGRAM_URL} />
       </main>
 
     </>
