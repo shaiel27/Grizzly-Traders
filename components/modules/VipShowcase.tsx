@@ -106,7 +106,7 @@ export function VipShowcase({ locale, vipUrl, telegramUrl }: VipShowcaseProps) {
   }, [])
 
   return (
-    <div ref={sectionRef} className="vip-border-wrap relative mt-16 rounded-2xl p-px">
+    <div ref={sectionRef} className="vip-border-wrap relative mt-16 overflow-hidden rounded-2xl p-px">
       <section
         id="vip"
         className="relative overflow-hidden rounded-2xl bg-surface-container-lowest p-6 md:p-8"
