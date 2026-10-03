@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber'
-import { PerformanceMonitor, Stars } from '@react-three/drei'
+import { PerformanceMonitor } from '@react-three/drei'
 import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing'
 import {
   baseVertexShader,
@@ -402,23 +402,6 @@ function useFrameloopVisible(contenedorRef: React.RefObject<HTMLElement | null>)
   return visible
 }
 
-// Fondo estrellado dentro del mismo Canvas (no un segundo canvas/elemento CSS aparte): asi
-// hereda el mismo bloom sutil que el resto de la escena y puede girar en el tiempo para dar
-// sensacion de profundidad real en vez de un patron CSS estatico. Gira independiente del grupo
-// del globo (el arrastre del usuario no debe mover las estrellas).
-function CampoEstrellas({ reducedMotion }: { reducedMotion: boolean }) {
-  const grupoRef = useRef<THREE.Group>(null)
-  useFrame((_state, dt) => {
-    if (reducedMotion || !grupoRef.current) return
-    grupoRef.current.rotation.y += 0.004 * dt
-  })
-  return (
-    <group ref={grupoRef}>
-      <Stars radius={60} depth={40} count={2200} factor={2.4} saturation={0} fade speed={reducedMotion ? 0 : 0.4} />
-    </group>
-  )
-}
-
 function AjusteDpr({ alta }: { alta: boolean }) {
   const { gl, setDpr } = useThree()
   useEffect(() => {
@@ -480,7 +463,6 @@ export default function GloboHolografico({ datos, reducedMotion, ariaLabel, onRe
       >
         <PerformanceMonitor onDecline={() => setCalidadAlta(false)} onIncline={() => setCalidadAlta(true)} flipflops={2} />
         <AjusteDpr alta={calidadAlta} />
-        <CampoEstrellas reducedMotion={reducedMotion} />
         <Escena
           datos={datos}
           reducedMotion={reducedMotion}

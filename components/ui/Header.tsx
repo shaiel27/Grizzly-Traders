@@ -147,10 +147,27 @@ export function Header({ categories = [], initialTicker }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [query, setQuery] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const headerRef = useRef<HTMLElement>(null)
   const pathname = usePathname()
   const router = useRouter()
   const dict = useDictionary()
   const isTerminal = pathname === '/markets'
+
+  // El header real puede medir distinto al valor fijo de --header-height: fuentes del sistema
+  // mas grandes, zoom del navegador, o el menu movil abierto lo cambian. Sin esto, el hero y
+  // cualquier scroll a un ancla quedan calculados contra un numero que no es el real (ver plan
+  // 009 B2/B3). ResizeObserver cubre los tres casos (incluido el menu movil, que cambia la
+  // altura del propio <header>) sin tener que escuchar resize/orientationchange a mano.
+  useEffect(() => {
+    const el = headerRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(([entry]) => {
+      const alto = Math.round(entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height)
+      document.documentElement.style.setProperty('--header-h-real', `${alto}px`)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   // Category nav labels (Forex/Crypto/Commodities/Equities) stay as short English trading jargon in
   // both locales, by existing design (CATEGORY_LABELS/FALLBACK_NAV below) — not translated here.
@@ -204,7 +221,10 @@ export function Header({ categories = [], initialTicker }: HeaderProps) {
   }, [menuOpen])
 
   return (
-    <header className="fixed top-0 left-0 w-full z-50 flex flex-col border-b border-outline-variant/40 bg-surface-translucent backdrop-blur-md">
+    <header
+      ref={headerRef}
+      className="fixed top-0 left-0 w-full z-50 flex flex-col border-b border-outline-variant/40 bg-surface-translucent backdrop-blur-md"
+    >
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-2 focus:z-50 focus:rounded-full focus:bg-accent-blue focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
