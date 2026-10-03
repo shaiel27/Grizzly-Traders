@@ -190,7 +190,7 @@ export function LiveTicker({ initialQuotes = [], initialUpdatedAt = null }: Live
   const loop = fillLoop(items)
 
   return (
-    <div className="flex h-8 w-full items-center overflow-hidden border-b border-outline-variant/40 bg-surface-container-lowest">
+    <div data-intro-row="ticker" className="flex h-8 w-full items-center overflow-hidden border-b border-outline-variant/40 bg-surface-container-lowest">
       <div className="relative z-10 flex h-full shrink-0 items-center gap-2 border-r border-outline-variant/40 bg-surface-container-lowest pl-4 pr-4">
         <span className="relative flex size-1.5" aria-hidden="true">
           {!stale && (

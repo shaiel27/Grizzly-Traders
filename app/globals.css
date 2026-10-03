@@ -274,6 +274,93 @@
 .hero-glow-a { animation: heroGlowDriftA 22s var(--ease-in-out) infinite; }
 .hero-glow-b { animation: heroGlowDriftB 26s var(--ease-in-out) infinite; }
 
+/* Intro de primera carga de la home (components/modules/useIntroInicio.ts). El script de app/layout.tsx
+   pone html[data-intro="activo"] antes del primer pintado: el header arranca oculto y el globo ocupa la
+   pantalla. Al hacer scroll, el JS escribe en :root las variables de progreso (0 → 1):
+   --intro-header (deslizamiento del header), --intro-ticker y --intro-nav (sus dos filas, escalonadas) y
+   --intro-resto (texto secundario y botones). Al terminar se quita data-intro y todo esto deja de aplicar.
+   Sin data-intro (reduced motion, segunda visita, navegacion interna) nada de esto existe. */
+:root {
+  --intro-recorrido: 90svh;
+  --intro-globo: min(118svh, 105vw);
+  --intro-globo-y: 42svh;
+}
+@media (max-width: 1023px) {
+  :root {
+    --intro-recorrido: 75svh;
+    --intro-globo: min(175vw, 96svh);
+    --intro-globo-y: 40svh;
+  }
+}
+
+html[data-intro='activo'] [data-site-header] {
+  transform: translateY(calc((var(--intro-header, 0) - 1) * 100%));
+  will-change: transform;
+}
+html[data-intro='activo'][data-intro-header='oculto'] [data-site-header] {
+  pointer-events: none;
+}
+html[data-intro='activo'] [data-intro-row='ticker'] {
+  opacity: var(--intro-ticker, 0);
+  transform: translateY(calc((1 - var(--intro-ticker, 0)) * -6px));
+}
+html[data-intro='activo'] [data-intro-row='nav'] {
+  opacity: var(--intro-nav, 0);
+  transform: translateY(calc((1 - var(--intro-nav, 0)) * -6px));
+}
+/* Teclado: el "saltar al contenido" y los enlaces del header siguen siendo alcanzables con Tab */
+html[data-intro='activo'] [data-site-header]:focus-within {
+  transform: none;
+  pointer-events: auto;
+}
+html[data-intro='activo'] [data-site-header]:focus-within [data-intro-row] {
+  opacity: 1;
+  transform: none;
+}
+
+/* Pista de scroll: la escena queda fija (sticky) mientras se recorre --intro-recorrido. Es un espaciador y
+   no un padding de la pista porque el sticky solo se desplaza dentro del area de contenido de su padre. */
+html[data-intro='activo'] [data-intro-espaciador] {
+  display: block;
+  height: var(--intro-recorrido);
+}
+html[data-intro='activo'] [data-intro-escena] {
+  position: sticky;
+  top: 0;
+}
+
+/* El globo se dibuja a tamaño de intro (el canvas renderiza a esa resolucion, asi al encogerse con
+   transform queda nitido) y el JS lo lleva con FLIP hasta [data-globo-destino], un hueco invisible con
+   las mismas clases que la caja real que marca donde termina. */
+html[data-intro='activo'] [data-globo-caja] {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--intro-globo-y) - var(--header-height));
+  width: var(--intro-globo);
+  max-width: none;
+  translate: -50% -50%;
+  z-index: 1;
+}
+html:not([data-intro='activo']) [data-intro-espaciador],
+html:not([data-intro='activo']) [data-globo-destino],
+html:not([data-intro='activo']) [data-intro-solo] {
+  display: none;
+}
+/* El titulo pasa por encima del globo durante la intro */
+html[data-intro='activo'] [data-intro-texto] {
+  text-shadow: 0 2px 28px rgb(0 0 0 / 0.85);
+}
+html[data-intro='activo'] [data-intro-resto] {
+  opacity: var(--intro-resto, 0);
+  transform: translateY(calc((1 - var(--intro-resto, 0)) * 14px));
+}
+html[data-intro='activo'][data-intro-header='oculto'] [data-intro-resto] {
+  pointer-events: none;
+}
+
+@keyframes introCue { 0%, 100% { transform: translateY(0); opacity: 0.5; } 50% { transform: translateY(6px); opacity: 1; } }
+.intro-cue-flecha { animation: introCue 1.8s var(--ease-in-out) infinite; }
+
 /* Tarjetas de "Lo que hay dentro": una franja cian corta recorre el borde inferior en bucle
    continuo (no solo al pasar el mouse) — un detalle vivo en vez de un adorno estatico. */
 @keyframes featureCardShimmer { from { background-position: -60% 0; } to { background-position: 160% 0; } }
