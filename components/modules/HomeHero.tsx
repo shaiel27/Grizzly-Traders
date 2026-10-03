@@ -6,7 +6,7 @@ import { clsx } from 'clsx'
 import { Button } from '@/components/ui'
 import { HeroGlobe } from '@/components/globe/HeroGlobe'
 import type { DatosGlobo } from '@/components/globe/GloboHolografico'
-import { HomeFeatures } from './HomeFeatures'
+import { HomeFeatures, type NoticiaPreview, type CotizacionPreview, type PivotePreview } from './HomeFeatures'
 import { FondoHero } from '@/components/globe/FondoHero'
 import { getDictionary, type Locale } from '@/lib/i18n/get-dictionary'
 import { scrollSuaveA } from '@/lib/scroll'
@@ -17,9 +17,12 @@ interface HomeHeroProps {
   postCount: number
   assetCount: number
   btcPrice: PriceData | null
+  noticiasPreview: NoticiaPreview[]
+  cotizacionesPreview: CotizacionPreview[]
+  pivotePreview: PivotePreview | null
 }
 
-export function HomeHero({ locale, postCount, assetCount, btcPrice }: HomeHeroProps) {
+export function HomeHero({ locale, postCount, assetCount, btcPrice, noticiasPreview, cotizacionesPreview, pivotePreview }: HomeHeroProps) {
   const dict = getDictionary(locale).home
   const numberLocale = locale === 'en' ? 'en-US' : 'es-ES'
   // El texto espera a que el globo avise que esta listo (o a su propio timeout de 2s si WebGL
@@ -219,7 +222,7 @@ export function HomeHero({ locale, postCount, assetCount, btcPrice }: HomeHeroPr
           padding horizontal aca: HomeFeatures ya trae su propio section-container (16/20px +
           max-w-1200), duplicarlo sumaria padding de mas en mobile. */}
       <div className="relative z-10 pb-16 pt-4 md:pb-24">
-        <HomeFeatures locale={locale} />
+        <HomeFeatures locale={locale} noticiasPreview={noticiasPreview} cotizacionesPreview={cotizacionesPreview} pivotePreview={pivotePreview} />
       </div>
     </section>
   )

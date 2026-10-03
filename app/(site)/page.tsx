@@ -13,7 +13,12 @@ import {
 import { getServerLocale } from '@/lib/i18n/server'
 import { getDictionary, t } from '@/lib/i18n/get-dictionary'
 import { getCachedPrices, type PriceData } from '@/lib/prices'
+import { getTickerSnapshot } from '@/lib/ticker'
+import { getPivotQuotes } from '@/lib/pivot-data'
+import { calculatePivots } from '@/lib/pivots'
+import { localizedPost, sentimentMeta, timeAgo } from '@/lib/feed'
 import type { PostWithRelations } from '@/lib/types'
+import type { NoticiaPreview, CotizacionPreview, PivotePreview } from '@/components/modules/HomeFeatures'
 
 export const metadata: Metadata = {
   description:
@@ -88,6 +93,35 @@ export default async function HomePage({
     sourceDown = true
   }
 
+  // Vistas previas de "Lo que hay dentro" (plan 009 §12): datos reales ya cacheados en el
+  // servidor, sin pedidos de mas. Separado del try/catch de arriba a proposito, mismo criterio
+  // que btcPrice — si el ticker o los pivotes fallan, esas 2 tarjetas simplemente no muestran
+  // vista previa, no tumban el resto de la home.
+  const noticiasPreview: NoticiaPreview[] = latest.slice(0, 3).map((post) => {
+    const { title, slug } = localizedPost(post, locale)
+    const sentimiento = sentimentMeta(post.sentiment, locale)
+    return { titulo: title, href: `/articulos/${slug}`, sentimientoLabel: sentimiento.label, sentimientoClase: sentimiento.chip, fecha: timeAgo(post.published_at, locale) }
+  })
+
+  const cotizacionesPreview: CotizacionPreview[] = await getTickerSnapshot()
+    .then((snap) => {
+      const simbolos = ['BTC', 'XAUUSD', 'SPX']
+      return simbolos
+        .map((s) => snap.quotes.find((q) => q.symbol === s))
+        .filter((q): q is NonNullable<typeof q> => q != null)
+        .map((q) => ({ simbolo: q.symbol, label: q.label, precio: q.price, cambio: q.changePercent, moneda: q.currency }))
+    })
+    .catch(() => [])
+
+  const pivotePreview: PivotePreview | null = await getPivotQuotes('D')
+    .then((quotes) => {
+      const btc = quotes.find((q) => q.symbol === 'BINANCE:BTCUSDT')
+      if (!btc) return null
+      const niveles = calculatePivots(btc.previous.high, btc.previous.low, btc.previous.close, btc.previous.open).classic
+      return { s3: niveles.s3, s2: niveles.s2, s1: niveles.s1, pivot: niveles.pivot, r1: niveles.r1, r2: niveles.r2, r3: niveles.r3, precioActual: btc.price }
+    })
+    .catch(() => null)
+
   const breaking = featured
   const grid = latest
   const specs = [{ icon: 'update', label: dict.home.vipSpecLabel, value: dict.home.vipSpecValue }]
@@ -95,7 +129,15 @@ export default async function HomePage({
   return (
     <>
 
-      <HomeHero locale={locale} postCount={postCount} assetCount={assetCount} btcPrice={btcPrice} />
+      <HomeHero
+        locale={locale}
+        postCount={postCount}
+        assetCount={assetCount}
+        btcPrice={btcPrice}
+        noticiasPreview={noticiasPreview}
+        cotizacionesPreview={cotizacionesPreview}
+        pivotePreview={pivotePreview}
+      />
 
       <main id="main-content" tabIndex={-1} className="flex-grow pb-24 pt-10 max-w-[1200px] mx-auto px-6 md:px-8 w-full">
         {/* Only surfaces when something is actually wrong — same alert pattern as /markets */}
@@ -169,7 +211,7 @@ export default async function HomePage({
                 </Link>
               </div>
             </div>
-            <div className="hidden lg:block w-48 h-32 rounded-xl border border-outline-variant/40 bg-surface-2/50 flex items-center justify-center">
+            <div className="hidden lg:flex w-48 h-32 rounded-xl border border-outline-variant/40 bg-surface-2/50 items-center justify-center">
               <div className="text-center">
                 <span className="material-symbols-outlined text-[32px] text-accent-blue/60" aria-hidden="true">stacked_line_chart</span>
                 <p className="text-micro text-ink-muted mt-1">{dict.home.pivotMethodsLabel}</p>
