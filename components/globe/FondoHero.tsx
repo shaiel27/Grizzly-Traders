@@ -82,7 +82,13 @@ export function FondoHero() {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    const reducido = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    // Deliberately no prefers-reduced-motion check here, same call as the ticker (ver el
+    // comentario de .ticker-flash-down en este archivo): en Windows con "Efectos de animacion"
+    // desactivado, CUALQUIER navegador (no solo uno) reporta reduced-motion=true, y antes esto
+    // dejaba el fondo completamente congelado en el primer frame para siempre — no es un
+    // deterioro sutil de una animacion decorativa, es un fondo estatico sin aviso de que existe
+    // una preferencia de por medio. Sigue siendo decorativo y no bloquea nada (WCAG 2.2.2 ya
+    // esta cubierto por el resto de animaciones del sitio, que si se congelan).
     const dpr = Math.min(window.devicePixelRatio || 1, 1.5)
     let ancho = 0
     let alto = 0
@@ -113,12 +119,12 @@ export function FondoHero() {
 
       for (const e of estrellas) {
         const cfg = CONFIG_CAPAS[e.capa]
-        const derivaPx = reducido ? 0 : ((tiempoS * cfg.derivaPxS) % (ancho + 40)) - 20
-        const parX = reducido ? 0 : (puntero.x - 0.5) * cfg.parallaxPx
-        const parY = reducido ? 0 : (puntero.y - 0.5) * cfg.parallaxPx * 0.6
+        const derivaPx = ((tiempoS * cfg.derivaPxS) % (ancho + 40)) - 20
+        const parX = (puntero.x - 0.5) * cfg.parallaxPx
+        const parY = (puntero.y - 0.5) * cfg.parallaxPx * 0.6
         const x = (((e.x * ancho - derivaPx + parX) % ancho) + ancho) % ancho
         const y = e.y * alto + parY
-        const opacidad = reducido ? 0.6 : 0.2 + 0.8 * (0.5 + 0.5 * Math.sin(tiempoS * (Math.PI * 2) / e.periodo + e.fase))
+        const opacidad = 0.2 + 0.8 * (0.5 + 0.5 * Math.sin(tiempoS * (Math.PI * 2) / e.periodo + e.fase))
 
         ctx.beginPath()
         ctx.fillStyle = cfg.color.replace('alpha', opacidad.toFixed(3))
@@ -126,40 +132,38 @@ export function FondoHero() {
         ctx.fill()
       }
 
-      if (!reducido) {
-        if (!fugaz.activa) {
-          fugaz.proximaEn -= 1 / 60
-          if (fugaz.proximaEn <= 0) {
-            fugaz.activa = true
-            fugaz.t = 0
-            // Nace en la mitad derecha (donde esta el globo, no el texto) y cae en diagonal.
-            fugaz.x = ancho * (0.55 + rngFugaz() * 0.4)
-            fugaz.y = alto * (0.05 + rngFugaz() * 0.2)
-            fugaz.angulo = (35 + rngFugaz() * 20) * (Math.PI / 180)
-          }
+      if (!fugaz.activa) {
+        fugaz.proximaEn -= 1 / 60
+        if (fugaz.proximaEn <= 0) {
+          fugaz.activa = true
+          fugaz.t = 0
+          // Nace en la mitad derecha (donde esta el globo, no el texto) y cae en diagonal.
+          fugaz.x = ancho * (0.55 + rngFugaz() * 0.4)
+          fugaz.y = alto * (0.05 + rngFugaz() * 0.2)
+          fugaz.angulo = (35 + rngFugaz() * 20) * (Math.PI / 180)
+        }
+      } else {
+        fugaz.t += 1 / 60
+        const duracion = 0.3
+        const p = fugaz.t / duracion
+        if (p >= 1) {
+          fugaz.activa = false
+          fugaz.proximaEn = 8 + rngFugaz() * 7
         } else {
-          fugaz.t += 1 / 60
-          const duracion = 0.3
-          const p = fugaz.t / duracion
-          if (p >= 1) {
-            fugaz.activa = false
-            fugaz.proximaEn = 8 + rngFugaz() * 7
-          } else {
-            const largo = 90
-            const x1 = fugaz.x + Math.cos(fugaz.angulo) * largo * p
-            const y1 = fugaz.y + Math.sin(fugaz.angulo) * largo * p
-            const x0 = x1 - Math.cos(fugaz.angulo) * largo * 0.5
-            const y0 = y1 - Math.sin(fugaz.angulo) * largo * 0.5
-            const grad = ctx.createLinearGradient(x0, y0, x1, y1)
-            grad.addColorStop(0, 'rgba(127,212,255,0)')
-            grad.addColorStop(1, `rgba(220,245,255,${1 - p})`)
-            ctx.strokeStyle = grad
-            ctx.lineWidth = 1.5
-            ctx.beginPath()
-            ctx.moveTo(x0, y0)
-            ctx.lineTo(x1, y1)
-            ctx.stroke()
-          }
+          const largo = 90
+          const x1 = fugaz.x + Math.cos(fugaz.angulo) * largo * p
+          const y1 = fugaz.y + Math.sin(fugaz.angulo) * largo * p
+          const x0 = x1 - Math.cos(fugaz.angulo) * largo * 0.5
+          const y0 = y1 - Math.sin(fugaz.angulo) * largo * 0.5
+          const grad = ctx.createLinearGradient(x0, y0, x1, y1)
+          grad.addColorStop(0, 'rgba(127,212,255,0)')
+          grad.addColorStop(1, `rgba(220,245,255,${1 - p})`)
+          ctx.strokeStyle = grad
+          ctx.lineWidth = 1.5
+          ctx.beginPath()
+          ctx.moveTo(x0, y0)
+          ctx.lineTo(x1, y1)
+          ctx.stroke()
         }
       }
     }
@@ -191,10 +195,8 @@ export function FondoHero() {
       intersectionObserver.observe(contenedor)
     }
 
-    if (!reducido) {
-      window.addEventListener('pointermove', onPointerMove, { passive: true })
-      loop()
-    }
+    window.addEventListener('pointermove', onPointerMove, { passive: true })
+    loop()
 
     return () => {
       cancelAnimationFrame(frame)

@@ -94,9 +94,11 @@ export function useIntroInicio(refs: RefsIntro) {
         globoDy: rd.top + rd.height / 2 - (rc.top + rc.height / 2),
         globoEscala: rc.width > 0 ? rd.width / rc.width : 1,
         // En la intro el titulo va centrado y apoyado en la parte baja de la pantalla, sobre el globo, dejando
-        // sitio debajo para la pista "desliza para explorar"
+        // sitio debajo para la pista "desliza para explorar". 150px (antes 110): con el titulo en
+        // 4 lineas (movil angosto, title wrapea) el hueco quedaba tan justo que "desliza para
+        // explorar" tocaba la ultima linea — verificado visualmente con capturas en varios anchos.
         textoDx: window.innerWidth / 2 - (rt.left + rt.width / 2),
-        textoDy: escenaTop + window.innerHeight - 110 - rt.bottom,
+        textoDy: escenaTop + window.innerHeight - 150 - rt.bottom,
       }
     }
 
