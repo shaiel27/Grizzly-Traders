@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import { clsx } from 'clsx'
 import { formatNumber, formatPrice } from '@/lib/format'
 
@@ -19,6 +20,7 @@ interface CryptoRanking {
 export function CryptoRankings() {
   const [coins, setCoins] = useState<CryptoRanking[] | null>(null)
   const [failed, setFailed] = useState(false)
+  const [brokenIcons, setBrokenIcons] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const controller = new AbortController()
@@ -65,8 +67,23 @@ export function CryptoRankings() {
                   <td className="py-2.5 pr-4 text-[13px] tabular-nums text-ink-subtle">{coin.rank}</td>
                   <td className="py-2.5 pr-4">
                     <span className="flex items-center gap-2">
-                      {/* eslint-disable-next-line @next/next/no-img-element -- remote icon host (CoinGecko), not worth next/image config for this widget */}
-                      <img src={coin.image} alt="" width={18} height={18} className="rounded-full" />
+                      {brokenIcons.has(coin.id) || !coin.image ? (
+                        <span
+                          aria-hidden="true"
+                          className="flex size-[18px] shrink-0 items-center justify-center rounded-full bg-surface-container-lowest text-[9px] font-semibold text-ink-subtle"
+                        >
+                          {coin.symbol.charAt(0)}
+                        </span>
+                      ) : (
+                        <Image
+                          src={coin.image}
+                          alt=""
+                          width={18}
+                          height={18}
+                          className="rounded-full"
+                          onError={() => setBrokenIcons((prev) => new Set(prev).add(coin.id))}
+                        />
+                      )}
                       <span className="text-[13px] text-ink">{coin.name}</span>
                       <span className="text-[11px] text-ink-subtle">{coin.symbol}</span>
                     </span>
