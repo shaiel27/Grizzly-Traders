@@ -26,6 +26,19 @@ interface NoticiaActivo {
 // publicos, nada sensible que requiera invalidarse por usuario.
 const cacheNoticias = new Map<string, Promise<NoticiaActivo[]>>()
 
+// marcador.simbolo es el ticker "pelado" que usan lib/ticker.ts y la API de noticias (p.ej.
+// 'XAUUSD'), pero el terminal (lib/market-assets.ts) indexa cada activo por su simbolo con
+// prefijo de exchange de TradingView (p.ej. 'OANDA:XAUUSD') — son catalogos distintos con
+// distinta clave. Sin este mapeo, el enlace "ver en terminal" nunca encuentra el activo en
+// MarketsClient.tsx y cae siempre al primero de la lista.
+const SIMBOLO_TERMINAL: Record<string, string> = {
+  XAUUSD: 'OANDA:XAUUSD',
+  XAGUSD: 'TVC:SILVER',
+  BRENT: 'ICEEUR:BRN1!',
+  WTI: 'NYMEX:CL1!',
+  NG: 'NYMEX:NG1!',
+}
+
 export function precargarNoticias(simbolo: string, locale: Locale): Promise<NoticiaActivo[]> {
   const clave = `${simbolo}:${locale}`
   let promesa = cacheNoticias.get(clave)
@@ -185,7 +198,7 @@ export function TarjetaActivo({ marcador, locale, cotizacion, posicionRef, autoe
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-white/10 pt-3 text-micro">
-        <Link href={`/markets?activo=${marcador.simbolo}`} className="font-medium text-accent-cyan hover:underline">
+        <Link href={`/markets?activo=${encodeURIComponent(SIMBOLO_TERMINAL[marcador.simbolo] ?? marcador.simbolo)}`} className="font-medium text-accent-cyan hover:underline">
           {dict.home.globoVerTerminal}
         </Link>
         <Link href={`/buscar?q=${encodeURIComponent(marcador.simbolo)}`} className="text-ink-muted hover:text-ink hover:underline">
