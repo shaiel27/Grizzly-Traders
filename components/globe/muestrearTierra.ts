@@ -21,6 +21,9 @@ export interface PuntosTierra {
   aBrillo: Float32Array
   aFase: Float32Array
   aVel: Float32Array
+  // Id de region de sentimiento (0 = ninguna, 1-6, ver scripts/build-globe-mask.mjs) por punto —
+  // plan 009 §3.2. Queda en 0 para todos si no se pasa `maskRegiones`.
+  aRegion: Float32Array
   count: number
 }
 
@@ -38,16 +41,30 @@ export function extraerImageData(image: CanvasImageSource, width: number, height
 /**
  * Muestrea `cantidadObjetivo` puntos sobre la tierra (uniforme en area esferica: lat = asin(2v-1)),
  * con mas densidad y brillo en la costa (un pixel de tierra con algun vecino de agua en radio 2px).
+ * `maskRegiones`, si se pasa, debe tener el MISMO ancho/alto que `mask` y venir de la misma
+ * proyeccion (scripts/build-globe-mask.mjs genera ambas asi a proposito) — se lee en el mismo
+ * pixel que la mascara de tierra, sin una segunda conversion lat/lon.
  */
-export function muestrearPuntosTierra(mask: ImageData, cantidadObjetivo: number, seed = 1337, radio = 1): PuntosTierra {
+export function muestrearPuntosTierra(mask: ImageData, cantidadObjetivo: number, seed = 1337, radio = 1, maskRegiones?: ImageData): PuntosTierra {
   const rand = mulberry32(seed)
   const { width, height, data } = mask
+  const dataRegiones = maskRegiones?.data
 
   const esTierra = (x: number, y: number): boolean => {
     if (y < 0 || y >= height) return false
     const xi = ((x % width) + width) % width
     const idx = (y * width + xi) * 4
     return data[idx] > 128
+  }
+
+  // El canal R de regiones-2048.png guarda id*40 (ver scripts/build-globe-mask.mjs) — redondear
+  // al multiplo de 40 mas cercano absorbe el antialiasing de los bordes de pais sin confundir
+  // una region con otra (los pasos de 40 estan bien separados).
+  const regionEn = (x: number, y: number): number => {
+    if (!dataRegiones) return 0
+    const xi = ((x % width) + width) % width
+    const idx = (y * width + xi) * 4
+    return Math.round(dataRegiones[idx] / 40)
   }
 
   const esCosta = (x: number, y: number): boolean => {
@@ -64,6 +81,7 @@ export function muestrearPuntosTierra(mask: ImageData, cantidadObjetivo: number,
   const brillos: number[] = []
   const fases: number[] = []
   const velocidades: number[] = []
+  const regiones: number[] = []
 
   // x24 alcanza de sobra (~29% de la mascara es tierra) y corta casi a la mitad el costo
   // sincrono de este muestreo respecto al x60 original — se nota en cuanto tarda en aparecer.
@@ -83,6 +101,7 @@ export function muestrearPuntosTierra(mask: ImageData, cantidadObjetivo: number,
 
     const costa = esCosta(px, py)
     const repeticiones = costa ? 2 + Math.floor(rand() * 2) : 1
+    const region = regionEn(px, py)
 
     for (let r = 0; r < repeticiones && aceptados < cantidadObjetivo; r++) {
       const p = latLonAVector3(lat, lon, radio)
@@ -90,6 +109,7 @@ export function muestrearPuntosTierra(mask: ImageData, cantidadObjetivo: number,
       brillos.push(costa ? 0.85 + rand() * 0.15 : 0.35 + rand() * 0.35)
       fases.push(rand() * Math.PI * 2)
       velocidades.push(0.6 + rand() * 1.2)
+      regiones.push(region)
       aceptados++
     }
   }
@@ -99,6 +119,7 @@ export function muestrearPuntosTierra(mask: ImageData, cantidadObjetivo: number,
     aBrillo: new Float32Array(brillos),
     aFase: new Float32Array(fases),
     aVel: new Float32Array(velocidades),
+    aRegion: new Float32Array(regiones),
     count: aceptados,
   }
 }

@@ -29,14 +29,22 @@ export const baseFragmentShader = /* glsl */ `
 `
 
 // --- Puntos de los continentes ---
+// uSentimiento[8]: score -1..1 por region de lib/globe/sentimiento.ts (indice 0 sin usar, 1-6
+// las regiones de scripts/build-globe-mask.mjs). El resto del globo (aRegion=0) se queda cian.
+// Plan 009 §3.2 — version acotada: tiñe por region, sin brillo-por-sesion en el shader (eso
+// sigue resuelto con los nodos discretos de NodosSesion.tsx, no punto por punto).
 export const puntosVertexShader = /* glsl */ `
   attribute float aBrillo;
   attribute float aFase;
   attribute float aVel;
+  attribute float aRegion;
   uniform float uTiempo;
   uniform float uTam;
+  uniform vec3 uColor;
+  uniform float uSentimiento[8];
   varying float vBrillo;
   varying float vCara;
+  varying vec3 vColorRegion;
 
   void main() {
     // El globo es una esfera centrada en el origen: la normal de cada punto es su propia
@@ -50,6 +58,13 @@ export const puntosVertexShader = /* glsl */ `
     float parpadeo = 0.75 + 0.25 * sin(uTiempo * aVel + aFase);
     vBrillo = aBrillo * parpadeo;
 
+    int region = int(aRegion + 0.5);
+    float s = (region > 0 && region < 8) ? uSentimiento[region] : 0.0;
+    vec3 verde = vec3(0.133, 0.773, 0.369);
+    vec3 rojo = vec3(1.0, 0.231, 0.188);
+    float mezcla = min(abs(s), 1.0) * 0.65;
+    vColorRegion = s > 0.0 ? mix(uColor, verde, mezcla) : mix(uColor, rojo, mezcla);
+
     gl_Position = projectionMatrix * mvPosition;
     // clamp(1.0, 4.5): con uTam=3.4 (el valor anterior) y la camara a z=5.2, esto daba
     // 300/5 * 3.4 ~= 200px POR PUNTO. Con 22k puntos aditivos eso funde todo en una masa
@@ -61,16 +76,16 @@ export const puntosVertexShader = /* glsl */ `
 `
 
 export const puntosFragmentShader = /* glsl */ `
-  uniform vec3 uColor;
   varying float vBrillo;
   varying float vCara;
+  varying vec3 vColorRegion;
   void main() {
     vec2 coord = gl_PointCoord - vec2(0.5);
     float dist = length(coord);
     if (dist > 0.5) discard;
     float suavidad = smoothstep(0.5, 0.15, dist);
     float atenuacion = vCara > 0.0 ? 1.0 : 0.25;
-    gl_FragColor = vec4(min(uColor * max(vBrillo, 0.0) * atenuacion, vec3(4.0)), clamp(suavidad * atenuacion, 0.0, 1.0));
+    gl_FragColor = vec4(min(vColorRegion * max(vBrillo, 0.0) * atenuacion, vec3(4.0)), clamp(suavidad * atenuacion, 0.0, 1.0));
   }
 `
 

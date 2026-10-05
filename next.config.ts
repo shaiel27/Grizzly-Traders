@@ -31,6 +31,18 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Solo importa en dev: permite que el websocket de HMR (/_next/hmr) conteste pedidos de un
+  // tunel de Cloudflare (cloudflared tunnel --url), que sirve el sitio desde un host *.trycloudflare.com
+  // en vez de localhost. Sin esto, Next bloquea esos pedidos cross-origin por seguridad (ver
+  // node_modules/next/dist/docs/.../allowedDevOrigins.md) y el globo (que depende del chunk
+  // cargado por HMR) se queda sin terminar de cargar al entrar por el tunel — el log mostraba
+  // "Blocked cross-origin request to Next.js dev resource /_next/hmr" seguido de cloudflared
+  // reportando la respuesta como "malformed... Unauthorized", que es la consecuencia, no la
+  // causa. `*.trycloudflare.com` (un solo nivel de subdominio) cubre cualquier tunel nuevo:
+  // cloudflared genera un subdominio al azar cada vez que se corre `tunnel --url`, nunca el
+  // mismo dos veces, asi que el host especifico del log (assets-opt-snowboard-mini...) habria
+  // dejado de servir apenas se reinicie el tunel.
+  ...(isDev ? { allowedDevOrigins: ["*.trycloudflare.com"] } : {}),
   images: {
     remotePatterns: [
       {
