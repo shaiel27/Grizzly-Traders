@@ -272,6 +272,13 @@
 .hero-fade-scale { opacity: 0; animation: heroFadeScale 0.6s var(--ease-hero-entrance) forwards; }
 .hero-bar-grow { opacity: 0; transform-origin: bottom; animation: heroBarGrow 0.42s var(--ease-hero-entrance) forwards; }
 
+/* Menu movil (Header.tsx): mismo truco de opacity:0 + animation forwards que el hero de arriba,
+   pero mas corto/sutil (120px menos de distancia, duracion a menos de la mitad) — esto es chrome
+   de UI que se abre y cierra todo el tiempo, no una entrada de pagina de una sola vez; con la
+   duracion del hero se sentiria perezoso en comparacion al resto de las interacciones del header. */
+@keyframes menuItemIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.menu-item-in { animation: menuItemIn 0.28s var(--ease-hero-entrance) forwards; }
+
 /* Fondo ambiental de la seccion del globo: dos glows lejos de el, en las esquinas — el campo de
    estrellas en si vive dentro del Canvas de Three.js (components/globe/GloboHolografico.tsx,
    <CampoEstrellas>), no aca. Esto solo evita que el negro fuera del canvas (bordes en mobile)
