@@ -27,6 +27,7 @@ interface NavEntry {
   slug: string
   href: string
   icon?: string
+  group?: 'content' | 'tools'
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -34,6 +35,23 @@ const CATEGORY_LABELS: Record<string, string> = {
   forex: 'Forex',
   'materias-primas': 'Commodities',
   acciones: 'Equities',
+}
+
+// Icono por slug, solo para el menu movil (el desktop no lleva iconos en la fila de categorias).
+// 'category' de respaldo: una categoria nueva creada desde el CMS con un slug que no esta aca
+// no se queda sin icono, solo con uno generico.
+const NAV_ICONS: Record<string, string> = {
+  '': 'newspaper',
+  forex: 'currency_exchange',
+  criptomonedas: 'currency_bitcoin',
+  'materias-primas': 'oil_barrel',
+  acciones: 'trending_up',
+  __autor: 'person',
+  __pivots: 'functions',
+  __calendar: 'calendar_month',
+  __tools: 'build',
+  __learn: 'menu_book',
+  __markets: 'candlestick_chart',
 }
 
 const FALLBACK_NAV: NavEntry[] = [
@@ -48,9 +66,13 @@ interface NavLinksProps {
   activeCategory: string
   variant: 'desktop' | 'mobile'
   onNavigate?: () => void
+  // Dispara la entrada escalonada de los items del menu movil (ver .menu-item-in en globals.css);
+  // sin esto el panel quedaria siempre montado (para poder animar el cierre) pero los items solo
+  // animarian una vez, en el primer montaje, nunca de nuevo al reabrir.
+  animateIn?: boolean
 }
 
-function NavLinks({ items, activeCategory, variant, onNavigate }: NavLinksProps) {
+function NavLinks({ items, activeCategory, variant, onNavigate, animateIn }: NavLinksProps) {
   const pathname = usePathname()
   const isActive = (slug: string) => {
     if (slug === '__autor') return pathname.startsWith('/autor')
@@ -62,42 +84,84 @@ function NavLinks({ items, activeCategory, variant, onNavigate }: NavLinksProps)
     return slug ? activeCategory === slug : pathname === '/articulos' && !activeCategory
   }
 
-  const links = items.map((item) => (
-    <Link
-      key={item.slug}
-      href={item.href}
-      onClick={onNavigate}
-      aria-current={isActive(item.slug) ? 'page' : undefined}
-      className={clsx(
-        variant === 'desktop'
-          ? 'relative py-1 text-body-sm font-medium transition-colors whitespace-nowrap after:absolute after:inset-x-0 after:-bottom-[7px] after:h-[2px] after:rounded-full after:transition-colors'
-          : 'flex items-center gap-2.5 py-2.5 text-body font-medium transition-colors',
-        isActive(item.slug)
-          ? variant === 'desktop'
-            ? 'text-ink after:bg-accent-blue'
-            : 'text-accent-blue'
-          : variant === 'desktop'
-            ? 'text-ink-muted after:bg-transparent hover:text-ink'
-            : 'text-ink-muted hover:text-ink'
-      )}
-    >
-      {variant === 'mobile' && item.icon && (
-        <span className="material-symbols-outlined text-[18px] text-ink-subtle" aria-hidden="true">
-          {item.icon}
-        </span>
-      )}
-      {item.label}
-    </Link>
-  ))
+  if (variant === 'desktop') {
+    return (
+      <>
+        {items.map((item) => (
+          <Link
+            key={item.slug}
+            href={item.href}
+            onClick={onNavigate}
+            aria-current={isActive(item.slug) ? 'page' : undefined}
+            className={clsx(
+              'relative py-1 text-body-sm font-medium transition-colors whitespace-nowrap after:absolute after:inset-x-0 after:-bottom-[7px] after:h-[2px] after:rounded-full after:transition-colors',
+              isActive(item.slug) ? 'text-ink after:bg-accent-blue' : 'text-ink-muted after:bg-transparent hover:text-ink'
+            )}
+          >
+            {item.label}
+          </Link>
+        ))}
+      </>
+    )
+  }
 
-  if (variant === 'desktop') return <>{links}</>
+  // Dos grupos (contenido / herramientas) en vez de una lista plana de 10 items: separa "que leer"
+  // de "que usar", consistente con como Row B del desktop ya separa categorias (izquierda) de
+  // iconos de herramientas (derecha) — aca no hay espacio para dos filas, asi que se apilan con un
+  // divisor con etiqueta en vez de mezclarse sin orden.
+  // El indice global (no por grupo) viaja pegado a cada item desde antes de filtrar, asi el
+  // stagger sigue siendo una cascada continua de arriba a abajo en vez de reiniciarse en el
+  // divisor "Herramientas" — y sin una variable mutable compartida entre los dos .map() (la
+  // regla react-hooks/immutability del compilador de React no deja reasignar fuera del render).
+  const indexado = items.map((item, i) => ({ item, i }))
+  const contenido = indexado.filter(({ item }) => item.group !== 'tools')
+  const herramientas = indexado.filter(({ item }) => item.group === 'tools')
+
+  const fila = ({ item, i }: { item: NavEntry; i: number }) => {
+    const activo = isActive(item.slug)
+    return (
+      <li key={item.slug} className={clsx(animateIn ? 'menu-item-in' : 'opacity-0')} style={animateIn ? { animationDelay: `${i * 35}ms` } : undefined}>
+        <Link
+          href={item.href}
+          onClick={onNavigate}
+          aria-current={activo ? 'page' : undefined}
+          className={clsx(
+            'group flex items-center gap-3 rounded-lg px-2.5 py-2.5 text-body-sm font-medium transition-colors',
+            activo ? 'bg-accent-blue/10 text-ink' : 'text-ink-muted hover:bg-white/[0.04] hover:text-ink'
+          )}
+        >
+          <span
+            className={clsx(
+              'flex size-8 shrink-0 items-center justify-center rounded-lg border transition-colors',
+              activo ? 'border-accent-blue/40 bg-accent-blue/15 text-accent-blue' : 'border-hairline-soft bg-white/[0.03] text-ink-subtle group-hover:text-ink-muted'
+            )}
+          >
+            <span className="material-symbols-outlined text-[17px]" aria-hidden="true">
+              {item.icon ?? 'chevron_right'}
+            </span>
+          </span>
+          <span className="flex-1">{item.label}</span>
+          <span
+            className={clsx('material-symbols-outlined text-[16px] transition-colors', activo ? 'text-accent-blue' : 'text-ink-subtle/60 group-hover:text-ink-subtle')}
+            aria-hidden="true"
+          >
+            chevron_right
+          </span>
+        </Link>
+      </li>
+    )
+  }
 
   return (
-    <ul className="flex flex-col">
-      {links.map((link) => (
-        <li key={link.key}>{link}</li>
-      ))}
-    </ul>
+    <div className="flex flex-col gap-1">
+      <ul className="flex flex-col gap-0.5">{contenido.map(fila)}</ul>
+      {herramientas.length > 0 && (
+        <>
+          <p className="mb-0.5 mt-3 px-2.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Herramientas</p>
+          <ul className="flex flex-col gap-0.5">{herramientas.map(fila)}</ul>
+        </>
+      )}
+    </div>
   )
 }
 
@@ -182,12 +246,12 @@ export function Header({ categories = [], initialTicker }: HeaderProps) {
   const navItems: NavEntry[] = [{ label: dict.header.navNews, slug: '', href: '/articulos' }, ...categoryItems]
   const desktopItems: NavEntry[] = [...navItems, { label: dict.header.navAuthor, slug: '__autor', href: '/autor' }]
   const mobileItems: NavEntry[] = [
-    ...desktopItems,
-    { label: dict.header.navPivotPoints, slug: '__pivots', href: '/pivot-points' },
-    { label: dict.header.navCalendar, slug: '__calendar', href: '/calendario', icon: 'calendar_month' },
-    { label: dict.header.navTools, slug: '__tools', href: '/herramientas' },
-    { label: dict.header.navLearn, slug: '__learn', href: '/aprende' },
-    { label: dict.header.navMarkets, slug: '__markets', href: '/markets' },
+    ...desktopItems.map((item) => ({ ...item, icon: NAV_ICONS[item.slug] ?? 'category', group: 'content' as const })),
+    { label: dict.header.navPivotPoints, slug: '__pivots', href: '/pivot-points', icon: NAV_ICONS.__pivots, group: 'tools' },
+    { label: dict.header.navCalendar, slug: '__calendar', href: '/calendario', icon: NAV_ICONS.__calendar, group: 'tools' },
+    { label: dict.header.navTools, slug: '__tools', href: '/herramientas', icon: NAV_ICONS.__tools, group: 'tools' },
+    { label: dict.header.navLearn, slug: '__learn', href: '/aprende', icon: NAV_ICONS.__learn, group: 'tools' },
+    { label: dict.header.navMarkets, slug: '__markets', href: '/markets', icon: NAV_ICONS.__markets, group: 'tools' },
   ]
 
   const submitSearch = (e: React.FormEvent) => {
@@ -218,6 +282,18 @@ export function Header({ categories = [], initialTicker }: HeaderProps) {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
+  }, [menuOpen])
+
+  // El menu movil ahora es un drawer con scrim (antes era un bloque que solo empujaba contenido
+  // abajo del header): bloquea el scroll de fondo mientras esta abierto, igual que cualquier
+  // overlay modal — si no, se puede desplazar la pagina por detras del scrim sin querer.
+  useEffect(() => {
+    if (!menuOpen) return
+    const previo = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previo
+    }
   }, [menuOpen])
 
   return (
@@ -346,14 +422,52 @@ export function Header({ categories = [], initialTicker }: HeaderProps) {
         </nav>
       </div>
 
-      {menuOpen && (
-        <nav id="mobile-menu" aria-label={dict.header.categoriesNavAria} className="md:hidden border-t border-outline-variant/40 px-6 py-3">
-          <ActiveNavLinks items={mobileItems} variant="mobile" onNavigate={() => setMenuOpen(false)} />
-          <div className="mt-3 pt-3 border-t border-hairline-soft">
+      {/* Panel siempre montado (antes era `{menuOpen && (<nav>...)}`, que aparecia/desaparecia de
+          un salto): asi el cierre tambien anima, no solo la apertura. El colapso usa max-height
+          (no se mide el alto real con JS): visualmente lo que se nota es el fade/traslado en
+          cascada de los items (animateIn, via NavLinks), no la curva exacta del numero de px.
+          75svh fijo, NO var(--header-h-real): ese valor lo mide un ResizeObserver sobre el propio
+          <header> que CONTIENE a este nav — usarlo aca para el propio alto crea un ciclo (el panel
+          abre -> el header crece -> el observer actualiza la variable -> el max-height de este
+          panel se recalcula con el nuevo valor -> el header cambia de alto otra vez...), que en la
+          practica se estabilizaba recortado a 2 items visibles. overflow-y-auto como red de
+          seguridad si el contenido no entra en 75svh (pantallas muy bajas). inert saca el panel
+          del foco/tab y de lectores de pantalla mientras esta cerrado, aunque siga en el DOM. */}
+      <nav
+        id="mobile-menu"
+        aria-label={dict.header.categoriesNavAria}
+        inert={!menuOpen}
+        className={clsx(
+          // bg solido propio (no el surface-translucent+blur del <header>): a media apertura el
+          // panel queda flotando sobre el contenido de la pagina (el globo, brillante) detras del
+          // header — con solo translucidez eso se filtraba como un velo claro encima de las filas,
+          // bajando el contraste. Un panel opaco lee mas a terminal real, menos a cristal esmerilado.
+          'md:hidden overflow-y-auto overflow-x-hidden bg-canvas transition-[max-height,border-color] duration-300 ease-[var(--ease-in-out)]',
+          menuOpen ? 'max-h-[75svh] border-t border-outline-variant/40' : 'max-h-0 border-t border-transparent'
+        )}
+      >
+        <div className="flex items-center gap-2 border-b border-hairline-soft px-5 py-2.5 font-mono text-[10px] uppercase tracking-wider text-ink-subtle">
+          <span className="splash-mark size-1.5 rounded-full bg-semantic-success" aria-hidden="true" />
+          grizzly://navegacion
+        </div>
+        <div className="px-4 py-3">
+          <ActiveNavLinks items={mobileItems} variant="mobile" onNavigate={() => setMenuOpen(false)} animateIn={menuOpen} />
+          <div className="mt-3 border-t border-hairline-soft pt-3">
             <LocaleSwitcher />
           </div>
-        </nav>
-      )}
+        </div>
+      </nav>
+
+      {/* Scrim: z-40, debajo del header (z-50) asi el header se queda opaco arriba y solo se
+          oscurece la pagina. Clickeable para cerrar, estandar en cualquier drawer movil. */}
+      <div
+        aria-hidden="true"
+        onClick={() => setMenuOpen(false)}
+        className={clsx(
+          'fixed inset-0 z-40 bg-black/60 backdrop-blur-[2px] transition-opacity duration-300 md:hidden',
+          menuOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
+        )}
+      />
 
       {searchOpen && (
         <form onSubmit={submitSearch} className="sm:hidden px-4 pb-3">
