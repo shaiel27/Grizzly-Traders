@@ -223,6 +223,7 @@ export function Header({ categories = [], initialTicker }: HeaderProps) {
   return (
     <header
       ref={headerRef}
+      data-site-header
       className="fixed top-0 left-0 w-full z-50 flex flex-col border-b border-outline-variant/40 bg-surface-translucent backdrop-blur-md"
     >
       <a
@@ -233,7 +234,7 @@ export function Header({ categories = [], initialTicker }: HeaderProps) {
       </a>
       <LiveTicker initialQuotes={initialTicker?.quotes} initialUpdatedAt={initialTicker?.updatedAt} />
 
-      <div className="section-container w-full">
+      <div data-intro-row="nav" className="section-container w-full">
         {/* Row A — identity and the one action every visitor might take (search, go VIP). Fixed height,
             fixed set of elements: this row can never gain content, so it can never overflow. */}
         <nav className="h-16 flex items-center justify-between gap-4" aria-label={dict.header.mainNavAria}>
