@@ -58,6 +58,13 @@ export const viewport: Viewport = {
   maximumScale: 5,
 }
 
+// First-load intro of the home (components/modules/useIntroInicio.ts). Runs while the HTML is parsed, so the
+// header starts hidden on the very first paint instead of flashing in and out. Only on a hard load of "/",
+// once per tab session, and never with reduced motion. If the home never takes control (an error page,
+// a failed chunk), the header comes back 5 s after `load` — not a fixed timer from here, because the home
+// streams in after its data and can take longer than any fixed delay to mount.
+const INTRO_SCRIPT = `(function(){try{var d=document.documentElement;if(location.pathname!=='/'||location.hash)return;if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;if(sessionStorage.getItem('gt-intro-visto'))return;d.setAttribute('data-intro','activo');addEventListener('load',function(){setTimeout(function(){if(!d.hasAttribute('data-intro-control'))d.removeAttribute('data-intro')},5000)})}catch(e){}})()`
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Only the <html lang> attribute is resolved dynamically here (Fase 5 MVP). title/description/openGraph.locale
   // stay the static ES defaults on purpose — making those request-dependent would require converting this static
@@ -65,9 +72,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const locale = await getServerLocale()
 
   return (
-    <html lang={locale} className={`${inter.variable} ${serif.variable} h-full antialiased`}>
+    // suppressHydrationWarning: INTRO_SCRIPT may add data-intro to <html> before React hydrates
+    <html lang={locale} className={`${inter.variable} ${serif.variable} h-full antialiased`} suppressHydrationWarning>
       <head>
         <link rel="preload" href="/fonts/material-symbols.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+        <script dangerouslySetInnerHTML={{ __html: INTRO_SCRIPT }} />
       </head>
       <body className="min-h-full flex flex-col bg-canvas text-on-surface">
         {children}
