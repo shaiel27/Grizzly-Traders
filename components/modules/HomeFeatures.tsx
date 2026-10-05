@@ -104,8 +104,13 @@ function MercadosFilas({ items, locale }: { items: CotizacionPreview[]; locale: 
 }
 
 // --- Vista previa: Puntos pivote — escalera R3..S3 de BTC con el precio actual marcado ---
-function PivoteEscalera({ datos }: { datos: PivotePreview | null }) {
+function PivoteEscalera({ datos, locale }: { datos: PivotePreview | null; locale: Locale }) {
   if (!datos) return null
+  // locale explicito, no `undefined` (= locale del runtime): en el servidor Node.js suele
+  // resolver a en-US y en el navegador al idioma configurado por el usuario — con es-ES ese
+  // separador de miles pasa de coma a punto (89,399 vs 89.399) y React descarta todo el arbol
+  // por mismatch de hidratacion (visto en Safari con el sistema en español, plan 009 fix).
+  const numberLocale = locale === 'en' ? 'en-US' : 'es-ES'
   const niveles = [
     { label: 'R3', valor: datos.r3 },
     { label: 'R2', valor: datos.r2 },
@@ -135,7 +140,7 @@ function PivoteEscalera({ datos }: { datos: PivotePreview | null }) {
             <span className={clsx('font-semibold', n.label === 'P' ? 'text-accent-cyan' : n.label[0] === 'R' ? 'text-semantic-success' : 'text-semantic-danger')}>
               {n.label}
             </span>
-            <span className="tabular-nums text-ink-muted">{n.valor.toLocaleString(undefined, { maximumFractionDigits: n.valor > 100 ? 0 : 2 })}</span>
+            <span className="tabular-nums text-ink-muted">{n.valor.toLocaleString(numberLocale, { maximumFractionDigits: n.valor > 100 ? 0 : 2 })}</span>
           </div>
         ))}
       </div>
@@ -271,7 +276,7 @@ export function HomeFeatures({ locale, noticiasPreview, cotizacionesPreview, piv
   const canales: Canal[] = [
     { codigo: 'NEWS', href: '/articulos', title: features.news.title, body: features.news.body, preview: <NoticiasRotator items={noticiasPreview} /> },
     { codigo: 'MKTS', href: '/markets', title: features.markets.title, body: features.markets.body, preview: <MercadosFilas items={cotizacionesPreview} locale={locale} /> },
-    { codigo: 'PVT', href: '/pivot-points', title: features.pivots.title, body: features.pivots.body, preview: <PivoteEscalera datos={pivotePreview} /> },
+    { codigo: 'PVT', href: '/pivot-points', title: features.pivots.title, body: features.pivots.body, preview: <PivoteEscalera datos={pivotePreview} locale={locale} /> },
     { codigo: 'CAL', href: '/calendario', title: features.calendar.title, body: features.calendar.body, preview: <CalendarioPreview /> },
   ]
 
