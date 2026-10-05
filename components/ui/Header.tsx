@@ -442,7 +442,24 @@ export function Header({ categories = [], initialTicker }: HeaderProps) {
           // panel queda flotando sobre el contenido de la pagina (el globo, brillante) detras del
           // header — con solo translucidez eso se filtraba como un velo claro encima de las filas,
           // bajando el contraste. Un panel opaco lee mas a terminal real, menos a cristal esmerilado.
-          'md:hidden overflow-y-auto overflow-x-hidden bg-canvas transition-[max-height,border-color] duration-300 ease-[var(--ease-in-out)]',
+          // relative z-10: el scrim de abajo es `fixed` (position != static) con z-40 — un hermano
+          // sin position (este nav, por defecto) SIEMPRE pinta detras de cualquier hermano con
+          // position, sin importar el z-index, asi que sin esto el scrim (su blur+oscurecido)
+          // quedaba literalmente ENCIMA de los propios enlaces del menu ("la barra de rutas se ve
+          // desenfocada") en vez de solo sobre la pagina detras. z-10 > el z-40 del scrim no hace
+          // falta (position ya alcanza para ganarle a un hermano sin position), pero deja explicito
+          // que este panel debe quedar arriba.
+          //
+          // [transform:translateZ(0)]: fuerza a este panel a su propia capa de composicion en vez
+          // de quedar aplanado dentro de la del <header> (que tiene backdrop-blur-md). Confirmado
+          // en celular real (no se reproducia en Chromium de escritorio, donde el texto salia
+          // nitido en las pruebas): Safari/iOS tiene un bug documentado donde backdrop-filter en un
+          // ancestro deja todo lo que hay DENTRO de un descendiente con overflow-y-auto (este nav)
+          // con aspecto desenfocado, aunque ese descendiente tenga su propio fondo opaco — el bug
+          // es de composicion de capas, no de blur real aplicado a cada elemento. translateZ(0) es
+          // el workaround estandar: promueve el nav a su propia capa GPU, independiente de la del
+          // header, asi WebKit lo rasteriza nitido por separado.
+          'md:hidden relative z-10 isolate [transform:translateZ(0)] overflow-y-auto overflow-x-hidden bg-canvas transition-[max-height,border-color] duration-300 ease-[var(--ease-in-out)]',
           menuOpen ? 'max-h-[75svh] border-t border-outline-variant/40' : 'max-h-0 border-t border-transparent'
         )}
       >
