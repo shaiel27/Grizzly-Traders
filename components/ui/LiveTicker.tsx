@@ -191,14 +191,17 @@ export function LiveTicker({ initialQuotes = [], initialUpdatedAt = null }: Live
 
   return (
     <div data-intro-row="ticker" className="flex h-8 w-full items-center overflow-hidden border-b border-outline-variant/40 bg-surface-container-lowest">
-      <div className="relative z-10 flex h-full shrink-0 items-center gap-2 border-r border-outline-variant/40 bg-surface-container-lowest pl-4 pr-4">
-        <span className="relative flex size-1.5" aria-hidden="true">
+      {/* En mobile queda solo el punto (menos ancho fijo = mas lugar para el ticker, que es lo
+          que importa ahi); el texto vuelve desde sm (640px). aria-label en el punto reemplaza al
+          texto para el lector de pantalla cuando esta oculto. */}
+      <div className="relative z-10 flex h-full shrink-0 items-center gap-2 border-r border-outline-variant/40 bg-surface-container-lowest pl-3 pr-3 sm:pl-4 sm:pr-4">
+        <span className="relative flex size-1.5" aria-label={stale ? 'Datos desactualizados' : 'Feed en vivo'}>
           {!stale && (
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-semantic-success opacity-75 motion-reduce:animate-none" />
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-semantic-success opacity-75 motion-reduce:animate-none" aria-hidden="true" />
           )}
-          <span className={clsx('relative inline-flex size-1.5 rounded-full', stale ? 'bg-semantic-warning' : 'bg-semantic-success')} />
+          <span className={clsx('relative inline-flex size-1.5 rounded-full', stale ? 'bg-semantic-warning' : 'bg-semantic-success')} aria-hidden="true" />
         </span>
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-muted">Feed en vivo</span>
+        <span className="hidden text-[10px] font-semibold uppercase tracking-wider text-ink-muted sm:inline">Feed en vivo</span>
       </div>
 
       <div className="ticker-viewport relative ml-3 flex w-full items-center" role="marquee" aria-label="Cotizaciones de mercado">
