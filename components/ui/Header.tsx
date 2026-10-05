@@ -308,9 +308,18 @@ export function Header({ categories = [], initialTicker }: HeaderProps) {
       >
         {dict.common.skipToContent}
       </a>
+      {/* relative z-50 en estas dos filas (y en LiveTicker, ver su propio root): mismo problema de
+          stacking que tenia #mobile-menu antes del fix de mas abajo, pero aca con el scrim tapando
+          el HEADER en vez del panel. El scrim es hijo del <header> igual que estas filas, `fixed`
+          con z-40 (positivo) — en el stacking context que crea el propio <header> (fixed, z-50),
+          contenido en flujo normal SIN position (estas filas, por defecto) siempre pinta por
+          DEBAJO de cualquier hermano posicionado con z-index positivo, sin importar el z-index del
+          <header> ancestro. Resultado: con el menu abierto, el scrim oscurecia tambien el logo, la
+          barra de busqueda y el feed en vivo — el <header> NO se quedaba opaco como dice el
+          comentario del scrim mas abajo. */}
       <LiveTicker initialQuotes={initialTicker?.quotes} initialUpdatedAt={initialTicker?.updatedAt} />
 
-      <div data-intro-row="nav" className="section-container w-full">
+      <div data-intro-row="nav" className="relative z-50 section-container w-full">
         {/* Row A — identity and the one action every visitor might take (search, go VIP). Fixed height,
             fixed set of elements: this row can never gain content, so it can never overflow. */}
         <nav className="h-16 flex items-center justify-between gap-4" aria-label={dict.header.mainNavAria}>
@@ -442,13 +451,19 @@ export function Header({ categories = [], initialTicker }: HeaderProps) {
           // panel queda flotando sobre el contenido de la pagina (el globo, brillante) detras del
           // header — con solo translucidez eso se filtraba como un velo claro encima de las filas,
           // bajando el contraste. Un panel opaco lee mas a terminal real, menos a cristal esmerilado.
-          // relative z-10: el scrim de abajo es `fixed` (position != static) con z-40 — un hermano
-          // sin position (este nav, por defecto) SIEMPRE pinta detras de cualquier hermano con
-          // position, sin importar el z-index, asi que sin esto el scrim (su blur+oscurecido)
-          // quedaba literalmente ENCIMA de los propios enlaces del menu ("la barra de rutas se ve
-          // desenfocada") en vez de solo sobre la pagina detras. z-10 > el z-40 del scrim no hace
-          // falta (position ya alcanza para ganarle a un hermano sin position), pero deja explicito
-          // que este panel debe quedar arriba.
+          // relative z-50 (antes z-10 — ese era el bug real, ver abajo): el scrim de mas abajo es
+          // `fixed` (position != static) con z-40. El fix anterior le puso `relative` a este nav
+          // pero lo dejo en z-10 razonando que "estar posicionado ya alcanza para ganarle a un
+          // hermano sin position, el numero no importa" — cierto SOLO si este nav se hubiera
+          // quedado sin position. En cuanto este nav tiene `relative` + un z-index explicito, deja
+          // de ser "un hermano sin position": pasa a ser OTRO elemento posicionado, y dos hermanos
+          // posicionados se comparan por el VALOR numerico de z-index, no por "quien esta
+          // posicionado". z-10 < z-40, asi que el scrim seguia pintando encima de los propios
+          // enlaces del menu (texto/iconos "desenfocados" en celular real, confirmado por el
+          // usuario — el fix anterior no lo resolvio). z-50 iguala el z-50 global del propio
+          // <header>, lo cual es seguro: este nav vive dentro del stacking context local que crea
+          // ese <header> (tambien tiene `relative`/`isolate` de forma efectiva via el header
+          // posicionado), asi que z-50 aca no compite con nada fuera de ese header.
           //
           // [transform:translateZ(0)]: fuerza a este panel a su propia capa de composicion en vez
           // de quedar aplanado dentro de la del <header> (que tiene backdrop-blur-md). Confirmado
@@ -459,7 +474,7 @@ export function Header({ categories = [], initialTicker }: HeaderProps) {
           // es de composicion de capas, no de blur real aplicado a cada elemento. translateZ(0) es
           // el workaround estandar: promueve el nav a su propia capa GPU, independiente de la del
           // header, asi WebKit lo rasteriza nitido por separado.
-          'md:hidden relative z-10 isolate [transform:translateZ(0)] overflow-y-auto overflow-x-hidden bg-canvas transition-[max-height,border-color] duration-300 ease-[var(--ease-in-out)]',
+          'md:hidden relative z-50 isolate [transform:translateZ(0)] overflow-y-auto overflow-x-hidden bg-canvas transition-[max-height,border-color] duration-300 ease-[var(--ease-in-out)]',
           menuOpen ? 'max-h-[75svh] border-t border-outline-variant/40' : 'max-h-0 border-t border-transparent'
         )}
       >
