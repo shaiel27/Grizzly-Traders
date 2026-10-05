@@ -190,7 +190,12 @@ export function LiveTicker({ initialQuotes = [], initialUpdatedAt = null }: Live
   const loop = fillLoop(items)
 
   return (
-    <div data-intro-row="ticker" className="flex h-8 w-full items-center overflow-hidden border-b border-outline-variant/40 bg-surface-container-lowest">
+    // relative z-50: ver el comentario sobre el mismo fix en Header.tsx (encima de <LiveTicker>) —
+    // sin esto, el scrim del menu movil (fixed, z-40) oscurecia tambien esta barra.
+    <div
+      data-intro-row="ticker"
+      className="relative z-50 flex h-8 w-full items-center overflow-hidden border-b border-outline-variant/40 bg-surface-container-lowest"
+    >
       {/* En mobile queda solo el punto (menos ancho fijo = mas lugar para el ticker, que es lo
           que importa ahi); el texto vuelve desde sm (640px). aria-label en el punto reemplaza al
           texto para el lector de pantalla cuando esta oculto. */}
