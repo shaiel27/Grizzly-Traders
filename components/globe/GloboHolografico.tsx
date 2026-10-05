@@ -39,6 +39,9 @@ export interface DatosGlobo {
   // Precio + variacion del dia por simbolo, para las tarjetas emergentes de los pines (plan 009
   // §1.4) — ya calculado en page.tsx/HomeHero.tsx con datos del ticker ya cacheado.
   cotizacionesPines: Record<string, { precio: number; cambio: number | null }>
+  // Score -1..1 por region (1=EEUU, 2=Eurozona, 3=Reino Unido, 4=Japon, 5=China, 6=Australia —
+  // ver scripts/build-globe-mask.mjs) para el mapa de calor del sentimiento (plan 009 §3.2).
+  sentimientoPorRegion: Record<number, number>
 }
 
 interface GloboHolograficoProps {
@@ -212,15 +215,27 @@ function AnilloHud({ config, reducedMotion }: { config: ConfigAnillo; reducedMot
 const PUNTOS_OBJETIVO = 36000
 const PUNTOS_OBJETIVO_BAJA = 18000
 
-function PuntosTierraCapa({ urlMascara, calidadAlta }: { urlMascara: string; calidadAlta: boolean }) {
-  const textura = useLoader(THREE.TextureLoader, urlMascara)
+function PuntosTierraCapa({
+  urlMascara,
+  urlRegiones,
+  calidadAlta,
+  sentimientoPorRegion,
+}: {
+  urlMascara: string
+  urlRegiones: string
+  calidadAlta: boolean
+  sentimientoPorRegion: Record<number, number>
+}) {
+  // Array de URLs: carga las dos texturas en paralelo, un solo Suspense (el de Escena) cubre
+  // ambas en vez de anidar un <Suspense> por textura.
+  const [textura, texturaRegiones] = useLoader(THREE.TextureLoader, [urlMascara, urlRegiones])
   const materialRef = useRef<THREE.ShaderMaterial>(null)
 
   const puntos = useMemo(() => {
-    const image = textura.image as CanvasImageSource
-    const datosImagen = extraerImageData(image, 2048, 1024)
-    return muestrearPuntosTierra(datosImagen, PUNTOS_OBJETIVO, 1337)
-  }, [textura])
+    const datosImagen = extraerImageData(textura.image as CanvasImageSource, 2048, 1024)
+    const datosRegiones = extraerImageData(texturaRegiones.image as CanvasImageSource, 2048, 1024)
+    return muestrearPuntosTierra(datosImagen, PUNTOS_OBJETIVO, 1337, 1, datosRegiones)
+  }, [textura, texturaRegiones])
 
   const geometria = useMemo(() => {
     const geo = new THREE.BufferGeometry()
@@ -228,6 +243,7 @@ function PuntosTierraCapa({ urlMascara, calidadAlta }: { urlMascara: string; cal
     geo.setAttribute('aBrillo', new THREE.BufferAttribute(puntos.aBrillo, 1))
     geo.setAttribute('aFase', new THREE.BufferAttribute(puntos.aFase, 1))
     geo.setAttribute('aVel', new THREE.BufferAttribute(puntos.aVel, 1))
+    geo.setAttribute('aRegion', new THREE.BufferAttribute(puntos.aRegion, 1))
     return geo
   }, [puntos])
 
@@ -247,13 +263,22 @@ function PuntosTierraCapa({ urlMascara, calidadAlta }: { urlMascara: string; cal
     }
   })
 
+  // Array de 8 (indice 0 sin usar, 1-6 = regiones) para que coincida con uniform float
+  // uSentimiento[8] del shader — WebGL no acepta un array mas chico que el declarado.
+  const arregloSentimiento = useMemo(() => {
+    const arr = new Array(8).fill(0)
+    for (let i = 1; i <= 6; i++) arr[i] = sentimientoPorRegion[i] ?? 0
+    return arr
+  }, [sentimientoPorRegion])
+
   const uniforms = useMemo(
     () => ({
       uTiempo: { value: 0 },
       uTam: { value: 0.09 },
       uColor: { value: new THREE.Color(COLOR_PUNTOS) },
+      uSentimiento: { value: arregloSentimiento },
     }),
-    []
+    [arregloSentimiento]
   )
 
   return (
@@ -438,7 +463,12 @@ function Escena({
         {/* useLoader suspende hasta que la mascara carga — sin este limite, React no tiene
             donde atrapar esa suspension dentro del Canvas y la escena entera no pinta nada. */}
         <Suspense fallback={null}>
-          <PuntosTierraCapa urlMascara="/globo/tierra-mascara-2048.png" calidadAlta={calidadAlta} />
+          <PuntosTierraCapa
+            urlMascara="/globo/tierra-mascara-2048.png"
+            urlRegiones="/globo/regiones-2048.png"
+            calidadAlta={calidadAlta}
+            sentimientoPorRegion={datos.sentimientoPorRegion}
+          />
         </Suspense>
 
         {/* Pines de activos: hijos de grupoGlobo para que giren con el planeta (plan 009 §1.2). */}

@@ -25,6 +25,7 @@ interface HomeHeroProps {
   pivotePreview: PivotePreview | null
   cotizacionesGlobo: Record<string, { precio: number; cambio: number | null }>
   riesgo: ResultadoSentimiento | null
+  sentimientoPorRegion: Record<number, number>
 }
 
 export function HomeHero({
@@ -37,6 +38,7 @@ export function HomeHero({
   pivotePreview,
   cotizacionesGlobo,
   riesgo,
+  sentimientoPorRegion,
 }: HomeHeroProps) {
   const dict = getDictionary(locale).home
   const numberLocale = locale === 'en' ? 'en-US' : 'es-ES'
@@ -126,6 +128,7 @@ export function HomeHero({
     etiquetaNoticias: `${postCount.toLocaleString(numberLocale)} ${dict.globeLabelNoticias}`,
     etiquetaActivos: `${assetCount.toLocaleString(numberLocale)} ${dict.globeLabelActivos}`,
     cotizacionesPines: cotizacionesGlobo,
+    sentimientoPorRegion,
   }
 
   return (

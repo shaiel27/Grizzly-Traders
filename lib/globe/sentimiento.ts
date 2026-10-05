@@ -46,3 +46,12 @@ export function calcularSentimiento(entrada: EntradaSentimiento): ResultadoSenti
 
   return { score, clasificacion }
 }
+
+// Plan 009 §3.2: normaliza el % de cambio diario de UN indice a un score -1..1 para tiñir su
+// region en el globo (ver uSentimiento en components/globe/shaders.ts). /1.5 porque un movimiento
+// diario de 1.5% en un indice amplio (SPX/DAX/NIKKEI/FTSE/SSE/ASX) ya es un dia volatil — eso
+// satura el color al maximo en vez de necesitar un crash de varios puntos porcentuales para verse.
+export function normalizarCambio(cambio: number | null): number {
+  if (cambio == null) return 0
+  return Math.max(-1, Math.min(1, cambio / 1.5))
+}

@@ -20,7 +20,7 @@ import { getPivotQuotes } from '@/lib/pivot-data'
 import { calculatePivots } from '@/lib/pivots'
 import { localizedPost, sentimentMeta, timeAgo } from '@/lib/feed'
 import { scanTradingView } from '@/lib/markets'
-import { calcularSentimiento, type ResultadoSentimiento } from '@/lib/globe/sentimiento'
+import { calcularSentimiento, normalizarCambio, type ResultadoSentimiento } from '@/lib/globe/sentimiento'
 import type { PostWithRelations } from '@/lib/types'
 import type { NoticiaPreview, CotizacionPreview, PivotePreview } from '@/components/modules/HomeFeatures'
 
@@ -137,6 +137,11 @@ export default async function HomePage({
   // (no estan en el ticker) y se delega el calculo a una funcion pura y testeada
   // (lib/globe/sentimiento.ts), nunca inline aca.
   let riesgo: ResultadoSentimiento | null = null
+  // Mapa region->score para el mapa de calor del globo (plan 009 §3.2): mismas regiones que
+  // scripts/build-globe-mask.mjs (1 EE.UU./SPX, 2 Eurozona/DAX, 3 Reino Unido/FTSE, 4 Japon/NIKKEI,
+  // 5 China/SSE, 6 Australia/XJO). Si falta un dato, normalizarCambio(null) da 0 — ese continente
+  // simplemente se queda sin tiñe, no rompe el resto del mapa.
+  let sentimientoPorRegion: Record<number, number> = {}
   try {
     const filas = await scanTradingView(GLOBE_EXTRA.map((a) => a.tv), ['change'])
     const porTicker = new Map(filas.map((f) => [f.s, f.d]))
@@ -145,16 +150,27 @@ export default async function HomePage({
       const v = d?.[0]
       return typeof v === 'number' ? v : null
     }
+    const sse = cambioDe('TVC:SHCOMP')
+    const xjo = cambioDe('TVC:XJO')
     riesgo = calcularSentimiento({
       spx: cotizacionesGlobo.SPX?.cambio ?? null,
       dax: cotizacionesGlobo.DAX?.cambio ?? null,
       nikkei: cotizacionesGlobo.NIKKEI?.cambio ?? null,
       ftse: cotizacionesGlobo.FTSE?.cambio ?? null,
-      sse: cambioDe('TVC:SHCOMP'),
+      sse,
       vix: cotizacionesGlobo.VIX?.cambio ?? null,
     })
+    sentimientoPorRegion = {
+      1: normalizarCambio(cotizacionesGlobo.SPX?.cambio ?? null),
+      2: normalizarCambio(cotizacionesGlobo.DAX?.cambio ?? null),
+      3: normalizarCambio(cotizacionesGlobo.FTSE?.cambio ?? null),
+      4: normalizarCambio(cotizacionesGlobo.NIKKEI?.cambio ?? null),
+      5: normalizarCambio(sse),
+      6: normalizarCambio(xjo),
+    }
   } catch {
-    // riesgo se queda null — el chip del globo simplemente no se muestra.
+    // riesgo se queda null y sentimientoPorRegion vacio — el chip y el tiñe del globo
+    // simplemente no se muestran, no tumban el resto de la home.
   }
 
   // Un solo pedido a getPivotQuotes('D') alimenta la vista previa chica del hero (BTC, classic
@@ -201,6 +217,7 @@ export default async function HomePage({
         pivotePreview={pivotePreview}
         cotizacionesGlobo={cotizacionesGlobo}
         riesgo={riesgo}
+        sentimientoPorRegion={sentimientoPorRegion}
       />
 
       <main id="main-content" tabIndex={-1} className="flex-grow pb-24 pt-10 max-w-[1200px] mx-auto px-6 md:px-8 w-full">
