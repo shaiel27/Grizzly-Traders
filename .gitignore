@@ -44,3 +44,8 @@ opencode.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Claude Code: worktrees para agentes en paralelo (isolation:"worktree") viven dentro del repo,
+# en .claude/worktrees/ — sin esto, `git status` las mostraba como directorios sin trackear listos
+# para commitearse por accidente (serian repos git anidados, un desastre si entran al historial).
+.claude/
