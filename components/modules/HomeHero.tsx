@@ -230,46 +230,53 @@ export function HomeHero({
                   <span className="block">{dict.heroTitleLine1}</span>
                   <span className="block">{dict.heroTitleLine2}</span>
                 </h1>
-                <p
-                  className={clsx('mt-5 max-w-md text-body text-on-surface-variant', listo ? 'hero-fade-up' : 'opacity-0')}
-                  style={listo ? { animationDelay: '220ms' } : undefined}
-                >
-                  {dict.heroLead}
-                </p>
-                {/* Pastilla en vez de linea de texto suelta: ahora se lee como una pista de uso,
-                    no como otro renglon de copy. */}
-                <p
-                  className={clsx(
-                    'mt-4 inline-flex items-center gap-1.5 rounded-full border border-hairline bg-white/[0.03] px-3 py-1.5 font-mono text-micro text-ink-muted',
-                    listo ? 'hero-fade-up' : 'opacity-0'
-                  )}
-                  style={listo ? { animationDelay: '340ms' } : undefined}
-                >
-                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                    <path
-                      d="M8 1.5 L8 11.5 M8 1.5 L5 4.5 M8 1.5 L11 4.5 M3 9 C3 12.5 5.2 14.5 8 14.5 C10.8 14.5 13 12.5 13 9"
-                      stroke="currentColor"
-                      strokeWidth="1.3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  {dict.heroDragHint}
-                </p>
+                {/* data-intro-resto (y el de mas abajo): durante la intro esto queda en opacity:0
+                    hasta el ultimo tramo del scroll (ver --intro-resto en globals.css/useIntroInicio.ts)
+                    — viaja pegado a textoRef asi que se traslada junto con el titulo, pero no se ve
+                    hasta que el titulo ya esta cerca de su posicion final. Sin este wrapper (bug real
+                    encontrado al verificar visualmente la intro con Playwright) aparecia de entrada,
+                    superpuesto al globo a pantalla completa y al titulo gigante. */}
+                <div data-intro-resto>
+                  <p className={clsx('mt-5 max-w-md text-body text-on-surface-variant', listo ? 'hero-fade-up' : 'opacity-0')} style={listo ? { animationDelay: '220ms' } : undefined}>
+                    {dict.heroLead}
+                  </p>
+                  {/* Pastilla en vez de linea de texto suelta: ahora se lee como una pista de uso,
+                      no como otro renglon de copy. */}
+                  <p
+                    className={clsx(
+                      'mt-4 inline-flex items-center gap-1.5 rounded-full border border-hairline bg-white/[0.03] px-3 py-1.5 font-mono text-micro text-ink-muted',
+                      listo ? 'hero-fade-up' : 'opacity-0'
+                    )}
+                    style={listo ? { animationDelay: '340ms' } : undefined}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <path
+                        d="M8 1.5 L8 11.5 M8 1.5 L5 4.5 M8 1.5 L11 4.5 M3 9 C3 12.5 5.2 14.5 8 14.5 C10.8 14.5 13 12.5 13 9"
+                        stroke="currentColor"
+                        strokeWidth="1.3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    {dict.heroDragHint}
+                  </p>
+                </div>
               </div>
 
-              <div
-                className={clsx('mt-7 flex flex-wrap justify-center gap-3 lg:justify-start', listo ? 'hero-fade-up' : 'opacity-0')}
-                style={listo ? { animationDelay: '460ms' } : undefined}
-              >
-                <Button variant="primary" size="lg" className="whitespace-nowrap" asChild>
-                  <Link href="/articulos">{dict.heroCtaPrimary}</Link>
-                </Button>
-                <Button variant="secondary" size="lg" className="whitespace-nowrap" asChild>
-                  <a href="#lo-que-hay-dentro" onClick={irAFeatures}>
-                    {dict.heroCtaMore}
-                  </a>
-                </Button>
+              <div data-intro-resto>
+                <div
+                  className={clsx('mt-7 flex flex-wrap justify-center gap-3 lg:justify-start', listo ? 'hero-fade-up' : 'opacity-0')}
+                  style={listo ? { animationDelay: '460ms' } : undefined}
+                >
+                  <Button variant="primary" size="lg" className="whitespace-nowrap" asChild>
+                    <Link href="/articulos">{dict.heroCtaPrimary}</Link>
+                  </Button>
+                  <Button variant="secondary" size="lg" className="whitespace-nowrap" asChild>
+                    <a href="#lo-que-hay-dentro" onClick={irAFeatures}>
+                      {dict.heroCtaMore}
+                    </a>
+                  </Button>
+                </div>
               </div>
             </div>
 
