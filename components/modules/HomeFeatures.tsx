@@ -40,15 +40,10 @@ interface HomeFeaturesProps {
 }
 
 interface EventoCalendario {
-  time: string
-  country: string
-  event: string
+  event_timestamp: string | null
+  currency: string
   impact: string
-}
-
-function paisABandera(codigo: string): string {
-  if (!/^[a-zA-Z]{2}$/.test(codigo)) return ''
-  return String.fromCodePoint(...codigo.toUpperCase().split('').map((c) => 127397 + c.charCodeAt(0)))
+  title: string
 }
 
 // --- Vista previa: Noticias verificadas — titulares rotando cada 4s ---
@@ -149,23 +144,24 @@ function PivoteEscalera({ datos, locale }: { datos: PivotePreview | null; locale
 }
 
 // --- Vista previa: Calendario económico — proximo evento de alto impacto con cuenta atras ---
-// Se pide aparte (no en page.tsx con el resto): si /api/economic-calendar falla (sin
-// FINNHUB_API_KEY, p.ej.) esta tarjeta sola se queda sin vista previa, el resto de la home no
-// se entera.
+// Se pide aparte (no en page.tsx con el resto): si /api/forex-calendar falla esta tarjeta sola
+// se queda sin vista previa, el resto de la home no se entera. Misma fuente que ForexCalendar.tsx
+// (tabla `economic_events` en Supabase, sincronizada por el automatismo n8n/ForexFactory) — ya
+// no depende de Finnhub (rate-limited) como antes.
 function CalendarioPreview() {
   const [evento, setEvento] = useState<EventoCalendario | null>(null)
   const [faltan, setFaltan] = useState('')
 
   useEffect(() => {
     let cancelado = false
-    fetch('/api/economic-calendar')
+    fetch('/api/forex-calendar')
       .then((r) => r.json())
       .then((body: { data?: EventoCalendario[] }) => {
         if (cancelado) return
         const ahora = Date.now()
         const proximo = (body.data ?? [])
-          .filter((e) => e.impact === 'high' && new Date(e.time).getTime() > ahora)
-          .sort((a, b) => a.time.localeCompare(b.time))[0]
+          .filter((e) => e.impact === 'high' && e.event_timestamp && new Date(e.event_timestamp).getTime() > ahora)
+          .sort((a, b) => (a.event_timestamp as string).localeCompare(b.event_timestamp as string))[0]
         setEvento(proximo ?? null)
       })
       .catch(() => {})
@@ -175,9 +171,10 @@ function CalendarioPreview() {
   }, [])
 
   useEffect(() => {
-    if (!evento) return
+    if (!evento?.event_timestamp) return
+    const timestamp = evento.event_timestamp
     const actualizar = () => {
-      const ms = new Date(evento.time).getTime() - Date.now()
+      const ms = new Date(timestamp).getTime() - Date.now()
       if (ms <= 0) {
         setFaltan('00:00:00')
         return
@@ -197,8 +194,10 @@ function CalendarioPreview() {
   return (
     <div className="flex flex-col justify-center gap-1.5">
       <p className="flex items-center gap-1.5 text-body-sm font-medium text-ink">
-        <span aria-hidden="true">{paisABandera(evento.country)}</span>
-        <span className="truncate">{evento.event}</span>
+        <span className="shrink-0 rounded-[4px] bg-surface-2 px-1 py-0.5 font-mono text-[9px] text-ink-subtle" aria-hidden="true">
+          {evento.currency}
+        </span>
+        <span className="truncate">{evento.title}</span>
       </p>
       <p className="font-mono text-headline-sm tabular-nums text-accent-cyan">{faltan}</p>
     </div>
