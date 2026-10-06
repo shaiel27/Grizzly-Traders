@@ -48,10 +48,13 @@ type Overlay = IndicatorKey | 'volume'
 
 const DEFAULT_OVERLAYS: Overlay[] = ['sma50', 'sma200', 'volume']
 
-// fitContent() on an intraday range (e.g. 3mo of 1h candles, ~400 bars) crams every bar into the
-// available width until they blur into a solid wall. Default to a recent, legible window instead —
-// the rest of the fetched range is still loaded, a scroll/pinch-zoom away.
-const DEFAULT_INTRADAY_BARS = 120
+// fitContent() crams the ENTIRE fetched range into the available width — e.g. 1d fetches 2y of daily
+// candles (~500 bars), 1h fetches 3mo of hourly ones (~400 bars). Past a certain density the bodies
+// get thinner than the moving-average lines drawn over them and the whole chart reads as a grey
+// blur. Default to a recent, legible window on every timeframe instead — the rest of the fetched
+// range is still loaded, a scroll/pinch-zoom away. ~7-8px per candle at the panel's usual width is
+// comfortable regardless of timeframe, so one flat count works across all of them.
+const DEFAULT_VISIBLE_BARS = 120
 
 // Decimals on the price axis: 2 is useless for forex, where the interesting moves are in the 4th and 5th
 function axisPrecision(reference: number): number {
@@ -241,9 +244,9 @@ export function MarketChart({
     // Fit only when the symbol or timeframe changes: toggling an indicator must not throw away the zoom
     const fitKey = `${symbol}|${timeframe}|${attempt}`
     if (fittedKeyRef.current !== fitKey) {
-      if (spec.intraday && candles.length > DEFAULT_INTRADAY_BARS) {
+      if (candles.length > DEFAULT_VISIBLE_BARS) {
         const to = candles.length - 1
-        chart.timeScale().setVisibleLogicalRange({ from: to - DEFAULT_INTRADAY_BARS, to })
+        chart.timeScale().setVisibleLogicalRange({ from: to - DEFAULT_VISIBLE_BARS, to })
       } else {
         chart.timeScale().fitContent()
       }
