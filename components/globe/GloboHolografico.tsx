@@ -14,7 +14,7 @@ import {
   baseHologramaVertexShader,
   baseHologramaFragmentShader,
 } from './shaders'
-import { extraerImageData, muestrearPuntosTierra } from './muestrearTierra'
+import { extraerImageData, muestrearPuntosTierra, type PuntosTierra } from './muestrearTierra'
 import { useArrastreGlobo, type EstadoArrastreGlobo } from './useArrastreGlobo'
 import { PinesActivos } from './PinesActivos'
 import { TarjetaActivo, precargarNoticias, type PosicionPin } from './TarjetaActivo'
@@ -230,14 +230,38 @@ function PuntosTierraCapa({
   // ambas en vez de anidar un <Suspense> por textura.
   const [textura, texturaRegiones] = useLoader(THREE.TextureLoader, [urlMascara, urlRegiones])
   const materialRef = useRef<THREE.ShaderMaterial>(null)
+  const [puntos, setPuntos] = useState<PuntosTierra | null>(null)
 
-  const puntos = useMemo(() => {
-    const datosImagen = extraerImageData(textura.image as CanvasImageSource, 2048, 1024)
-    const datosRegiones = extraerImageData(texturaRegiones.image as CanvasImageSource, 2048, 1024)
-    return muestrearPuntosTierra(datosImagen, PUNTOS_OBJETIVO, 1337, 1, datosRegiones)
+  // Diferido a un efecto, NO useMemo durante el render: muestrear 36k puntos (con chequeo de
+  // costa vecino-a-vecino por candidato) tarda ~1-3s de CPU sincronicos — confirmado con
+  // Lighthouse (auditoria de calidad, plan de diseño): una sola tarea bloqueaba el hilo principal
+  // 10s bajo el throttling movil por defecto (~2.7s sin throttling), y como useMemo corre DURANTE
+  // el render, bloqueaba el primer paint de TODA la pagina (header, ticker, texto del hero), no
+  // solo del globo. Diferido asi, el resto de la pagina ya esta pintada e interactiva cuando esto
+  // corre; el globo (que de todos modos ya espera su propio Suspense por las texturas) aparece un
+  // instante despues con sus puntos, en vez de retener el primer paint del sitio entero.
+  useEffect(() => {
+    // setTimeout, no una llamada directa (react-hooks/set-state-in-effect): de paso, cede el
+    // hilo principal al navegador un tick antes de arrancar el muestreo pesado, asi el paint ya
+    // en curso (header, ticker, texto del hero) no espera a que esto termine para salir en pantalla.
+    // muestrearPuntosTierra es async y cede el hilo varias veces mas por dentro (ver su propio
+    // comentario) — `cancelado` evita escribir el resultado si el componente ya se desmonto o
+    // cambiaron las texturas mientras tanto, dado que ahora puede tardar varios tramos en volver.
+    let cancelado = false
+    const id = setTimeout(async () => {
+      const datosImagen = extraerImageData(textura.image as CanvasImageSource, 2048, 1024)
+      const datosRegiones = extraerImageData(texturaRegiones.image as CanvasImageSource, 2048, 1024)
+      const resultado = await muestrearPuntosTierra(datosImagen, PUNTOS_OBJETIVO, 1337, 1, datosRegiones)
+      if (!cancelado) setPuntos(resultado)
+    }, 0)
+    return () => {
+      cancelado = true
+      clearTimeout(id)
+    }
   }, [textura, texturaRegiones])
 
   const geometria = useMemo(() => {
+    if (!puntos) return null
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(puntos.positions, 3))
     geo.setAttribute('aBrillo', new THREE.BufferAttribute(puntos.aBrillo, 1))
@@ -248,10 +272,12 @@ function PuntosTierraCapa({
   }, [puntos])
 
   useEffect(() => {
+    if (!puntos || !geometria) return
     geometria.setDrawRange(0, calidadAlta ? puntos.count : Math.min(puntos.count, PUNTOS_OBJETIVO_BAJA))
   }, [calidadAlta, puntos, geometria])
 
   useEffect(() => {
+    if (!geometria) return
     return () => {
       geometria.dispose()
     }
@@ -280,6 +306,10 @@ function PuntosTierraCapa({
     }),
     [arregloSentimiento]
   )
+
+  // Nada que dibujar todavia (el muestreo del efecto de arriba no termino): el resto del globo
+  // (esfera base, anillos, pines) ya se ve, los puntos de tierra aparecen apenas esten listos.
+  if (!geometria) return null
 
   return (
     <points geometry={geometria} renderOrder={1}>
