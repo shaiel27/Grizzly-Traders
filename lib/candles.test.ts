@@ -6,7 +6,7 @@ describe('toYahooSymbol', () => {
   it('maps the scanner tickers used for commodities and indices', () => {
     expect(toYahooSymbol('OANDA:XAUUSD')).toBe('GC=F')
     expect(toYahooSymbol('ICEEUR:BRN1!')).toBe('BZ=F')
-    expect(toYahooSymbol('TVC:DJI')).toBe('^DJI')
+    expect(toYahooSymbol('DJ:DJI')).toBe('^DJI')
     expect(toYahooSymbol('TVC:DEU40')).toBe('^GDAXI')
   })
 
@@ -20,9 +20,9 @@ describe('toYahooSymbol', () => {
     expect(toYahooSymbol('NOEXCHANGE')).toBeNull()
   })
 
-  it('has a chart for every pivot asset', () => {
+  it('has a chart for every pivot asset except the 2-year yield, which Yahoo does not publish', () => {
     const missing = PIVOT_ASSETS.filter((asset) => !toYahooSymbol(asset.tv)).map((asset) => asset.tv)
-    expect(missing).toEqual([])
+    expect(missing).toEqual(['TVC:US02Y'])
   })
 })
 

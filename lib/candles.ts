@@ -1,3 +1,5 @@
+import { ASSETS } from './assets-catalog'
+
 export interface Candle {
   time: number
   open: number
@@ -44,39 +46,13 @@ export function isTimeframe(value: string): value is TimeframeKey {
   return Object.hasOwn(TIMEFRAMES, value)
 }
 
-const FIXED_MAP: Record<string, string> = {
-  'COMEX:XAUUSD': 'GC=F',
-  'COMEX:XAGUSD': 'SI=F',
-  'COMEX:PL': 'PL=F',
-  'COMEX:PA': 'PA=F',
-  'OANDA:XAUUSD': 'GC=F',
-  'TVC:SILVER': 'SI=F',
-  'ICEEUR:BRN1!': 'BZ=F',
-  'NYMEX:CL1!': 'CL=F',
-  'NYMEX:NG1!': 'NG=F',
-  'TVC:DJI': '^DJI',
-  'TVC:DEU40': '^GDAXI',
-  'TVC:UKX': '^FTSE',
-  'TVC:NI225': '^N225',
-  'COMEX:HG1!': 'HG=F',
-  'TVC:PLATINUM': 'PL=F',
-  'TVC:PALLADIUM': 'PA=F',
-  'CBOT:ZC1!': 'ZC=F',
-  'CBOT:ZW1!': 'ZW=F',
-  'ICEUS:SB1!': 'SB=F',
-  'ICEUS:KC1!': 'KC=F',
-  'TVC:VIX': '^VIX',
-  'TVC:CAC40': '^FCHI',
-  'TVC:SX5E': '^STOXX50E',
-  'SP:SPX': '^GSPC',
-  'NASDAQ:NDX': '^NDX',
-  'TVC:DXY': 'DX-Y.NYB',
-  'TVC:US10Y': '^TNX',
-  'TVC:DAX': '^GDAXI',
-  'TVC:NIKKEI': '^N225',
-  'TVC:HSI': '^HSI',
-  'TVC:FTSE': '^FTSE',
-}
+// Derivado de lib/assets-catalog.ts (campo `yahoo`) — antes esto era un objeto a mano con 31
+// claves, 7 de ellas ('COMEX:XAUUSD', 'COMEX:XAGUSD', 'COMEX:PL', 'COMEX:PA', 'TVC:DAX',
+// 'TVC:NIKKEI', 'TVC:FTSE') sin ningun activo del catalogo que las use — ningun ticker real le
+// pegaba nunca a esas entradas, confirmado contra MARKET_ASSETS antes de borrarlas.
+const FIXED_MAP: Record<string, string> = Object.fromEntries(
+  ASSETS.filter((a) => a.yahoo !== undefined).map((a) => [a.tv, a.yahoo as string])
+)
 
 // Maps a TradingView ticker (as used by /api/markets) to its Yahoo Finance symbol.
 export function toYahooSymbol(tvSymbol: string): string | null {

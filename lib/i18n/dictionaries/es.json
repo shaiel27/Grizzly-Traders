@@ -190,7 +190,14 @@
     "allAssets": "Todos los activos",
     "categoriesAria": "Categorías",
     "tagsAria": "Tags",
-    "assetsAria": "Activos"
+    "assetsAria": "Activos",
+    "seeAll": "Ver todos",
+    "seeLess": "Ver menos",
+    "assetTypeCrypto": "Cripto",
+    "assetTypeForex": "Forex",
+    "assetTypeCommodity": "Materias primas",
+    "assetTypeStock": "Acciones",
+    "assetTypeIndex": "Índices"
   },
   "newsGrid": {
     "sortGroupAria": "Ordenar noticias",
