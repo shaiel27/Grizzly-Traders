@@ -48,6 +48,11 @@ type Overlay = IndicatorKey | 'volume'
 
 const DEFAULT_OVERLAYS: Overlay[] = ['sma50', 'sma200', 'volume']
 
+// fitContent() on an intraday range (e.g. 3mo of 1h candles, ~400 bars) crams every bar into the
+// available width until they blur into a solid wall. Default to a recent, legible window instead —
+// the rest of the fetched range is still loaded, a scroll/pinch-zoom away.
+const DEFAULT_INTRADAY_BARS = 120
+
 // Decimals on the price axis: 2 is useless for forex, where the interesting moves are in the 4th and 5th
 function axisPrecision(reference: number): number {
   if (reference >= 100) return 2
@@ -236,15 +241,28 @@ export function MarketChart({
     // Fit only when the symbol or timeframe changes: toggling an indicator must not throw away the zoom
     const fitKey = `${symbol}|${timeframe}|${attempt}`
     if (fittedKeyRef.current !== fitKey) {
-      chart.timeScale().fitContent()
+      if (spec.intraday && candles.length > DEFAULT_INTRADAY_BARS) {
+        const to = candles.length - 1
+        chart.timeScale().setVisibleLogicalRange({ from: to - DEFAULT_INTRADAY_BARS, to })
+      } else {
+        chart.timeScale().fitContent()
+      }
       fittedKeyRef.current = fitKey
     }
   }, [candles, overlays, shift, spec.intraday, precision, symbol, timeframe, attempt])
 
   // Horizontal levels
   useEffect(() => {
+    const chart = chartRef.current
     const series = candleRef.current
-    if (!series) return
+    if (!chart || !series) return
+
+    // Pivots (R3..S3) stack up to 7 price-line labels on the right axis; with the default 8% margin
+    // they crowd the top edge and collide with the axis's own tick labels. A bit more headroom when
+    // they're shown spreads the cluster out and keeps it off the border.
+    chart.priceScale('right').applyOptions({
+      scaleMargins: levelsOn && levels.length > 0 ? { top: 0.14, bottom: 0.08 } : { top: 0.08, bottom: 0.08 },
+    })
 
     for (const line of priceLinesRef.current) series.removePriceLine(line)
     priceLinesRef.current = []
