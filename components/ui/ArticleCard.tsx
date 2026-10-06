@@ -6,8 +6,10 @@ import { MediaPreview } from './MediaPreview'
 
 type ArticleCardVariant = 'cover' | 'compact'
 
+// Mismo lenguaje de hover que Card.tsx (lift + sombra), antes esta tarjeta solo cambiaba de
+// color — dos sistemas de tarjetas con dos sensaciones de hover distintas en el mismo sitio.
 const CARD_CLASS =
-  'group flex flex-col rounded-lg border border-hairline-soft bg-surface-1 transition-colors duration-200 hover:border-hairline hover:bg-surface-2/50'
+  'group flex flex-col rounded-lg border border-hairline-soft bg-surface-1 transition-all duration-200 hover:border-hairline hover:bg-surface-2/50 hover:-translate-y-0.5 hover:shadow-[0_12px_32px_rgba(0,0,0,0.6)]'
 const TITLE_CLASS =
   'font-serif text-body-lg font-semibold leading-[1.25] text-ink transition-colors line-clamp-3 hover:text-accent-blue'
 const ARROW_CLASS =

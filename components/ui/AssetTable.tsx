@@ -1,12 +1,47 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { clsx } from 'clsx'
 import { formatCompact, formatNumber, formatPrice } from '@/lib/format'
 import { pageCount, pageSlice } from '@/lib/pagination'
 import { PageControls } from './PageControls'
 import { rsiReading, signalFor, type Tone } from '@/lib/market-analysis'
 import type { MarketItem as MarketAsset } from '@/lib/markets'
+
+interface Flash {
+  dir: 'up' | 'down'
+  tick: number
+}
+
+// Mismo patron que LiveTicker.tsx (ticker-flash-up/down + remontar por key para reiniciar la
+// animacion): esta tabla recibe `assets` entero de nuevo cada 60s (MarketsClient.tsx) pero antes
+// no habia ninguna señal visual de que un precio cambio, solo el numero distinto. La comparacion
+// con el precio anterior vive en un ref (no en el cuerpo del render, para no mutar durante el
+// render) y se actualiza en un efecto; el mapa de flashes en si es estado porque SI dispara un
+// repintado (la animacion).
+function usePriceFlash(assets: MarketAsset[]): Map<string, Flash> {
+  const prevCloseRef = useRef<Map<string, number>>(new Map())
+  const [flashes, setFlashes] = useState<Map<string, Flash>>(new Map())
+
+  useEffect(() => {
+    setFlashes((prevFlashes) => {
+      let changed = false
+      const next = new Map(prevFlashes)
+      for (const asset of assets) {
+        const prevClose = prevCloseRef.current.get(asset.symbol)
+        if (prevClose !== undefined && prevClose !== asset.close) {
+          const tick = (next.get(asset.symbol)?.tick ?? 0) + 1
+          next.set(asset.symbol, { dir: asset.close > prevClose ? 'up' : 'down', tick })
+          changed = true
+        }
+        prevCloseRef.current.set(asset.symbol, asset.close)
+      }
+      return changed ? next : prevFlashes
+    })
+  }, [assets])
+
+  return flashes
+}
 
 type SortKey = keyof MarketAsset
 
@@ -55,6 +90,7 @@ export function AssetTable({ assets, loading = false, selectedSymbol = null, emp
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(0)
   const [seenResetKey, setSeenResetKey] = useState(resetKey)
+  const flashes = usePriceFlash(assets)
 
   // Resetting state while rendering (instead of in an effect) avoids painting the old page for a frame
   if (seenResetKey !== resetKey) {
@@ -124,7 +160,12 @@ export function AssetTable({ assets, loading = false, selectedSymbol = null, emp
                   <span className="block truncate text-[12px] text-ink-muted">{asset.description}</span>
                 </span>
                 <span className="text-right tabular-nums">
-                  <span className="block text-[14px] text-ink">{formatPrice(asset.close, asset.symbol)}</span>
+                  <span
+                    key={flashes.get(asset.symbol)?.tick ?? 0}
+                    className={clsx('block rounded text-[14px] text-ink', flashes.get(asset.symbol) && `ticker-flash-${flashes.get(asset.symbol)!.dir}`)}
+                  >
+                    {formatPrice(asset.close, asset.symbol)}
+                  </span>
                   <span className={clsx('block text-[13px]', tone(asset.change))}>{pct(asset.change)}</span>
                 </span>
                 <span className="col-span-2 flex items-center gap-4 text-[12px] text-ink-muted">
@@ -201,7 +242,14 @@ export function AssetTable({ assets, loading = false, selectedSymbol = null, emp
                       <span className="block text-[12px] text-ink-muted">{asset.description}</span>
                     </button>
                   </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-ink">{formatPrice(asset.close, asset.symbol)}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-ink">
+                    <span
+                      key={flashes.get(asset.symbol)?.tick ?? 0}
+                      className={clsx('rounded px-1', flashes.get(asset.symbol) && `ticker-flash-${flashes.get(asset.symbol)!.dir}`)}
+                    >
+                      {formatPrice(asset.close, asset.symbol)}
+                    </span>
+                  </td>
                   <td className={clsx('px-3 py-2.5 text-right tabular-nums', tone(asset.change))}>{pct(asset.change)}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums text-ink-muted">{asset.volume > 0 ? formatCompact(asset.volume) : '—'}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums text-ink-muted">{asset.marketCap > 0 ? formatNumber(asset.marketCap, 0, 1) : '—'}</td>

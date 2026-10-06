@@ -1,6 +1,6 @@
 'use client'
 
-import { useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { clsx } from 'clsx'
 import { formatLevel } from '@/lib/format'
 import { ladderDomain, spreadLabels } from '@/lib/pivot-layout'
@@ -31,6 +31,15 @@ function signed(value: number, decimals = 2): string {
 export function PivotLadder({ levels, price, symbol = '', height = 400, className }: PivotLadderProps) {
   const gradientId = useId()
   const [active, setActive] = useState<string | null>(null)
+  // Entrada en cascada de los botones de nivel al montar (antes aparecian todos de un salto).
+  // Solo al montar, no en cada cambio de datos: los botones estan posicionados en absoluto por
+  // `top` (el layout real), asi que una entrada por `opacity` (sin transform, para no pelear con
+  // la posicion) alcanza y evita la complejidad de re-disparar la cascada en cada cambio de activo/metodo.
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    const id = setTimeout(() => setVisible(true), 0)
+    return () => clearTimeout(id)
+  }, [])
 
   const layout = useMemo(() => {
     const domain = ladderDomain([...levels.map((level) => level.value), price])
@@ -141,9 +150,10 @@ export function PivotLadder({ levels, price, symbol = '', height = 400, classNam
               title={`${level.label}: ${formatLevel(level.value, price, symbol)} (${signed(distance)} desde el precio)`}
               className={clsx(
                 'absolute left-0 right-0 -translate-y-1/2 rounded-lg border px-2 py-1 text-left transition-colors focus-visible:outline-2 focus-visible:outline-accent-blue',
-                active === level.key || isNearest ? 'border-hairline bg-surface-2' : 'border-transparent hover:bg-surface-2/60'
+                active === level.key || isNearest ? 'border-hairline bg-surface-2' : 'border-transparent hover:bg-surface-2/60',
+                visible ? 'pivot-row-in' : 'opacity-0'
               )}
-              style={{ top: labelY[index] }}
+              style={{ top: labelY[index], animationDelay: visible ? `${index * 40}ms` : undefined }}
             >
               <span className="flex items-baseline justify-between gap-2">
                 <span className="text-[11px] font-bold" style={{ color: KIND_COLOR[level.kind] }}>
