@@ -279,6 +279,21 @@
 @keyframes menuItemIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 .menu-item-in { animation: menuItemIn 0.28s var(--ease-hero-entrance) forwards; }
 
+/* PivotLadder.tsx: entrada en cascada de los botones de nivel al montar. Solo opacity, sin
+   transform — los botones ya estan posicionados en absoluto con -translate-y-1/2 (el centrado
+   vertical real); sumar un transform propio acá pisaria ese translate en vez de combinarse con
+   el, corriendo cada nivel de su lugar real en la escalera durante la animacion. */
+@keyframes pivotRowIn { from { opacity: 0; } to { opacity: 1; } }
+.pivot-row-in { animation: pivotRowIn 0.3s var(--ease-hero-entrance) forwards; }
+
+/* app/(site)/template.tsx: transicion liviana entre rutas (antes no existia ninguna, el cambio
+   de pagina era un corte seco). Deliberadamente corta y solo opacity (sin transform/scale): es
+   la unica animacion que corre en TODAS las paginas, incluida la home (que ya tiene sus propias
+   entradas escalonadas via `listo`) — tiene que ser casi imperceptible como transicion de marco,
+   no competir con el contenido de adentro. */
+@keyframes pageFadeIn { from { opacity: 0; } to { opacity: 1; } }
+.page-fade-in { animation: pageFadeIn 0.2s ease-out forwards; }
+
 /* Fondo ambiental de la seccion del globo: dos glows lejos de el, en las esquinas — el campo de
    estrellas en si vive dentro del Canvas de Three.js (components/globe/GloboHolografico.tsx,
    <CampoEstrellas>), no aca. Esto solo evita que el negro fuera del canvas (bordes en mobile)
