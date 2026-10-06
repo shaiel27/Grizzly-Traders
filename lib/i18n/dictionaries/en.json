@@ -190,7 +190,14 @@
     "allAssets": "All assets",
     "categoriesAria": "Categories",
     "tagsAria": "Tags",
-    "assetsAria": "Assets"
+    "assetsAria": "Assets",
+    "seeAll": "See all",
+    "seeLess": "See less",
+    "assetTypeCrypto": "Crypto",
+    "assetTypeForex": "Forex",
+    "assetTypeCommodity": "Commodities",
+    "assetTypeStock": "Equities",
+    "assetTypeIndex": "Indices"
   },
   "newsGrid": {
     "sortGroupAria": "Sort news",

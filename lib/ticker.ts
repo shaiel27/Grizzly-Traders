@@ -1,4 +1,5 @@
 import { unstable_cache } from 'next/cache'
+import { ASSETS, intercalarPorClase } from './assets-catalog'
 import { scanTradingView, type ScannerRow } from './markets'
 import { getCachedPrices, type PriceData } from './prices'
 
@@ -24,44 +25,16 @@ interface TickerAsset {
   currency: boolean
 }
 
-// Interleaved on purpose: every stretch of the scrolling bar mixes asset classes
-const TICKER_ASSETS: TickerAsset[] = [
-  { symbol: 'BTC', label: 'BTC/USD', tv: 'BINANCE:BTCUSDT', currency: true },
-  { symbol: 'EURUSD', label: 'EUR/USD', tv: 'FX:EURUSD', currency: false },
-  { symbol: 'SPX', label: 'S&P 500', tv: 'SP:SPX', currency: false },
-  { symbol: 'XAUUSD', label: 'XAU/USD', tv: 'OANDA:XAUUSD', currency: true },
-  { symbol: 'AAPL', label: 'AAPL', tv: 'NASDAQ:AAPL', currency: true },
-  { symbol: 'ETH', label: 'ETH/USD', tv: 'BINANCE:ETHUSDT', currency: true },
-  { symbol: 'GBPUSD', label: 'GBP/USD', tv: 'FX:GBPUSD', currency: false },
-  { symbol: 'NDX', label: 'NASDAQ 100', tv: 'NASDAQ:NDX', currency: false },
-  { symbol: 'BRENT', label: 'BRENT', tv: 'ICEEUR:BRN1!', currency: true },
-  { symbol: 'WTI', label: 'WTI', tv: 'NYMEX:CL1!', currency: true },
-  { symbol: 'NVDA', label: 'NVDA', tv: 'NASDAQ:NVDA', currency: true },
-  { symbol: 'SOL', label: 'SOL/USD', tv: 'BINANCE:SOLUSDT', currency: true },
-  { symbol: 'USDJPY', label: 'USD/JPY', tv: 'FX:USDJPY', currency: false },
-  { symbol: 'DJI', label: 'DOW JONES', tv: 'TVC:DJI', currency: false },
-  { symbol: 'XAGUSD', label: 'XAG/USD', tv: 'TVC:SILVER', currency: true },
-  { symbol: 'TSLA', label: 'TSLA', tv: 'NASDAQ:TSLA', currency: true },
-  { symbol: 'BNB', label: 'BNB/USD', tv: 'BINANCE:BNBUSDT', currency: true },
-  { symbol: 'DXY', label: 'DXY', tv: 'TVC:DXY', currency: false },
-  { symbol: 'AUDUSD', label: 'AUD/USD', tv: 'FX:AUDUSD', currency: false },
-  { symbol: 'DAX', label: 'DAX', tv: 'TVC:DEU40', currency: false },
-  { symbol: 'MSFT', label: 'MSFT', tv: 'NASDAQ:MSFT', currency: true },
-  { symbol: 'XRP', label: 'XRP/USD', tv: 'BINANCE:XRPUSDT', currency: true },
-  { symbol: 'NG', label: 'GAS NAT.', tv: 'NYMEX:NG1!', currency: true },
-  { symbol: 'USDCAD', label: 'USD/CAD', tv: 'FX:USDCAD', currency: false },
-  { symbol: 'NIKKEI', label: 'NIKKEI', tv: 'TVC:NI225', currency: false },
-  { symbol: 'AMZN', label: 'AMZN', tv: 'NASDAQ:AMZN', currency: true },
-  { symbol: 'ADA', label: 'ADA/USD', tv: 'BINANCE:ADAUSDT', currency: true },
-  { symbol: 'FTSE', label: 'FTSE 100', tv: 'TVC:UKX', currency: false },
-  { symbol: 'USDCHF', label: 'USD/CHF', tv: 'FX:USDCHF', currency: false },
-  { symbol: 'META', label: 'META', tv: 'NASDAQ:META', currency: true },
-  { symbol: 'DOGE', label: 'DOGE/USD', tv: 'BINANCE:DOGEUSDT', currency: true },
-  { symbol: 'VIX', label: 'VIX', tv: 'TVC:VIX', currency: false },
-  { symbol: 'GOOGL', label: 'GOOGL', tv: 'NASDAQ:GOOGL', currency: true },
-  { symbol: 'AVAX', label: 'AVAX/USD', tv: 'BINANCE:AVAXUSDT', currency: true },
-  { symbol: 'LINK', label: 'LINK/USD', tv: 'BINANCE:LINKUSDT', currency: true },
-]
+// Derivado de lib/assets-catalog.ts: antes esto declaraba a mano un subconjunto de 35 (la mitad
+// del catalogo real de la terminal, 64) con un orden intercalado curado activo por activo —
+// intercalarPorClase() reproduce ese mismo criterio ("cada tramo de la barra mezcla clases de
+// activo") de forma generada, asi agregar un activo nuevo no implica editar esto tambien.
+const TICKER_ASSETS: TickerAsset[] = intercalarPorClase(ASSETS).map((a) => ({
+  symbol: a.plain,
+  label: a.label ?? a.plain,
+  tv: a.tv,
+  currency: a.currency,
+}))
 
 const SCANNER_COLUMNS = ['close', 'change']
 

@@ -330,32 +330,6 @@ async function getPostsByCategoryRaw(categorySlug: string, limit = 3, locale: 'e
   return normalizePosts(data as unknown as Record<string, unknown>[])
 }
 
-async function getAssetsForTickerRaw() {
-  const supabase = createPublicClient()
-
-  const { data, error } = await supabase
-    .from('activos')
-    .select('id, symbol, name, tipo:tipos_activo(name)')
-    .order('symbol')
-
-  if (error) throw error
-  return (data ?? []).map((item) => {
-    const rawTipo = item.tipo as unknown
-    let tipoName: string | null = null
-    if (Array.isArray(rawTipo)) {
-      tipoName = rawTipo[0]?.name ?? null
-    } else if (rawTipo && typeof rawTipo === 'object') {
-      tipoName = (rawTipo as { name: string }).name ?? null
-    }
-    return {
-      id: item.id,
-      symbol: item.symbol,
-      name: item.name,
-      tipo: tipoName ? { name: tipoName } : null,
-    }
-  }) as { id: number; symbol: string; name: string; tipo: { name: string } | null }[]
-}
-
 async function getPostCountRaw() {
   const supabase = createPublicClient()
 
@@ -489,7 +463,6 @@ export const getSources = cached('getSources', getSourcesRaw, 'catalog')
 export const getAssetTypes = cached('getAssetTypes', getAssetTypesRaw, 'catalog')
 export const getRelatedPosts = cached('getRelatedPosts', getRelatedPostsRaw, 'posts')
 export const getPostsByCategory = cached('getPostsByCategory', getPostsByCategoryRaw, 'posts')
-export const getAssetsForTicker = cached('getAssetsForTicker', getAssetsForTickerRaw, 'catalog')
 export const getPostCount = cached('getPostCount', getPostCountRaw, 'posts')
 export const searchPosts = cached('searchPosts', searchPostsRaw, 'posts', 60)
 export const getAllAuthors = cached('getAllAuthors', getAllAuthorsRaw, 'catalog')

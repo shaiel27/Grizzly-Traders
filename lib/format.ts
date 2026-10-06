@@ -1,8 +1,12 @@
 // Single place to change how prices and figures are written across the site
+import { ASSETS } from './assets-catalog'
+
 export const NUMBER_LOCALE = 'en-US'
 
-const FOREX_3_DECIMALS = ['USDJPY', 'USDCHF', 'USDCAD', 'EURGBP', 'EURJPY', 'GBPJPY']
-const FOREX_5_DECIMALS = ['EURUSD', 'GBPUSD', 'AUDUSD', 'NZDUSD']
+// Derivado de lib/assets-catalog.ts (campo `decimals`) — un par forex con decimals:3 va acá,
+// decimals:5 allá. Agregar un par forex nuevo al catálogo ya alcanza, no hace falta tocar esto.
+const FOREX_3_DECIMALS = ASSETS.filter((a) => a.cls === 'forex' && a.decimals === 3).map((a) => a.plain)
+const FOREX_5_DECIMALS = ASSETS.filter((a) => a.cls === 'forex' && a.decimals === 5).map((a) => a.plain)
 
 interface PriceOptions {
   // Prefix the value with $ (forex pairs never get one)
