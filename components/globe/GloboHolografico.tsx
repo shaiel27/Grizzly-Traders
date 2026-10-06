@@ -659,11 +659,32 @@ export default function GloboHolografico({ datos, reducedMotion, ariaLabel, loca
   // `Escena`, dentro del Canvas, lee ese mismo `estadoRef` en su useFrame para rotar el grupo.
   const arrastre = useArrastreGlobo(reducedMotionRef, onToque)
 
-  // Mientras hay una tarjeta abierta, el auto-giro se congela (useArrastreGlobo.ts ya respeta
-  // estado.pausado). Volver a arrastrar retoma el control normal y cierra la tarjeta (abajo).
+  // Mientras hay una tarjeta abierta O esta corriendo la intro de primera carga, el auto-giro
+  // se congela (useArrastreGlobo.ts ya respeta estado.pausado). Sin esto, el globo giraba solo
+  // TODO el tiempo que dura la intro (useIntroInicio.ts) a la vez que se encoge y se reposiciona
+  // via FLIP — dos movimientos simultaneos e independientes (giro 3D + traslado/escalado 2D) que
+  // en la practica se leian como una animacion confusa, "se va a un lado", aunque el centro del
+  // contenedor nunca se mueve del centro (verificado: el delta horizontal del FLIP es 0 en
+  // mobile). Pausar el giro deja un solo movimiento legible: el globo se achica y acomoda en su
+  // lugar sin girar de encima. `data-intro` se saca de <html> al terminar la intro (sin cambiar
+  // su valor, se remueve el atributo entero), asi que hace falta un MutationObserver, no un
+  // simple chequeo de estado de React.
+  const [introActiva, setIntroActiva] = useState(false)
   useEffect(() => {
-    arrastre.setPausado(seleccionId !== null)
-  }, [seleccionId, arrastre])
+    const html = document.documentElement
+    const sincronizar = () => setIntroActiva(html.dataset.intro === 'activo')
+    const id = setTimeout(sincronizar, 0)
+    const observer = new MutationObserver(sincronizar)
+    observer.observe(html, { attributes: true, attributeFilter: ['data-intro'] })
+    return () => {
+      clearTimeout(id)
+      observer.disconnect()
+    }
+  }, [])
+
+  useEffect(() => {
+    arrastre.setPausado(seleccionId !== null || introActiva)
+  }, [seleccionId, introActiva, arrastre])
 
   // Precarga las noticias del pin apenas se resalta (hover) — para cuando el usuario de verdad
   // lo toca/clickea, probablemente ya este la respuesta.
