@@ -781,14 +781,22 @@ export default function GloboHolografico({ datos, reducedMotion, ariaLabel, loca
       </Canvas>
 
       {/* Zona de arrastre: solo el circulo del globo, no todo el canvas, para que el scroll
-          tactil fuera de el siga funcionando. */}
+          tactil fuera de el siga funcionando. Durante la intro esta MISMA zona (72% del
+          contenedor, que ahi es casi toda la pantalla — ver --intro-globo en globals.css) cubre
+          la mayor parte del viewport, asi que cualquier swipe para hacer scroll caia DENTRO de
+          ella y touch-action:none se lo tragaba entero como si fuera un arrastre manual del
+          globo — eso, no el auto-giro (ya corregido aparte), era la causa real de "el globo se
+          va a un lado" reportada en celular: cada intento de scroll durante la intro giraba el
+          globo en vez de avanzar la pagina. pointer-events-none mientras introActiva deja pasar
+          el scroll nativo sin estorbo; arrastrar/tocar pines vuelve a funcionar normal apenas
+          termina la intro. */}
       <div
         className={clsx(
           'absolute left-1/2 top-1/2 size-[72%] -translate-x-1/2 -translate-y-1/2 touch-none rounded-full outline-none active:cursor-grabbing',
-          resaltadoId ? 'cursor-pointer' : 'cursor-grab'
+          introActiva ? 'pointer-events-none' : resaltadoId ? 'cursor-pointer' : 'cursor-grab'
         )}
         style={{ touchAction: 'none' }}
-        tabIndex={0}
+        tabIndex={introActiva ? -1 : 0}
         role="img"
         aria-label={ariaLabel}
         onPointerDown={arrastre.handlers.onPointerDown}
