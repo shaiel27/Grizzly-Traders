@@ -38,14 +38,31 @@ export function extraerImageData(image: CanvasImageSource, width: number, height
   return ctx.getImageData(0, 0, width, height)
 }
 
+// Cuantos intentos del loop de abajo corren antes de ceder el hilo principal una vez. Medido con
+// Lighthouse (auditoria de calidad): el muestreo completo (36k puntos, intentosMax ~864k) tardaba
+// ~2.7s sincronicos sin ceder nunca — una sola tarea bloqueando TODO el hilo principal (scroll,
+// clicks, el resto de la pagina sin pintar), el culpable confirmado de un Total Blocking Time de
+// 14-18s y, en cascada, un Cumulative Layout Shift de ~0.93 (el resto de la pagina "saltaba" de
+// una vez al desbloquearse recien). 1500 cede cada ~5ms en el caso tipico, bien por debajo del
+// umbral de 50ms que cuenta como "tarea larga".
+const INTENTOS_POR_TRAMO = 1500
+
+function cederHiloPrincipal(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0))
+}
+
 /**
  * Muestrea `cantidadObjetivo` puntos sobre la tierra (uniforme en area esferica: lat = asin(2v-1)),
  * con mas densidad y brillo en la costa (un pixel de tierra con algun vecino de agua en radio 2px).
  * `maskRegiones`, si se pasa, debe tener el MISMO ancho/alto que `mask` y venir de la misma
  * proyeccion (scripts/build-globe-mask.mjs genera ambas asi a proposito) — se lee en el mismo
  * pixel que la mascara de tierra, sin una segunda conversion lat/lon.
+ *
+ * Async: cede el hilo principal cada INTENTOS_POR_TRAMO iteraciones (ver comentario arriba) en
+ * vez de correr de un tiro — el resultado es identico (mismo PRNG con semilla, mismo orden de
+ * llamadas), solo que repartido en tramos que dejan respirar al navegador entre uno y otro.
  */
-export function muestrearPuntosTierra(mask: ImageData, cantidadObjetivo: number, seed = 1337, radio = 1, maskRegiones?: ImageData): PuntosTierra {
+export async function muestrearPuntosTierra(mask: ImageData, cantidadObjetivo: number, seed = 1337, radio = 1, maskRegiones?: ImageData): Promise<PuntosTierra> {
   const rand = mulberry32(seed)
   const { width, height, data } = mask
   const dataRegiones = maskRegiones?.data
@@ -89,6 +106,8 @@ export function muestrearPuntosTierra(mask: ImageData, cantidadObjetivo: number,
   let aceptados = 0
 
   for (let i = 0; i < intentosMax && aceptados < cantidadObjetivo; i++) {
+    if (i > 0 && i % INTENTOS_POR_TRAMO === 0) await cederHiloPrincipal()
+
     const u = rand()
     const v = rand()
     const lon = u * 2 * Math.PI - Math.PI
