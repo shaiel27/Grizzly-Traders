@@ -3,6 +3,8 @@ import Image from 'next/image'
 import { notFound } from 'next/navigation'
 import { Breadcrumbs, ArticleCard } from '@/components/ui'
 import { getAuthorBySlug, getAuthorStats, getPostsByAuthor } from '@/lib/api'
+import { getServerLocale } from '@/lib/i18n/server'
+import { getDictionary } from '@/lib/i18n/get-dictionary'
 import type { AuthorProfile } from '@/lib/types'
 
 interface AuthorPageProps {
@@ -20,7 +22,10 @@ async function loadAuthor(slug: string): Promise<AuthorProfile | null> {
 export async function generateMetadata({ params }: AuthorPageProps): Promise<Metadata> {
   const { slug } = await params
   const author = await loadAuthor(slug)
-  if (!author) return { title: 'Autor no encontrado', robots: { index: false } }
+  if (!author) {
+    const locale = await getServerLocale()
+    return { title: getDictionary(locale).author.notFoundTitle, robots: { index: false } }
+  }
 
   return {
     title: author.full_name,
@@ -29,10 +34,9 @@ export async function generateMetadata({ params }: AuthorPageProps): Promise<Met
   }
 }
 
-const SOCIAL_LINKS = [
+const SOCIAL_LINK_DEFS = [
   { key: 'twitter_url', label: 'X / Twitter', icon: 'alternate_email' },
   { key: 'linkedin_url', label: 'LinkedIn', icon: 'work' },
-  { key: 'website_url', label: 'Sitio web', icon: 'language' },
 ] as const
 
 export default async function AuthorPage({ params }: AuthorPageProps) {
@@ -40,8 +44,11 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
   const author = await loadAuthor(slug)
   if (!author) notFound()
 
+  const locale = await getServerLocale()
+  const dict = getDictionary(locale)
+
   const [posts, stats] = await Promise.all([
-    getPostsByAuthor(author.id).catch(() => []),
+    getPostsByAuthor(author.id, locale).catch(() => []),
     getAuthorStats(author.id).catch(() => null),
   ])
 
@@ -53,17 +60,26 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
     .toUpperCase()
 
   const statItems = [
-    { label: 'Artículos publicados', value: stats?.posts ?? posts.length },
-    { label: 'Mercados cubiertos', value: stats?.categories },
-    { label: 'Activos analizados', value: stats?.assets },
+    { label: dict.author.publishedArticles, value: stats?.posts ?? posts.length },
+    { label: dict.author.marketsCovered, value: stats?.categories },
+    { label: dict.author.assetsAnalyzed, value: stats?.assets },
   ].filter((item): item is { label: string; value: number } => typeof item.value === 'number')
 
-  const socials = SOCIAL_LINKS.filter((link) => author[link.key])
+  const socials = [
+    ...SOCIAL_LINK_DEFS.filter((link) => author[link.key]),
+    ...(author.website_url ? [{ key: 'website_url' as const, label: dict.author.website, icon: 'language' }] : []),
+  ]
 
   return (
     <main id="main-content" tabIndex={-1} className="flex-1 pt-[var(--header-height)] pb-24">
       <div className="mx-auto max-w-[1200px] px-6 md:px-8">
-        <Breadcrumbs items={[{ label: 'Inicio', href: '/' }, { label: 'Autores', href: '/autor' }, { label: author.full_name }]} />
+        <Breadcrumbs
+          items={[
+            { label: dict.author.breadcrumbHome, href: '/' },
+            { label: dict.author.breadcrumbAuthors, href: '/autor' },
+            { label: author.full_name },
+          ]}
+        />
 
         <section className="mb-12 rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-8 md:p-10">
           <div className="flex flex-col items-start gap-8 md:flex-row">
@@ -125,12 +141,12 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
 
         <section aria-labelledby="author-articles-heading">
           <h2 id="author-articles-heading" className="mb-6 text-headline text-ink">
-            Últimos Artículos
+            {dict.author.latestArticles}
           </h2>
           {posts.length > 0 ? (
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {posts.map((post) => (
-                <ArticleCard key={post.id} post={post} />
+                <ArticleCard key={post.id} post={post} locale={locale} />
               ))}
             </div>
           ) : (
@@ -138,7 +154,7 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
               <span className="material-symbols-outlined mb-3 block text-5xl text-ink-subtle" aria-hidden="true">
                 article
               </span>
-              <p className="text-body text-ink-muted">Aún no hay artículos publicados.</p>
+              <p className="text-body text-ink-muted">{dict.author.noArticlesYet}</p>
             </div>
           )}
         </section>

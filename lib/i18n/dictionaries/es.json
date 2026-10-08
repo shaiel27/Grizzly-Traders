@@ -257,5 +257,28 @@
     "englishNotice": "English version coming soon. This legal document is currently published in Spanish only.",
     "draftNotice": "Borrador sujeto a revisión legal externa. Este documento no constituye asesoramiento legal.",
     "lastUpdated": "Última actualización: {date}"
+  },
+  "article": {
+    "notFoundTitle": "Artículo no encontrado",
+    "breadcrumbHome": "Inicio",
+    "breadcrumbNews": "Noticias",
+    "readingTime": "{n} min lectura",
+    "views": "{n} vistas",
+    "relatedArticles": "Artículos Relacionados",
+    "translationPendingNotice": "This article hasn't been translated into English yet — showing the original Spanish version below."
+  },
+  "author": {
+    "notFoundTitle": "Autor no encontrado",
+    "breadcrumbHome": "Inicio",
+    "breadcrumbAuthors": "Autores",
+    "latestArticles": "Últimos Artículos",
+    "noArticlesYet": "Aún no hay artículos publicados.",
+    "publishedArticles": "Artículos publicados",
+    "marketsCovered": "Mercados cubiertos",
+    "assetsAnalyzed": "Activos analizados",
+    "website": "Sitio web",
+    "listTitle": "Autores",
+    "listDescription": "Conoce al equipo de analistas de Grizzly Traders.",
+    "noAuthorsYet": "Aún no hay autores para mostrar."
   }
 }

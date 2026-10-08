@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_LOCALE, findMissingKeys, getDictionary, hasLocale, t, type Dictionary } from './get-dictionary'
-import { categoryMeta, localizedPost, sentimentMeta, timeAgo } from '../feed'
+import { categoryMeta, localizedPost, localizedPostContent, sentimentMeta, timeAgo } from '../feed'
 import type { PostTranslation } from '../types'
 
 describe('hasLocale', () => {
@@ -83,6 +83,76 @@ describe('localizedPost fallback (lib/feed.ts, Fase 5.3)', () => {
   it('defaults to es when no locale argument is passed (back-compat)', () => {
     const result = localizedPost({ ...basePost, translations: [esTranslation, enTranslation] })
     expect(result.title).toBe('Título en Español')
+  })
+})
+
+describe('localizedPostContent fallback (lib/feed.ts, Fase 3 — article detail page)', () => {
+  const basePost = {
+    title: 'Base ES title',
+    slug: 'base-es-title',
+    content_html: '<p>Base</p>',
+    meta_title: null,
+    meta_description: null,
+  }
+  const esTranslation: PostTranslation = {
+    id: 1,
+    post_id: 'post-1',
+    locale: 'es',
+    title: 'Título en Español',
+    slug: 'titulo-en-espanol',
+    content_html: '<p>Contenido en español</p>',
+    meta_title: 'Meta ES',
+    meta_description: 'Descripción ES',
+    created_at: '',
+    updated_at: '',
+  }
+  const enTranslation: PostTranslation = {
+    ...esTranslation,
+    id: 2,
+    locale: 'en',
+    title: 'English Title',
+    slug: 'english-title',
+    content_html: '<p>English content</p>',
+    meta_title: 'Meta EN',
+    meta_description: 'Description EN',
+  }
+
+  it('uses the English row and reports no fallback when one exists', () => {
+    const result = localizedPostContent({ ...basePost, translations: [esTranslation, enTranslation] }, 'en')
+    expect(result).toMatchObject({
+      title: 'English Title',
+      slug: 'english-title',
+      contentHtml: '<p>English content</p>',
+      metaTitle: 'Meta EN',
+      metaDescription: 'Description EN',
+      resolvedLocale: 'en',
+      isFallback: false,
+    })
+  })
+
+  it('falls back to the es row and flags isFallback when only es exists', () => {
+    const result = localizedPostContent({ ...basePost, translations: [esTranslation] }, 'en')
+    expect(result).toMatchObject({
+      title: 'Título en Español',
+      contentHtml: '<p>Contenido en español</p>',
+      resolvedLocale: 'es',
+      isFallback: true,
+    })
+  })
+
+  it('falls back to the post base fields and flags isFallback when there are no translations at all', () => {
+    const result = localizedPostContent({ ...basePost, translations: [] }, 'en')
+    expect(result).toMatchObject({
+      title: 'Base ES title',
+      contentHtml: '<p>Base</p>',
+      resolvedLocale: 'es',
+      isFallback: true,
+    })
+  })
+
+  it('never flags isFallback under the es locale, since es is always the base language', () => {
+    const result = localizedPostContent({ ...basePost, translations: [esTranslation] }, 'es')
+    expect(result.isFallback).toBe(false)
   })
 })
 

@@ -86,6 +86,48 @@ export function localizedPost(post: { title: string; slug: string; translations?
   }
 }
 
+export interface LocalizedPostContent {
+  title: string
+  slug: string
+  contentHtml: string
+  metaTitle: string | null
+  metaDescription: string | null
+  resolvedLocale: 'es' | 'en'
+  // True when the active locale has no translation row of its own and the content fell back
+  // (to 'es', or to the post's base fields) — the caller should show an honest notice rather
+  // than silently rendering untranslated content under translated chrome.
+  isFallback: boolean
+}
+
+// Same fallback cascade as localizedPost, extended with the body/meta fields that the article
+// detail page needs and the card-level helper deliberately doesn't resolve.
+export function localizedPostContent(
+  post: {
+    title: string
+    slug: string
+    content_html: string
+    meta_title: string | null
+    meta_description: string | null
+    translations?: PostTranslation[]
+  },
+  locale: Locale = 'es'
+): LocalizedPostContent {
+  const translation =
+    post.translations?.find((tr) => tr.locale === locale) ??
+    post.translations?.find((tr) => tr.locale === 'es') ??
+    post.translations?.[0]
+  const resolvedLocale = translation?.locale ?? 'es'
+  return {
+    title: translation?.title || post.title,
+    slug: translation?.slug || post.slug,
+    contentHtml: translation?.content_html || post.content_html,
+    metaTitle: translation?.meta_title ?? null,
+    metaDescription: translation?.meta_description ?? null,
+    resolvedLocale,
+    isFallback: locale !== resolvedLocale,
+  }
+}
+
 export function excerpt(html: string, length = 110): string {
   const text = html
     .replace(/<[^>]*>/g, ' ')
