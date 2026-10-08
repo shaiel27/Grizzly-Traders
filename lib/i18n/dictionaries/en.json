@@ -373,5 +373,26 @@
     "riskReward": "Risk/reward ratio",
     "invalidResult": "Check your inputs: the stop loss can't match the entry, and the take profit must be on the correct side.",
     "incompleteResult": "Fill in capital, risk, entry and stop loss to see the result."
+  },
+  "tools": {
+    "pageTitle": "Trading tools",
+    "metaDescription": "Position size and risk calculator, plus access to the pivot point calculator.",
+    "breadcrumbHome": "Home",
+    "breadcrumbTools": "Tools",
+    "h1": "Tools",
+    "body": "Utilities to plan your trades. These are indicative calculations and do not constitute financial advice.",
+    "pivotSectionTitle": "Pivot points",
+    "pivotSectionBody": "Calculate support and resistance levels with the Classic, Fibonacci, Camarilla, Woodie and DeMark methods, or check the current levels for the main assets.",
+    "openPivotCalculator": "Open pivot calculator",
+    "viewGlossary": "View glossary"
+  },
+  "learn": {
+    "pageTitle": "Trading glossary",
+    "metaDescription": "Definitions of support, resistance, pivot points, RSI, MACD, ATR and other key technical analysis terms.",
+    "breadcrumbHome": "Home",
+    "breadcrumbLearn": "Glossary",
+    "h1": "Trading glossary",
+    "body": "The concepts we use in articles, pivot levels and the markets terminal. Educational content, not financial advice.",
+    "glossaryNavAria": "Glossary index"
   }
 }

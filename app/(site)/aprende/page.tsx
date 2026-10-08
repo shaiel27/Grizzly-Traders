@@ -3,23 +3,33 @@ import { Breadcrumbs } from '@/components/ui'
 import { GLOSSARY } from '@/lib/glossary'
 import { jsonLdString } from '@/lib/json-ld'
 import { SITE_URL } from '@/lib/site'
+import { getServerLocale } from '@/lib/i18n/server'
+import { getDictionary } from '@/lib/i18n/get-dictionary'
 
-export const metadata: Metadata = {
-  title: 'Glosario de trading',
-  description: 'Definiciones de soporte, resistencia, puntos pivote, RSI, MACD, ATR y otros términos clave del análisis técnico.',
-  alternates: { canonical: '/aprende' },
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getServerLocale()
+  const dict = getDictionary(locale)
+  return {
+    title: dict.learn.pageTitle,
+    description: dict.learn.metaDescription,
+    alternates: { canonical: '/aprende' },
+  }
 }
 
-export default function LearnPage() {
+export default async function LearnPage() {
+  const locale = await getServerLocale()
+  const dict = getDictionary(locale)
+  const isEnglish = locale === 'en'
+
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'DefinedTermSet',
-    name: 'Glosario de trading',
+    name: dict.learn.pageTitle,
     url: `${SITE_URL}/aprende`,
     hasDefinedTerm: GLOSSARY.map((entry) => ({
       '@type': 'DefinedTerm',
-      name: entry.term,
-      description: entry.definition,
+      name: isEnglish ? entry.termEn : entry.term,
+      description: isEnglish ? entry.definitionEn : entry.definition,
       url: `${SITE_URL}/aprende#${entry.slug}`,
     })),
   }
@@ -29,16 +39,13 @@ export default function LearnPage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd) }} />
 
       <div className="mx-auto max-w-[1200px] px-6 pt-8 md:px-8">
-        <Breadcrumbs items={[{ label: 'Inicio', href: '/' }, { label: 'Glosario' }]} />
+        <Breadcrumbs items={[{ label: dict.learn.breadcrumbHome, href: '/' }, { label: dict.learn.breadcrumbLearn }]} />
 
-        <h1 className="mb-2 text-display-lg-mobile font-bold text-ink sm:text-display-lg">Glosario de trading</h1>
-        <p className="mb-8 max-w-2xl text-body text-on-surface-variant">
-          Los conceptos que usamos en los artículos, los niveles de pivote y la terminal de mercados. Contenido educativo, no
-          asesoramiento financiero.
-        </p>
+        <h1 className="mb-2 text-display-lg-mobile font-bold text-ink sm:text-display-lg">{dict.learn.h1}</h1>
+        <p className="mb-8 max-w-2xl text-body text-on-surface-variant">{dict.learn.body}</p>
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[220px_1fr]">
-          <nav aria-label="Índice del glosario" className="lg:sticky lg:top-[128px] lg:self-start">
+          <nav aria-label={dict.learn.glossaryNavAria} className="lg:sticky lg:top-[128px] lg:self-start">
             <ul className="flex flex-wrap gap-2 lg:flex-col lg:gap-1">
               {GLOSSARY.map((entry) => (
                 <li key={entry.slug}>
@@ -46,7 +53,7 @@ export default function LearnPage() {
                     href={`#${entry.slug}`}
                     className="block rounded-full border border-hairline bg-white/[0.04] px-3 py-1 text-micro text-ink-muted transition-colors hover:border-accent-blue hover:text-ink lg:rounded-lg lg:border-transparent lg:bg-transparent lg:py-1.5"
                   >
-                    {entry.term}
+                    {isEnglish ? entry.termEn : entry.term}
                   </a>
                 </li>
               ))}
@@ -60,8 +67,8 @@ export default function LearnPage() {
                 id={entry.slug}
                 className="scroll-mt-[var(--header-scroll-offset)] rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-6"
               >
-                <dt className="mb-2 text-subhead font-bold text-ink">{entry.term}</dt>
-                <dd className="text-body text-ink-muted">{entry.definition}</dd>
+                <dt className="mb-2 text-subhead font-bold text-ink">{isEnglish ? entry.termEn : entry.term}</dt>
+                <dd className="text-body text-ink-muted">{isEnglish ? entry.definitionEn : entry.definition}</dd>
               </div>
             ))}
           </dl>
