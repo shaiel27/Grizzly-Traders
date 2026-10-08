@@ -27,6 +27,10 @@ export interface MarketItem {
   symbol: string
   name: string
   description: string
+  // English counterpart of `description` (Fase 5 del plan de cobertura en inglés) — consumers
+  // pick this instead of `description` when the locale is 'en'; falls back to the same scanner
+  // text as `description` for stocks, whose description is already in English either way.
+  descriptionEn: string
   category: string
   type: string
   close: number
@@ -104,6 +108,7 @@ async function fetchBatch(batch: MarketAssetDef[]): Promise<MarketItem[]> {
           symbol: assetDef.symbol,
           name: assetDef.label || (d[0] as string) || assetDef.symbol.split(':').pop() || '',
           description: assetDef.title || (d[1] as string) || '',
+          descriptionEn: assetDef.nameEn || (d[1] as string) || '',
           category: assetDef.category,
           type: (d[2] as string) || '',
           close: d[3] as number,
