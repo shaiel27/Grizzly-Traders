@@ -257,5 +257,55 @@
     "englishNotice": "English version coming soon. This legal document is currently published in Spanish only.",
     "draftNotice": "Draft pending external legal review. This document does not constitute legal advice.",
     "lastUpdated": "Last updated: {date}"
+  },
+  "cryptoRankings": {
+    "title": "Crypto Rankings",
+    "description": "The top 50 cryptocurrencies by market capitalization.",
+    "tableCaption": "Ranking of the top 50 cryptocurrencies by market capitalization",
+    "colName": "Name",
+    "colPrice": "Price",
+    "col24h": "24h",
+    "colMarketCap": "Market Cap",
+    "colVolume": "24h Volume",
+    "loadingLabel": "Loading crypto rankings…",
+    "source": "Source: CoinGecko."
+  },
+  "liveTicker": {
+    "stale": "Stale data",
+    "live": "Live feed",
+    "quotesAria": "Market quotes",
+    "pause": "Pause quote scrolling",
+    "resume": "Resume quote scrolling",
+    "updatedAt": "Updated {time} UTC"
+  },
+  "newsletterForm": {
+    "label": "Get portal updates by email",
+    "placeholder": "you@example.com",
+    "submit": "Subscribe",
+    "submitting": "Sending…",
+    "honeypotLabel": "Leave this field blank",
+    "successMessage": "Done! We'll keep you posted on the latest updates.",
+    "genericError": "We couldn't complete the subscription.",
+    "networkError": "Connection error. Please try again."
+  },
+  "riskCalculator": {
+    "title": "Position Size Calculator",
+    "description": "Calculate how many units to trade so that, if your stop loss is hit, you lose only the percentage of capital you choose.",
+    "fieldCapital": "Account capital",
+    "fieldRiskPercent": "Risk per trade (%)",
+    "fieldEntry": "Entry price",
+    "fieldStopLoss": "Stop loss",
+    "fieldTakeProfit": "Take profit (optional)",
+    "direction": "Direction",
+    "directionLong": "Buy (long)",
+    "directionShort": "Sell (short)",
+    "riskAmount": "Money at risk",
+    "units": "Position size (units)",
+    "positionValue": "Position value",
+    "leverageNeeded": "Leverage needed",
+    "rewardAmount": "Potential profit",
+    "riskReward": "Risk/reward ratio",
+    "invalidResult": "Check your inputs: the stop loss can't match the entry, and the take profit must be on the correct side.",
+    "incompleteResult": "Fill in capital, risk, entry and stop loss to see the result."
   }
 }
