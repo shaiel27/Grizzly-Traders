@@ -3,21 +3,32 @@
 import { useId, useMemo, useState } from 'react'
 import { clsx } from 'clsx'
 import { calculatePosition } from '@/lib/risk'
+import { useDictionary } from '@/lib/i18n/LocaleProvider'
+import type { Dictionary } from '@/lib/i18n/get-dictionary'
 
 const FIELDS = [
-  { key: 'capital', label: 'Capital de la cuenta', placeholder: '10000', step: '1' },
-  { key: 'riskPercent', label: 'Riesgo por operación (%)', placeholder: '1', step: '0.1' },
-  { key: 'entry', label: 'Precio de entrada', placeholder: '100', step: 'any' },
-  { key: 'stopLoss', label: 'Stop loss', placeholder: '95', step: 'any' },
-  { key: 'takeProfit', label: 'Take profit (opcional)', placeholder: '115', step: 'any' },
+  { key: 'capital', placeholder: '10000', step: '1' },
+  { key: 'riskPercent', placeholder: '1', step: '0.1' },
+  { key: 'entry', placeholder: '100', step: 'any' },
+  { key: 'stopLoss', placeholder: '95', step: 'any' },
+  { key: 'takeProfit', placeholder: '115', step: 'any' },
 ] as const
 
 type FieldKey = (typeof FIELDS)[number]['key']
+
+const FIELD_LABEL_KEY: Record<FieldKey, keyof Dictionary['riskCalculator']> = {
+  capital: 'fieldCapital',
+  riskPercent: 'fieldRiskPercent',
+  entry: 'fieldEntry',
+  stopLoss: 'fieldStopLoss',
+  takeProfit: 'fieldTakeProfit',
+}
 
 const number = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 4 })
 const money = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2 })
 
 export function RiskCalculator() {
+  const dict = useDictionary()
   const baseId = useId()
   const [values, setValues] = useState<Record<FieldKey, string>>({
     capital: '',
@@ -55,15 +66,15 @@ export function RiskCalculator() {
 
   const rows = result
     ? [
-        { label: 'Dirección', value: result.direction === 'long' ? 'Compra (long)' : 'Venta (short)' },
-        { label: 'Dinero en riesgo', value: money.format(result.riskAmount) },
-        { label: 'Tamaño de la posición (unidades)', value: number.format(result.units), strong: true },
-        { label: 'Valor de la posición', value: money.format(result.positionValue) },
-        { label: 'Apalancamiento necesario', value: `${number.format(result.leverageNeeded)}x` },
+        { label: dict.riskCalculator.direction, value: result.direction === 'long' ? dict.riskCalculator.directionLong : dict.riskCalculator.directionShort },
+        { label: dict.riskCalculator.riskAmount, value: money.format(result.riskAmount) },
+        { label: dict.riskCalculator.units, value: number.format(result.units), strong: true },
+        { label: dict.riskCalculator.positionValue, value: money.format(result.positionValue) },
+        { label: dict.riskCalculator.leverageNeeded, value: `${number.format(result.leverageNeeded)}x` },
         ...(result.rewardAmount !== null
           ? [
-              { label: 'Beneficio potencial', value: money.format(result.rewardAmount) },
-              { label: 'Ratio riesgo/beneficio', value: `1 : ${number.format(result.riskReward ?? 0)}`, strong: true },
+              { label: dict.riskCalculator.rewardAmount, value: money.format(result.rewardAmount) },
+              { label: dict.riskCalculator.riskReward, value: `1 : ${number.format(result.riskReward ?? 0)}`, strong: true },
             ]
           : []),
       ]
@@ -72,10 +83,10 @@ export function RiskCalculator() {
   return (
     <section className="rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-6 md:p-8" aria-labelledby={`${baseId}-title`}>
       <h2 id={`${baseId}-title`} className="mb-1 text-subhead font-bold text-ink">
-        Calculadora de tamaño de posición
+        {dict.riskCalculator.title}
       </h2>
       <p className="mb-6 text-body-sm text-ink-muted">
-        Calcula cuántas unidades operar para que, si se activa el stop loss, pierdas solo el porcentaje de tu capital que elijas.
+        {dict.riskCalculator.description}
       </p>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
@@ -83,7 +94,7 @@ export function RiskCalculator() {
           {FIELDS.map((field) => (
             <div key={field.key}>
               <label htmlFor={`${baseId}-${field.key}`} className="mb-1.5 block text-micro font-medium text-ink-muted">
-                {field.label}
+                {dict.riskCalculator[FIELD_LABEL_KEY[field.key]]}
               </label>
               <input
                 id={`${baseId}-${field.key}`}
@@ -114,9 +125,7 @@ export function RiskCalculator() {
             </dl>
           ) : (
             <p className="rounded-xl border border-dashed border-outline-variant/40 px-4 py-10 text-center text-body-sm text-ink-muted">
-              {complete
-                ? 'Revisa los datos: el stop loss no puede coincidir con la entrada y el take profit debe estar del lado correcto.'
-                : 'Completa capital, riesgo, entrada y stop loss para ver el resultado.'}
+              {complete ? dict.riskCalculator.invalidResult : dict.riskCalculator.incompleteResult}
             </p>
           )}
         </div>

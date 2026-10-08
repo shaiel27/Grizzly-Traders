@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { clsx } from 'clsx'
 import { formatNumber, formatPrice } from '@/lib/format'
+import { useDictionary } from '@/lib/i18n/LocaleProvider'
 
 interface CryptoRanking {
   id: string
@@ -18,6 +19,7 @@ interface CryptoRanking {
 }
 
 export function CryptoRankings() {
+  const dict = useDictionary()
   const [coins, setCoins] = useState<CryptoRanking[] | null>(null)
   const [failed, setFailed] = useState(false)
   const [brokenIcons, setBrokenIcons] = useState<Set<string>>(new Set())
@@ -41,9 +43,9 @@ export function CryptoRankings() {
   return (
     <section aria-labelledby="rankings-heading">
       <h2 id="rankings-heading" className="text-[22px] font-semibold tracking-tight text-ink">
-        Ranking cripto
+        {dict.cryptoRankings.title}
       </h2>
-      <p className="mb-8 mt-1 max-w-2xl text-[14px] text-ink-muted">Las 50 criptomonedas de mayor capitalización de mercado.</p>
+      <p className="mb-8 mt-1 max-w-2xl text-[14px] text-ink-muted">{dict.cryptoRankings.description}</p>
 
       {coins === null ? (
         <div role="status" aria-live="polite" className="overflow-x-auto">
@@ -51,11 +53,11 @@ export function CryptoRankings() {
             <thead>
               <tr className="border-b border-hairline text-[12px] text-ink-muted">
                 <th scope="col" className="py-2 pr-4 font-normal">#</th>
-                <th scope="col" className="py-2 pr-4 font-normal">Nombre</th>
-                <th scope="col" className="py-2 pr-4 text-right font-normal">Precio</th>
-                <th scope="col" className="py-2 pr-4 text-right font-normal">24h</th>
-                <th scope="col" className="py-2 pr-4 text-right font-normal">Cap. de mercado</th>
-                <th scope="col" className="py-2 text-right font-normal">Volumen 24h</th>
+                <th scope="col" className="py-2 pr-4 font-normal">{dict.cryptoRankings.colName}</th>
+                <th scope="col" className="py-2 pr-4 text-right font-normal">{dict.cryptoRankings.colPrice}</th>
+                <th scope="col" className="py-2 pr-4 text-right font-normal">{dict.cryptoRankings.col24h}</th>
+                <th scope="col" className="py-2 pr-4 text-right font-normal">{dict.cryptoRankings.colMarketCap}</th>
+                <th scope="col" className="py-2 text-right font-normal">{dict.cryptoRankings.colVolume}</th>
               </tr>
             </thead>
             <tbody>
@@ -86,20 +88,20 @@ export function CryptoRankings() {
               ))}
             </tbody>
           </table>
-          <span className="sr-only">Cargando ranking cripto…</span>
+          <span className="sr-only">{dict.cryptoRankings.loadingLabel}</span>
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left">
-            <caption className="sr-only">Ranking de las 50 principales criptomonedas por capitalización</caption>
+            <caption className="sr-only">{dict.cryptoRankings.tableCaption}</caption>
             <thead>
               <tr className="border-b border-hairline text-[12px] text-ink-muted">
                 <th scope="col" className="py-2 pr-4 font-normal">#</th>
-                <th scope="col" className="py-2 pr-4 font-normal">Nombre</th>
-                <th scope="col" className="py-2 pr-4 text-right font-normal">Precio</th>
-                <th scope="col" className="py-2 pr-4 text-right font-normal">24h</th>
-                <th scope="col" className="py-2 pr-4 text-right font-normal">Cap. de mercado</th>
-                <th scope="col" className="py-2 text-right font-normal">Volumen 24h</th>
+                <th scope="col" className="py-2 pr-4 font-normal">{dict.cryptoRankings.colName}</th>
+                <th scope="col" className="py-2 pr-4 text-right font-normal">{dict.cryptoRankings.colPrice}</th>
+                <th scope="col" className="py-2 pr-4 text-right font-normal">{dict.cryptoRankings.col24h}</th>
+                <th scope="col" className="py-2 pr-4 text-right font-normal">{dict.cryptoRankings.colMarketCap}</th>
+                <th scope="col" className="py-2 text-right font-normal">{dict.cryptoRankings.colVolume}</th>
               </tr>
             </thead>
             <tbody>
@@ -142,7 +144,7 @@ export function CryptoRankings() {
           </table>
         </div>
       )}
-      <p className="mt-4 text-[11px] text-ink-subtle">Fuente: CoinGecko.</p>
+      <p className="mt-4 text-[11px] text-ink-subtle">{dict.cryptoRankings.source}</p>
     </section>
   )
 }
