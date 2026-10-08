@@ -20,6 +20,7 @@ import { clsx } from 'clsx'
 import { TIMEFRAMES, TIMEFRAME_KEYS, type Candle, type TimeframeKey } from '@/lib/candles'
 import { formatCompact, formatLevel } from '@/lib/format'
 import { INDICATORS, toLinePoints, type IndicatorKey } from '@/lib/indicators'
+import { useDictionary } from '@/lib/i18n/LocaleProvider'
 
 export interface ChartLevel {
   price: number
@@ -33,6 +34,7 @@ interface MarketChartProps {
   height?: number
   // Horizontal reference lines (e.g. daily pivots); the toolbar gets a switch for them when present
   levels?: ChartLevel[]
+  // Defaults to dict.marketChart.pivotsLabel (resolved inside the component) when omitted
   levelsLabel?: string
   initialTimeframe?: TimeframeKey
   // Drops the frame so the chart can live inside another panel
@@ -78,10 +80,12 @@ export function MarketChart({
   name,
   height = 420,
   levels = [],
-  levelsLabel = 'Pivotes',
+  levelsLabel,
   initialTimeframe = '1d',
   bare = false,
 }: MarketChartProps) {
+  const dict = useDictionary()
+  const resolvedLevelsLabel = levelsLabel ?? dict.marketChart.pivotsLabel
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const candleRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
@@ -349,7 +353,7 @@ export function MarketChart({
                 levelsOn ? 'bg-surface-2 text-ink' : 'text-ink-muted hover:bg-surface-1 hover:text-ink'
               )}
             >
-              {levelsLabel}
+              {resolvedLevelsLabel}
             </button>
           )}
 
@@ -361,7 +365,7 @@ export function MarketChart({
               onClick={() => setMenuOpen((value) => !value)}
               className="flex h-7 items-center gap-1 rounded-sm px-2.5 text-[12px] font-medium text-ink-muted transition-colors hover:bg-surface-1 hover:text-ink focus-visible:outline-2 focus-visible:outline-accent-blue"
             >
-              Indicadores
+              {dict.marketChart.indicatorsLabel}
               <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
                 expand_more
               </span>
@@ -378,7 +382,7 @@ export function MarketChart({
                       className="size-3.5 accent-[var(--accent-blue)]"
                     />
                     <span className="size-2 rounded-full" style={{ backgroundColor: indicator.color }} aria-hidden="true" />
-                    {indicator.label}
+                    {dict.indicators[indicator.key]}
                   </label>
                 ))}
                 <label
@@ -386,7 +390,7 @@ export function MarketChart({
                     'flex items-center gap-2.5 rounded-[6px] px-2.5 py-2 text-[13px]',
                     hasVolume ? 'cursor-pointer text-ink hover:bg-surface-2' : 'cursor-not-allowed text-ink-subtle'
                   )}
-                  title={hasVolume ? undefined : 'Este activo no publica volumen'}
+                  title={hasVolume ? undefined : dict.marketChart.noVolumeTooltip}
                 >
                   <input
                     type="checkbox"
@@ -396,7 +400,7 @@ export function MarketChart({
                     className="size-3.5 accent-[var(--accent-blue)]"
                   />
                   <span className="size-2 rounded-full bg-ink-subtle" aria-hidden="true" />
-                  Volumen
+                  {dict.marketChart.volumeLabel}
                 </label>
               </div>
             )}
@@ -435,7 +439,7 @@ export function MarketChart({
                 {activeIndicators.map((indicator) => (
                   <li key={indicator.key} className="flex items-center gap-1.5">
                     <span className="size-1.5 rounded-full" style={{ backgroundColor: indicator.color }} aria-hidden="true" />
-                    {indicator.label}
+                    {dict.indicators[indicator.key]}
                   </li>
                 ))}
               </ul>
