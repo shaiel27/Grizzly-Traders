@@ -280,5 +280,48 @@
     "listTitle": "Autores",
     "listDescription": "Conoce al equipo de analistas de Grizzly Traders.",
     "noAuthorsYet": "Aún no hay autores para mostrar."
+  },
+  "calendar": {
+    "pageTitle": "Calendario económico",
+    "metaDescription": "Calendario económico forex en tiempo real, sincronizado con ForexFactory: publicaciones macro de EE.UU., eurozona, Reino Unido, Japón y más, con dato real, previsión y dato anterior.",
+    "breadcrumb": "Calendario económico",
+    "description": "Publicaciones macro que mueven el mercado forex, con dato real, previsión y dato anterior.",
+    "today": "Hoy",
+    "tomorrow": "Mañana",
+    "inProgress": "en curso",
+    "inMinutes": "en {n} min",
+    "inHours": "en {n} h",
+    "inHoursMinutes": "en {h} h {n} min",
+    "inDays": "en {n} {unit}",
+    "dayUnitSingular": "día",
+    "dayUnitPlural": "días",
+    "impactHigh": "Alto impacto",
+    "impactMedium": "Impacto medio",
+    "impactLow": "Impacto bajo",
+    "holiday": "Feriado",
+    "allDay": "Todo el día",
+    "nextEvent": "Próximo evento",
+    "previous": "anterior",
+    "forecast": "previsto",
+    "previousAbbr": "ant.",
+    "forecastAbbr": "prev.",
+    "allCurrencies": "Todas",
+    "eventsCount": "{n} eventos",
+    "loadingLabel": "Cargando calendario económico…",
+    "emptyMessage": "No hay eventos económicos programados en las próximas 24 horas.",
+    "errorMessage": "No se pudo cargar el calendario económico. Intenta de nuevo en unos minutos.",
+    "source": "Fuente: ForexFactory."
+  },
+  "marketChart": {
+    "indicatorsLabel": "Indicadores",
+    "volumeLabel": "Volumen",
+    "pivotsLabel": "Pivotes",
+    "noVolumeTooltip": "Este activo no publica volumen"
+  },
+  "indicators": {
+    "sma20": "Media móvil 20",
+    "sma50": "Media móvil 50",
+    "sma200": "Media móvil 200",
+    "ema20": "Media exponencial 20"
   }
 }
