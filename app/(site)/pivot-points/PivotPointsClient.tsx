@@ -6,6 +6,8 @@ import { PivotAssetList, type PivotRow } from '@/components/ui/PivotAssetList'
 import { PageControls } from '@/components/ui/PageControls'
 import { PivotAssetPanel } from '@/components/ui/PivotAssetPanel'
 import { PivotCalculator } from '@/components/ui/PivotCalculator'
+import { t, type Locale } from '@/lib/i18n/get-dictionary'
+import { useDictionary, useLocale } from '@/lib/i18n/LocaleProvider'
 import { pageCount, pageSlice } from '@/lib/pagination'
 import { PIVOT_ASSETS, PIVOT_ASSET_BY_TV, PIVOT_CATEGORIES, type PivotCategory } from '@/lib/pivot-assets'
 import { PIVOT_METHOD_INFO } from '@/lib/pivot-methods'
@@ -20,14 +22,8 @@ const PAGE_SIZE = 10
 type CategoryFilter = 'all' | PivotCategory
 type SortKey = 'default' | 'change' | 'proximity'
 
-const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  { key: 'default', label: 'Predeterminado' },
-  { key: 'change', label: 'Mayor variación hoy' },
-  { key: 'proximity', label: 'Más cerca de un nivel' },
-]
-
-function formatUtcTime(timestamp: number): string {
-  return new Date(timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'UTC' })
+function formatUtcTime(timestamp: number, locale: Locale): string {
+  return new Date(timestamp).toLocaleTimeString(locale === 'en' ? 'en-US' : 'es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'UTC' })
 }
 
 // Smallest distance (in %) from the price to the level directly above or below it
@@ -75,6 +71,15 @@ interface PivotPointsClientProps {
 }
 
 export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
+  const { locale } = useLocale()
+  const dict = useDictionary().pivotPoints
+
+  const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+    { key: 'default', label: dict.sortDefault },
+    { key: 'change', label: dict.sortChange },
+    { key: 'proximity', label: dict.sortProximity },
+  ]
+
   const [timeframe, setTimeframe] = useState<PivotTimeframe>('D')
   const [quotes, setQuotes] = useState<PivotQuote[]>(initialQuotes)
   // The timeframe the quotes belong to: while it differs from the selected one, we are loading
@@ -190,30 +195,28 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
             <span className="material-symbols-outlined text-[28px] text-accent-blue" aria-hidden="true">
               candlestick_chart
             </span>
-            <h1 className="text-display-lg-mobile font-bold text-ink sm:text-display-lg">Pivot Points</h1>
+            <h1 className="text-display-lg-mobile font-bold text-ink sm:text-display-lg">{dict.pageTitle}</h1>
           </div>
-          <p className="max-w-3xl text-body text-on-surface-variant">
-            Soportes y resistencias calculados con el máximo, mínimo y cierre de la {timeframeInfo.period}, con cinco métodos distintos. Los
-            precios se actualizan solos cada 15 segundos.
-          </p>
+          <p className="max-w-3xl text-body text-on-surface-variant">{t(dict.description, { period: timeframeInfo.period })}</p>
           <p className="mt-2 flex items-center gap-2 text-micro text-ink-subtle">
             <span className="relative flex size-1.5" aria-hidden="true">
               {!error && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-semantic-success opacity-75 motion-reduce:animate-none" />}
               <span className={clsx('relative inline-flex size-1.5 rounded-full', error ? 'bg-semantic-warning' : 'bg-semantic-success')} />
             </span>
-            {updatedAt ? `Actualizado ${formatUtcTime(updatedAt)} UTC` : initialQuotes.length > 0 ? 'Datos cargados' : 'Cargando datos…'} · Fuente: TradingView
+            {updatedAt ? t(dict.updatedAt, { time: formatUtcTime(updatedAt, locale) }) : initialQuotes.length > 0 ? dict.dataLoaded : dict.dataLoading} ·{' '}
+            {dict.sourceLabel}
           </p>
         </header>
 
         {error && (
           <div role="alert" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-semantic-warning/40 bg-semantic-warning/10 px-4 py-3 text-body-sm text-ink">
-            <span>{quotes.length > 0 && !loading ? 'No se pudieron actualizar los pivotes; se muestran los últimos datos.' : 'No se pudieron cargar los pivotes.'}</span>
+            <span>{quotes.length > 0 && !loading ? dict.errorStale : dict.errorLoad}</span>
             <button
               type="button"
               onClick={() => setReloadKey((key) => key + 1)}
               className="rounded-lg border border-semantic-warning/50 px-3 py-1.5 text-xs font-bold text-ink transition-colors hover:bg-semantic-warning/20"
             >
-              Reintentar
+              {dict.retry}
             </button>
           </div>
         )}
@@ -221,18 +224,18 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
         <div className="mb-6 space-y-4 rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-4">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <div className="flex max-w-full flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
-              <span className="text-micro font-bold uppercase tracking-wider text-ink-muted">Período</span>
+              <span className="text-micro font-bold uppercase tracking-wider text-ink-muted">{dict.periodLabel}</span>
               <Segmented
-                label="Período"
+                label={dict.periodLabel}
                 value={timeframe}
                 onChange={setTimeframe}
-                options={PIVOT_TIMEFRAMES.map((option) => ({ key: option.key, label: option.label, title: `Usa la ${option.period}` }))}
+                options={PIVOT_TIMEFRAMES.map((option) => ({ key: option.key, label: option.label, title: t(dict.periodTitle, { period: option.period }) }))}
               />
             </div>
             <div className="flex min-w-0 max-w-full flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
-              <span className="text-micro font-bold uppercase tracking-wider text-ink-muted">Método</span>
+              <span className="text-micro font-bold uppercase tracking-wider text-ink-muted">{dict.methodLabel}</span>
               <Segmented
-                label="Método"
+                label={dict.methodLabel}
                 value={method}
                 onChange={setMethod}
                 options={PIVOT_METHODS.map((option) => ({ key: option, label: PIVOT_METHOD_INFO[option].short, title: PIVOT_METHOD_INFO[option].levels }))}
@@ -241,8 +244,8 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 border-t border-hairline-soft pt-4">
-            <div role="group" aria-label="Categorías" className="flex flex-wrap gap-2">
-              {([{ key: 'all', label: 'Todos' }, ...PIVOT_CATEGORIES] as { key: CategoryFilter; label: string }[]).map((option) => (
+            <div role="group" aria-label={dict.categoriesAria} className="flex flex-wrap gap-2">
+              {([{ key: 'all', label: dict.categoryAll }, ...PIVOT_CATEGORIES] as { key: CategoryFilter; label: string }[]).map((option) => (
                 <button
                   key={option.key}
                   type="button"
@@ -275,11 +278,11 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
                 <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
                   star
                 </span>
-                Favoritos
+                {dict.favoritesButton}
               </button>
 
               <label className="sr-only" htmlFor="pivot-sort">
-                Ordenar por
+                {dict.sortByLabel}
               </label>
               <select
                 id="pivot-sort"
@@ -299,17 +302,17 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
         </div>
 
         <div className="mb-10 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-          <section className="overflow-hidden rounded-2xl border border-outline-variant/40 bg-surface-container-lowest" aria-label="Niveles por activo">
+          <section className="overflow-hidden rounded-2xl border border-outline-variant/40 bg-surface-container-lowest" aria-label={dict.levelsHeading}>
             <div className="flex items-center justify-between border-b border-outline-variant/40 bg-surface-container-low px-6 py-4">
-              <h2 className="text-subhead font-bold text-ink">Niveles por activo</h2>
+              <h2 className="text-subhead font-bold text-ink">{dict.levelsHeading}</h2>
               <p className="text-micro text-ink-muted">
-                {loading ? 'Cargando…' : `${visibleRows.length} de ${rows.length} activos`}
+                {loading ? dict.loadingShort : t(dict.visibleCount, { visible: visibleRows.length, total: rows.length })}
               </p>
             </div>
 
             <div className="border-b border-outline-variant/40 px-6 py-3">
               <label className="sr-only" htmlFor="pivot-search">
-                Buscar activo
+                {dict.searchLabel}
               </label>
               <div className="relative">
                 <span className="material-symbols-outlined pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[18px] text-ink-subtle" aria-hidden="true">
@@ -320,7 +323,7 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
                   type="search"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Buscar por nombre o símbolo"
+                  placeholder={dict.searchPlaceholder}
                   autoComplete="off"
                   className="w-full rounded-full border border-outline-variant/70 bg-surface-2 py-2 pl-10 pr-4 text-body-sm text-ink placeholder:text-ink-muted focus:border-accent-blue focus:outline-none"
                 />
@@ -329,21 +332,21 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
 
             {missingAssets.length > 0 && (
               <p className="border-b border-hairline-soft px-6 py-2 text-micro text-ink-subtle">
-                Sin datos de la {timeframeInfo.period}: {missingAssets.map((asset) => asset.label).join(', ')}.
+                {t(dict.missingAssets, { period: timeframeInfo.period, names: missingAssets.map((asset) => asset.label).join(', ') })}
               </p>
             )}
 
             {!loading && rows.length > 0 && visibleRows.length === 0 ? (
               <div className="px-6 py-14 text-center">
-                <p className="mb-1 text-body text-ink-muted">Ningún activo coincide con los filtros.</p>
+                <p className="mb-1 text-body text-ink-muted">{dict.emptyFiltered}</p>
                 {filtersActive && (
                   <button type="button" onClick={clearFilters} className="mt-2 text-body-sm font-medium text-accent-blue hover:text-accent-blue-hover">
-                    Quitar filtros
+                    {dict.clearFilters}
                   </button>
                 )}
               </div>
             ) : !loading && rows.length === 0 ? (
-              <p className="px-6 py-14 text-center text-body text-ink-muted">No hay datos de pivotes disponibles por ahora.</p>
+              <p className="px-6 py-14 text-center text-body text-ink-muted">{dict.emptyData}</p>
             ) : (
               <PivotAssetList
                 rows={pageRows}
@@ -361,7 +364,7 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
                 total={visibleRows.length}
                 pageSize={PAGE_SIZE}
                 onPageChange={setPage}
-                label="Paginación de niveles por activo"
+                label={dict.paginationLabel}
                 className="border-t border-outline-variant/40 px-6 py-3"
               />
             )}
@@ -378,13 +381,13 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
               />
             ) : (
               <div className="h-[560px] animate-pulse motion-reduce:animate-none rounded-2xl bg-surface-2" role="status" aria-live="polite">
-                <span className="sr-only">Cargando niveles del activo…</span>
+                <span className="sr-only">{dict.assetLevelsLoading}</span>
               </div>
             )}
           </div>
         </div>
 
-        <section className="mb-10" aria-label="Calculadora de pivot points">
+        <section className="mb-10" aria-label={dict.calculatorAria}>
           <PivotCalculator
             quotes={loading ? [] : quotes}
             timeframeLabel={timeframeInfo.label}
@@ -395,7 +398,7 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
 
         <section aria-labelledby="pivot-methods-heading">
           <h2 id="pivot-methods-heading" className="mb-4 text-subhead font-bold text-ink">
-            Cómo se calculan
+            {dict.methodsHeading}
           </h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {PIVOT_METHODS.map((option) => {
@@ -415,10 +418,7 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
               )
             })}
           </div>
-          <p className="mt-6 max-w-3xl text-micro leading-relaxed text-ink-subtle">
-            Los pivotes son una referencia técnica, no una recomendación de compra o venta: el precio puede ignorarlos. Los datos provienen de un
-            servicio no oficial de TradingView y pueden tener retraso o interrupciones.
-          </p>
+          <p className="mt-6 max-w-3xl text-micro leading-relaxed text-ink-subtle">{dict.disclaimer}</p>
         </section>
       </div>
     </main>

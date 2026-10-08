@@ -1,3 +1,4 @@
+import { getDictionary, t, type Locale } from './i18n/get-dictionary'
 import { MARKET_CATEGORY_LABELS, type MarketCategory } from './market-assets'
 
 // The overview only needs these fields, so it stays usable with any list of assets that has them
@@ -28,11 +29,12 @@ export function summarizeMarket(assets: OverviewAsset[]): MarketSummary {
 }
 
 // One plain sentence that answers "how is the market today?"
-export function marketHeadline({ total, up, down }: MarketSummary): string {
-  if (total === 0) return 'Sin datos de mercado por ahora'
-  if (up / total >= 0.6) return `Hoy suben ${up} de ${total} activos`
-  if (down / total >= 0.6) return `Hoy bajan ${down} de ${total} activos`
-  return `El mercado está dividido: ${up} suben y ${down} bajan`
+export function marketHeadline({ total, up, down }: MarketSummary, locale: Locale = 'es'): string {
+  const dict = getDictionary(locale).marketOverview
+  if (total === 0) return dict.headlineEmpty
+  if (up / total >= 0.6) return t(dict.headlineUp, { up, total })
+  if (down / total >= 0.6) return t(dict.headlineDown, { down, total })
+  return t(dict.headlineMixed, { up, down })
 }
 
 export interface HistogramBin {
@@ -44,7 +46,8 @@ export interface HistogramBin {
 }
 
 // Counts assets by daily change in `step`-wide bins between `min` and `max`; larger moves fall into the outer bins
-export function changeHistogram(assets: OverviewAsset[], min = -5, max = 5, step = 1): HistogramBin[] {
+export function changeHistogram(assets: OverviewAsset[], locale: Locale = 'es', min = -5, max = 5, step = 1): HistogramBin[] {
+  const dict = getDictionary(locale).marketOverview
   const bins = Math.round((max - min) / step)
   const counts = new Array<number>(bins).fill(0)
 
@@ -53,11 +56,16 @@ export function changeHistogram(assets: OverviewAsset[], min = -5, max = 5, step
     counts[index] += 1
   }
 
-  const fmt = (value: number) => `${value > 0 ? '+' : ''}${value}%`
+  const fmt = (value: number) => `${value > 0 ? '+' : ''}${value}`
   return counts.map((count, index) => {
     const from = min + index * step
     const to = from + step
-    const label = index === 0 ? `${fmt(to)} o menos` : index === bins - 1 ? `${fmt(from)} o más` : `${fmt(from)} a ${fmt(to)}`
+    const label =
+      index === 0
+        ? t(dict.binLessOrEqual, { x: fmt(to) })
+        : index === bins - 1
+          ? t(dict.binMoreOrEqual, { x: fmt(from) })
+          : t(dict.binRange, { from: fmt(from), to: fmt(to) })
     return { from, to, count, label }
   })
 }
