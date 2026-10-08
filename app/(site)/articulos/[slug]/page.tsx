@@ -9,9 +9,12 @@ import { getPostBySlug, getPostViewCount, getRelatedPosts, incrementViewCount } 
 import { htmlToText, sanitizeArticleHtml } from '@/lib/sanitize'
 import { SITE_NAME, SITE_URL } from '@/lib/site'
 import { jsonLdString } from '@/lib/json-ld'
+import { categoryMeta, localizedPostContent } from '@/lib/feed'
+import { getServerLocale } from '@/lib/i18n/server'
+import { getDictionary, t } from '@/lib/i18n/get-dictionary'
 import Image from 'next/image'
 import { format, formatDistanceToNow } from 'date-fns'
-import { es } from 'date-fns/locale'
+import { es, enUS } from 'date-fns/locale'
 
 const BOT_PATTERN = /bot|crawl|spider|slurp|preview|facebookexternalhit|headless/i
 
@@ -30,12 +33,12 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
   const { slug } = await params
   try {
     const post = await getPostBySlug(slug)
-    const translation = post.translations?.find((t) => t.locale === 'es') || post.translations?.[0]
-    const title = translation?.title || post.title
-    const description =
-      translation?.meta_description || htmlToText(translation?.content_html || post.content_html).slice(0, 160)
+    const locale = await getServerLocale()
+    const translation = localizedPostContent(post, locale)
+    const title = translation.title
+    const description = translation.metaDescription || htmlToText(translation.contentHtml).slice(0, 160)
     const image = post.og_image_url || post.cover_image_url
-    const socialTitle = translation?.meta_title || title
+    const socialTitle = translation.metaTitle || title
 
     return {
       title,
@@ -59,7 +62,8 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
       },
     }
   } catch {
-    return { title: 'Artículo no encontrado', robots: { index: false } }
+    const locale = await getServerLocale()
+    return { title: getDictionary(locale).article.notFoundTitle, robots: { index: false } }
   }
 }
 
@@ -84,12 +88,18 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   const liveViewCount = await getPostViewCount(post.id)
   const viewCount = liveViewCount ?? post.view_count
 
-  const translation = post.translations?.find((t) => t.locale === 'es') || post.translations?.[0]
-  const title = translation?.title || post.title
-  const content = sanitizeArticleHtml(translation?.content_html || post.content_html)
+  const locale = await getServerLocale()
+  const dict = getDictionary(locale)
+  const translation = localizedPostContent(post, locale)
+  const title = translation.title
+  const content = sanitizeArticleHtml(translation.contentHtml)
+  const dateFnsLocale = locale === 'en' ? enUS : es
   const publishedDate = post.published_at ? new Date(post.published_at) : new Date(post.created_at)
-  const timeAgo = formatDistanceToNow(publishedDate, { addSuffix: true, locale: es })
-  const absoluteDate = format(publishedDate, "d 'de' MMMM 'de' yyyy", { locale: es })
+  const timeAgo = formatDistanceToNow(publishedDate, { addSuffix: true, locale: dateFnsLocale })
+  const absoluteDate =
+    locale === 'en'
+      ? format(publishedDate, 'MMMM d, yyyy', { locale: dateFnsLocale })
+      : format(publishedDate, "d 'de' MMMM 'de' yyyy", { locale: dateFnsLocale })
 
   // Get related posts
   const assetIds = post.assets?.map((a) => a.id).filter(Boolean) || []
@@ -120,19 +130,29 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
         <article className="section-container max-w-4xl pt-8">
           <Breadcrumbs
             items={[
-              { label: 'Inicio', href: '/' },
-              { label: 'Noticias', href: '/articulos' },
+              { label: dict.article.breadcrumbHome, href: '/' },
+              { label: dict.article.breadcrumbNews, href: '/articulos' },
               ...(post.category
-                ? [{ label: post.category.name, href: `/articulos?categoria=${post.category.slug}` }]
+                ? [{ label: categoryMeta(post.category, locale).name, href: `/articulos?categoria=${post.category.slug}` }]
                 : []),
               { label: title },
             ]}
           />
 
+          {translation.isFallback && locale === 'en' && (
+            <p className="mb-6 rounded-lg border border-hairline-soft bg-surface-2/60 px-4 py-3 text-body-sm text-ink-muted">
+              {dict.article.translationPendingNotice}
+            </p>
+          )}
+
           {/* Header Meta */}
           <header className="mb-8">
             <div className="flex flex-wrap items-center gap-2 mb-4">
-              {post.category && <Chip href={`/articulos?categoria=${encodeURIComponent(post.category.slug)}`}>{post.category.name}</Chip>}
+              {post.category && (
+                <Chip href={`/articulos?categoria=${encodeURIComponent(post.category.slug)}`}>
+                  {categoryMeta(post.category, locale).name}
+                </Chip>
+              )}
               <Badge sentiment={post.sentiment} />
               {post.source && (
                 <Chip icon={<svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>}>
@@ -165,11 +185,11 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
               {post.reading_time_minutes && (
                 <>
                   <span>•</span>
-                  <span>{post.reading_time_minutes} min lectura</span>
+                  <span>{t(dict.article.readingTime, { n: post.reading_time_minutes })}</span>
                 </>
               )}
               <span>•</span>
-              <span>{viewCount.toLocaleString()} vistas</span>
+              <span>{t(dict.article.views, { n: viewCount.toLocaleString(locale === 'en' ? 'en-US' : 'es-ES') })}</span>
             </div>
           </header>
 
@@ -225,11 +245,11 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           {/* Related Posts */}
           {relatedPosts.length > 0 && (
             <section className="mt-16" aria-labelledby="related-heading">
-              <h2 id="related-heading" className="text-display-md font-bold text-ink mb-6">Artículos Relacionados</h2>
+              <h2 id="related-heading" className="text-display-md font-bold text-ink mb-6">{dict.article.relatedArticles}</h2>
               <ul className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {relatedPosts.map((relatedPost) => (
                   <li key={relatedPost.id}>
-                    <ArticleCard post={relatedPost} />
+                    <ArticleCard post={relatedPost} locale={locale} />
                   </li>
                 ))}
               </ul>
