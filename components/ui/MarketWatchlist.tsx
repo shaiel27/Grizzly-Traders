@@ -2,7 +2,8 @@
 
 import { clsx } from 'clsx'
 import { formatPrice } from '@/lib/format'
-import { useLocale } from '@/lib/i18n/LocaleProvider'
+import { t } from '@/lib/i18n/get-dictionary'
+import { useLocale, useDictionary } from '@/lib/i18n/LocaleProvider'
 import { MARKET_CATEGORY_LABELS, type MarketCategory } from '@/lib/market-assets'
 import type { MarketItem } from '@/lib/markets'
 
@@ -14,18 +15,6 @@ function localizedDescription(asset: MarketItem, locale: string): string {
 
 export type WatchlistCategory = 'all' | 'favorites' | MarketCategory
 export type WatchlistSort = 'default' | 'change' | 'name'
-
-export const WATCHLIST_CATEGORIES: { key: WatchlistCategory; label: string }[] = [
-  { key: 'all', label: 'Todos' },
-  { key: 'favorites', label: 'Favoritos' },
-  ...(Object.entries(MARKET_CATEGORY_LABELS) as [MarketCategory, string][]).map(([key, label]) => ({ key, label })),
-]
-
-const SORTS: { key: WatchlistSort; label: string }[] = [
-  { key: 'default', label: 'Predeterminado' },
-  { key: 'change', label: 'Variación' },
-  { key: 'name', label: 'Nombre' },
-]
 
 interface MarketWatchlistProps {
   assets: MarketItem[]
@@ -59,12 +48,26 @@ export function MarketWatchlist({
   onToggleFavorite,
 }: MarketWatchlistProps) {
   const { locale } = useLocale()
+  const dict = useDictionary().marketWatchlist
+
+  const categories: { key: WatchlistCategory; label: string }[] = [
+    { key: 'all', label: dict.categoryAll },
+    { key: 'favorites', label: dict.categoryFavorites },
+    ...(Object.entries(MARKET_CATEGORY_LABELS) as [MarketCategory, string][]).map(([key, label]) => ({ key, label })),
+  ]
+
+  const sorts: { key: WatchlistSort; label: string }[] = [
+    { key: 'default', label: dict.sortDefault },
+    { key: 'change', label: dict.sortChange },
+    { key: 'name', label: dict.sortName },
+  ]
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="space-y-3 border-b border-hairline-soft p-3">
         <div className="relative">
           <label htmlFor="watchlist-search" className="sr-only">
-            Buscar activo
+            {dict.searchLabel}
           </label>
           <span className="material-symbols-outlined pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[18px] text-ink-subtle" aria-hidden="true">
             search
@@ -74,14 +77,14 @@ export function MarketWatchlist({
             type="search"
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Buscar por nombre o símbolo"
+            placeholder={dict.searchPlaceholder}
             autoComplete="off"
             className="h-9 w-full rounded-[8px] border border-hairline bg-surface-1 pl-9 pr-3 text-[13px] text-ink placeholder:text-ink-subtle focus:border-accent-blue focus:outline-none"
           />
         </div>
 
-        <div role="group" aria-label="Categoría" className="flex flex-wrap gap-1">
-          {WATCHLIST_CATEGORIES.map((option) => (
+        <div role="group" aria-label={dict.categoryAria} className="flex flex-wrap gap-1">
+          {categories.map((option) => (
             <button
               key={option.key}
               type="button"
@@ -99,9 +102,9 @@ export function MarketWatchlist({
       </div>
 
       <div className="flex items-center justify-between gap-2 border-b border-hairline-soft px-3 py-1.5 text-[12px] text-ink-subtle">
-        <span aria-live="polite">{assets.length} activos</span>
-        <div role="group" aria-label="Orden" className="flex items-center gap-0.5">
-          {SORTS.map((option) => (
+        <span aria-live="polite">{t(dict.countLabel, { n: assets.length })}</span>
+        <div role="group" aria-label={dict.sortAria} className="flex items-center gap-0.5">
+          {sorts.map((option) => (
             <button
               key={option.key}
               type="button"
@@ -117,9 +120,7 @@ export function MarketWatchlist({
 
       {assets.length === 0 ? (
         <p className="px-4 py-10 text-center text-[13px] text-ink-muted">
-          {category === 'favorites'
-            ? 'Todavía no tienes favoritos. Marca la estrella de un activo para guardarlo aquí.'
-            : 'Ningún activo coincide con la búsqueda.'}
+          {category === 'favorites' ? dict.emptyFavorites : dict.emptySearch}
         </p>
       ) : (
         <ul className="scroll-thin min-h-0 flex-1 overflow-y-auto overscroll-contain">
@@ -151,7 +152,7 @@ export function MarketWatchlist({
                 <button
                   type="button"
                   aria-pressed={isFavorite}
-                  aria-label={isFavorite ? `Quitar ${asset.name} de favoritos` : `Añadir ${asset.name} a favoritos`}
+                  aria-label={t(isFavorite ? dict.removeAria : dict.addAria, { name: asset.name })}
                   onClick={() => onToggleFavorite(asset.symbol)}
                   className={clsx(
                     'absolute left-1.5 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-full transition-opacity focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-accent-blue',

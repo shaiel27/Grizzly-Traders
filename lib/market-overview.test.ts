@@ -28,16 +28,27 @@ describe('summarizeMarket', () => {
 describe('marketHeadline', () => {
   const summary = (up: number, down: number, total: number) => ({ total, up, down, flat: total - up - down, average: 0 })
 
-  it('says which side dominates once it holds 60% of the assets', () => {
-    expect(marketHeadline(summary(46, 15, 64))).toBe('Hoy suben 46 de 64 activos')
-    expect(marketHeadline(summary(10, 50, 64))).toBe('Hoy bajan 50 de 64 activos')
+  it('says which side dominates once it holds 60% of the assets (es)', () => {
+    expect(marketHeadline(summary(46, 15, 64), 'es')).toBe('Hoy suben 46 de 64 activos')
+    expect(marketHeadline(summary(10, 50, 64), 'es')).toBe('Hoy bajan 50 de 64 activos')
+  })
+
+  it('says which side dominates once it holds 60% of the assets (en)', () => {
+    expect(marketHeadline(summary(46, 15, 64), 'en')).toBe('46 of 64 assets are up today')
+    expect(marketHeadline(summary(10, 50, 64), 'en')).toBe('50 of 64 assets are down today')
   })
 
   it('calls a balanced market divided', () => {
-    expect(marketHeadline(summary(30, 30, 64))).toBe('El mercado está dividido: 30 suben y 30 bajan')
+    expect(marketHeadline(summary(30, 30, 64), 'es')).toBe('El mercado está dividido: 30 suben y 30 bajan')
+    expect(marketHeadline(summary(30, 30, 64), 'en')).toBe('The market is split: 30 up and 30 down')
   })
 
   it('does not invent a reading without data', () => {
+    expect(marketHeadline(summary(0, 0, 0), 'es')).toBe('Sin datos de mercado por ahora')
+    expect(marketHeadline(summary(0, 0, 0), 'en')).toBe('No market data available right now')
+  })
+
+  it('defaults to es when no locale argument is passed (back-compat)', () => {
     expect(marketHeadline(summary(0, 0, 0))).toBe('Sin datos de mercado por ahora')
   })
 })
@@ -64,11 +75,18 @@ describe('changeHistogram', () => {
     expect(bins[0].count).toBe(1)
   })
 
-  it('labels the bins in plain language', () => {
+  it('labels the bins in plain language (es, the default locale)', () => {
     const bins = changeHistogram([])
     expect(bins[0].label).toBe('-4% o menos')
     expect(bins[5].label).toBe('0% a +1%')
     expect(bins[9].label).toBe('+4% o más')
+  })
+
+  it('labels the bins in plain language (en)', () => {
+    const bins = changeHistogram([], 'en')
+    expect(bins[0].label).toBe('-4% or less')
+    expect(bins[5].label).toBe('0% to +1%')
+    expect(bins[9].label).toBe('+4% or more')
   })
 })
 
