@@ -10,6 +10,8 @@ export interface PivotAsset {
   tv: string
   label: string
   name: string
+  // English counterpart of `name` (Fase 5 del plan de cobertura en inglés)
+  nameEn: string
   category: PivotCategory
 }
 
@@ -22,7 +24,7 @@ export const PIVOT_CATEGORIES: { key: PivotCategory; label: string }[] = [
 ]
 
 function aPivotAsset(a: AssetDefinition): PivotAsset {
-  return { tv: a.tv, label: a.label ?? a.plain, name: a.name, category: a.cls }
+  return { tv: a.tv, label: a.label ?? a.plain, name: a.name, nameEn: a.nameEn ?? a.name, category: a.cls }
 }
 
 export const PIVOT_ASSETS: PivotAsset[] = ASSETS.map(aPivotAsset)
