@@ -373,5 +373,26 @@
     "riskReward": "Ratio riesgo/beneficio",
     "invalidResult": "Revisa los datos: el stop loss no puede coincidir con la entrada y el take profit debe estar del lado correcto.",
     "incompleteResult": "Completa capital, riesgo, entrada y stop loss para ver el resultado."
+  },
+  "tools": {
+    "pageTitle": "Herramientas de trading",
+    "metaDescription": "Calculadora de tamaño de posición y riesgo, y acceso a la calculadora de puntos pivote.",
+    "breadcrumbHome": "Inicio",
+    "breadcrumbTools": "Herramientas",
+    "h1": "Herramientas",
+    "body": "Utilidades para planificar tus operaciones. Son cálculos orientativos y no constituyen asesoramiento financiero.",
+    "pivotSectionTitle": "Puntos pivote",
+    "pivotSectionBody": "Calcula soportes y resistencias con los métodos Clásico, Fibonacci, Camarilla, Woodie y DeMark, o consulta los niveles actuales de los principales activos.",
+    "openPivotCalculator": "Abrir calculadora de pivotes",
+    "viewGlossary": "Ver glosario"
+  },
+  "learn": {
+    "pageTitle": "Glosario de trading",
+    "metaDescription": "Definiciones de soporte, resistencia, puntos pivote, RSI, MACD, ATR y otros términos clave del análisis técnico.",
+    "breadcrumbHome": "Inicio",
+    "breadcrumbLearn": "Glosario",
+    "h1": "Glosario de trading",
+    "body": "Los conceptos que usamos en los artículos, los niveles de pivote y la terminal de mercados. Contenido educativo, no asesoramiento financiero.",
+    "glossaryNavAria": "Índice del glosario"
   }
 }
