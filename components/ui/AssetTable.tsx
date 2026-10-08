@@ -7,6 +7,13 @@ import { pageCount, pageSlice } from '@/lib/pagination'
 import { PageControls } from './PageControls'
 import { rsiReading, signalFor, type Tone } from '@/lib/market-analysis'
 import type { MarketItem as MarketAsset } from '@/lib/markets'
+import { useLocale } from '@/lib/i18n/LocaleProvider'
+
+// Fase 5 del plan de cobertura en inglés: `description` llega en español desde el catálogo
+// (lib/assets-catalog.ts); en inglés se usa `descriptionEn` cuando existe, nunca al revés.
+function localizedDescription(asset: MarketAsset, locale: string): string {
+  return locale === 'en' && asset.descriptionEn ? asset.descriptionEn : asset.description
+}
 
 interface Flash {
   dir: 'up' | 'down'
@@ -86,6 +93,7 @@ function tone(value: number | null | undefined): string {
 }
 
 export function AssetTable({ assets, loading = false, selectedSymbol = null, emptyMessage, pageSize = 5, resetKey = '', onSelectAsset }: AssetTableProps) {
+  const { locale } = useLocale()
   const [sortKey, setSortKey] = useState<SortKey>('marketCap')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(0)
@@ -157,7 +165,7 @@ export function AssetTable({ assets, loading = false, selectedSymbol = null, emp
               >
                 <span className="min-w-0">
                   <span className="block truncate text-[14px] font-medium text-ink">{asset.name}</span>
-                  <span className="block truncate text-[12px] text-ink-muted">{asset.description}</span>
+                  <span className="block truncate text-[12px] text-ink-muted">{localizedDescription(asset, locale)}</span>
                 </span>
                 <span className="text-right tabular-nums">
                   <span
@@ -239,7 +247,7 @@ export function AssetTable({ assets, loading = false, selectedSymbol = null, emp
                       className="text-left focus-visible:outline-2 focus-visible:outline-accent-blue"
                     >
                       <span className="block font-medium text-ink">{asset.name}</span>
-                      <span className="block text-[12px] text-ink-muted">{asset.description}</span>
+                      <span className="block text-[12px] text-ink-muted">{localizedDescription(asset, locale)}</span>
                     </button>
                   </td>
                   <td className="px-3 py-2.5 text-right tabular-nums text-ink">

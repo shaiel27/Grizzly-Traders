@@ -2,8 +2,15 @@
 
 import { clsx } from 'clsx'
 import { formatPrice } from '@/lib/format'
+import { useLocale } from '@/lib/i18n/LocaleProvider'
 import { MARKET_CATEGORY_LABELS, type MarketCategory } from '@/lib/market-assets'
 import type { MarketItem } from '@/lib/markets'
+
+// Fase 5 del plan de cobertura en inglés: `description` llega en español desde el catálogo
+// (lib/assets-catalog.ts); en inglés se usa `descriptionEn` cuando existe, nunca al revés.
+function localizedDescription(asset: MarketItem, locale: string): string {
+  return locale === 'en' && asset.descriptionEn ? asset.descriptionEn : asset.description
+}
 
 export type WatchlistCategory = 'all' | 'favorites' | MarketCategory
 export type WatchlistSort = 'default' | 'change' | 'name'
@@ -51,6 +58,7 @@ export function MarketWatchlist({
   onSelect,
   onToggleFavorite,
 }: MarketWatchlistProps) {
+  const { locale } = useLocale()
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="space-y-3 border-b border-hairline-soft p-3">
@@ -132,7 +140,7 @@ export function MarketWatchlist({
                 >
                   <span className="min-w-0">
                     <span className="block truncate text-[13px] font-medium text-ink">{asset.name}</span>
-                    <span className="block truncate text-[12px] text-ink-muted">{asset.description}</span>
+                    <span className="block truncate text-[12px] text-ink-muted">{localizedDescription(asset, locale)}</span>
                   </span>
                   <span className="text-right tabular-nums">
                     <span className="block text-[13px] text-ink">{formatPrice(asset.close, asset.symbol)}</span>
