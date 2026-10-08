@@ -46,16 +46,18 @@ export function toLinePoints(candles: Candle[], values: (number | null)[]): Line
 
 export type IndicatorKey = 'sma20' | 'sma50' | 'sma200' | 'ema20'
 
+// Locale-agnostic on purpose: no display strings here. Callers resolve the label for a given
+// `key` from `dict.indicators[key]` (see components/ui/MarketChart.tsx) so this file never has
+// to know about the active locale.
 export interface IndicatorSpec {
   key: IndicatorKey
-  label: string
   color: string
   compute: (closes: number[]) => (number | null)[]
 }
 
 export const INDICATORS: IndicatorSpec[] = [
-  { key: 'sma20', label: 'Media móvil 20', color: '#f5a524', compute: (closes) => sma(closes, 20) },
-  { key: 'sma50', label: 'Media móvil 50', color: '#a78bfa', compute: (closes) => sma(closes, 50) },
-  { key: 'sma200', label: 'Media móvil 200', color: '#e5e2e1', compute: (closes) => sma(closes, 200) },
-  { key: 'ema20', label: 'Media exponencial 20', color: '#22d3ee', compute: (closes) => ema(closes, 20) },
+  { key: 'sma20', color: '#f5a524', compute: (closes) => sma(closes, 20) },
+  { key: 'sma50', color: '#a78bfa', compute: (closes) => sma(closes, 50) },
+  { key: 'sma200', color: '#e5e2e1', compute: (closes) => sma(closes, 200) },
+  { key: 'ema20', color: '#22d3ee', compute: (closes) => ema(closes, 20) },
 ]
