@@ -323,5 +323,55 @@
     "sma50": "Media móvil 50",
     "sma200": "Media móvil 200",
     "ema20": "Media exponencial 20"
+  },
+  "cryptoRankings": {
+    "title": "Ranking cripto",
+    "description": "Las 50 criptomonedas de mayor capitalización de mercado.",
+    "tableCaption": "Ranking de las 50 principales criptomonedas por capitalización",
+    "colName": "Nombre",
+    "colPrice": "Precio",
+    "col24h": "24h",
+    "colMarketCap": "Cap. de mercado",
+    "colVolume": "Volumen 24h",
+    "loadingLabel": "Cargando ranking cripto…",
+    "source": "Fuente: CoinGecko."
+  },
+  "liveTicker": {
+    "stale": "Datos desactualizados",
+    "live": "Feed en vivo",
+    "quotesAria": "Cotizaciones de mercado",
+    "pause": "Pausar desplazamiento de cotizaciones",
+    "resume": "Reanudar desplazamiento de cotizaciones",
+    "updatedAt": "Actualizado {time} UTC"
+  },
+  "newsletterForm": {
+    "label": "Recibe las novedades del portal por correo",
+    "placeholder": "tu@correo.com",
+    "submit": "Suscribirme",
+    "submitting": "Enviando…",
+    "honeypotLabel": "No rellenar",
+    "successMessage": "¡Listo! Te avisaremos de las novedades.",
+    "genericError": "No se pudo completar la suscripción.",
+    "networkError": "Error de conexión. Inténtalo de nuevo."
+  },
+  "riskCalculator": {
+    "title": "Calculadora de tamaño de posición",
+    "description": "Calcula cuántas unidades operar para que, si se activa el stop loss, pierdas solo el porcentaje de tu capital que elijas.",
+    "fieldCapital": "Capital de la cuenta",
+    "fieldRiskPercent": "Riesgo por operación (%)",
+    "fieldEntry": "Precio de entrada",
+    "fieldStopLoss": "Stop loss",
+    "fieldTakeProfit": "Take profit (opcional)",
+    "direction": "Dirección",
+    "directionLong": "Compra (long)",
+    "directionShort": "Venta (short)",
+    "riskAmount": "Dinero en riesgo",
+    "units": "Tamaño de la posición (unidades)",
+    "positionValue": "Valor de la posición",
+    "leverageNeeded": "Apalancamiento necesario",
+    "rewardAmount": "Beneficio potencial",
+    "riskReward": "Ratio riesgo/beneficio",
+    "invalidResult": "Revisa los datos: el stop loss no puede coincidir con la entrada y el take profit debe estar del lado correcto.",
+    "incompleteResult": "Completa capital, riesgo, entrada y stop loss para ver el resultado."
   }
 }

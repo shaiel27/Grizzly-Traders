@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, type Ref } from 'react'
 import { clsx } from 'clsx'
 import type { TickerQuote } from '@/lib/ticker'
 import { formatPrice } from '@/lib/format'
+import { t } from '@/lib/i18n/get-dictionary'
+import { useDictionary } from '@/lib/i18n/LocaleProvider'
 
 interface TickerItem extends TickerQuote {
   // Direction of the last price change; `tick` remounts the price so the flash animation replays
@@ -100,6 +102,7 @@ interface LiveTickerProps {
 }
 
 export function LiveTicker({ initialQuotes = [], initialUpdatedAt = null }: LiveTickerProps) {
+  const dict = useDictionary()
   const [items, setItems] = useState<TickerItem[]>(() => toItems(initialQuotes))
   // Server-provided quotes carry their own timestamp, so the label is identical on server and client
   const [updatedAt, setUpdatedAt] = useState<number | null>(initialUpdatedAt)
@@ -200,16 +203,16 @@ export function LiveTicker({ initialQuotes = [], initialUpdatedAt = null }: Live
           que importa ahi); el texto vuelve desde sm (640px). aria-label en el punto reemplaza al
           texto para el lector de pantalla cuando esta oculto. */}
       <div className="relative z-10 flex h-full shrink-0 items-center gap-2 border-r border-outline-variant/40 bg-surface-container-lowest pl-3 pr-3 sm:pl-4 sm:pr-4">
-        <span className="relative flex size-1.5" aria-label={stale ? 'Datos desactualizados' : 'Feed en vivo'}>
+        <span className="relative flex size-1.5" aria-label={stale ? dict.liveTicker.stale : dict.liveTicker.live}>
           {!stale && (
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-semantic-success opacity-75 motion-reduce:animate-none" aria-hidden="true" />
           )}
           <span className={clsx('relative inline-flex size-1.5 rounded-full', stale ? 'bg-semantic-warning' : 'bg-semantic-success')} aria-hidden="true" />
         </span>
-        <span className="hidden text-[10px] font-semibold uppercase tracking-wider text-ink-muted sm:inline">Feed en vivo</span>
+        <span className="hidden text-[10px] font-semibold uppercase tracking-wider text-ink-muted sm:inline">{dict.liveTicker.live}</span>
       </div>
 
-      <div className="ticker-viewport relative ml-3 flex w-full items-center" role="marquee" aria-label="Cotizaciones de mercado">
+      <div className="ticker-viewport relative ml-3 flex w-full items-center" role="marquee" aria-label={dict.liveTicker.quotesAria}>
         <div ref={trackRef} className="ticker-motion items-center" data-paused={paused ? 'true' : undefined}>
           <TickerItems items={loop} copyRef={copyRef} />
           <TickerItems items={loop} hidden />
@@ -218,11 +221,11 @@ export function LiveTicker({ initialQuotes = [], initialUpdatedAt = null }: Live
 
       <div className="relative z-10 hidden h-full shrink-0 items-center gap-3 border-l border-outline-variant/40 bg-surface-container-lowest pl-4 pr-4 lg:flex">
         {stale && (
-          <span className="text-[10px] font-medium uppercase tracking-wider text-semantic-warning">Datos desactualizados</span>
+          <span className="text-[10px] font-medium uppercase tracking-wider text-semantic-warning">{dict.liveTicker.stale}</span>
         )}
         {updatedAt !== null && (
           <span className="text-[10px] font-medium uppercase tracking-wider text-ink-muted">
-            Actualizado {formatUtcTime(updatedAt)} UTC
+            {t(dict.liveTicker.updatedAt, { time: formatUtcTime(updatedAt) })}
           </span>
         )}
       </div>
@@ -231,7 +234,7 @@ export function LiveTicker({ initialQuotes = [], initialUpdatedAt = null }: Live
         type="button"
         onClick={() => setPaused((value) => !value)}
         aria-pressed={paused}
-        aria-label={paused ? 'Reanudar desplazamiento de cotizaciones' : 'Pausar desplazamiento de cotizaciones'}
+        aria-label={paused ? dict.liveTicker.resume : dict.liveTicker.pause}
         className="relative z-10 flex h-full w-9 shrink-0 items-center justify-center border-l border-outline-variant/40 bg-surface-container-lowest text-ink-muted transition-colors hover:text-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-blue"
       >
         <svg className="size-3" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
