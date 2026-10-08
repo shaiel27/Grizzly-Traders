@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { clsx } from 'clsx'
 import { formatCompact, formatNumber, formatPrice } from '@/lib/format'
+import { useDictionary } from '@/lib/i18n/LocaleProvider'
 import { pageCount, pageSlice } from '@/lib/pagination'
 import { PageControls } from './PageControls'
 import { rsiReading, signalFor, type Tone } from '@/lib/market-analysis'
@@ -63,20 +64,6 @@ const TONE_TEXT: Record<Tone, string> = {
   neutral: 'text-ink-muted',
 }
 
-const COLUMNS: { key: SortKey; label: string; align?: 'right' | 'left' }[] = [
-  { key: 'name', label: 'Activo', align: 'left' },
-  { key: 'close', label: 'Precio', align: 'right' },
-  { key: 'change', label: 'Variación', align: 'right' },
-  { key: 'volume', label: 'Volumen', align: 'right' },
-  { key: 'marketCap', label: 'Capitalización', align: 'right' },
-  { key: 'rsi', label: 'RSI', align: 'right' },
-  { key: 'adx', label: 'ADX', align: 'right' },
-  { key: 'recommendAll', label: 'Señal', align: 'right' },
-  { key: 'perf1M', label: '1 mes', align: 'right' },
-  { key: 'perf3M', label: '3 meses', align: 'right' },
-  { key: 'perfY', label: '1 año', align: 'right' },
-]
-
 function pct(value: number | null | undefined, decimals = 2): string {
   return value == null || !Number.isFinite(value) ? '—' : `${value > 0 ? '+' : ''}${value.toFixed(decimals)}%`
 }
@@ -86,11 +73,26 @@ function tone(value: number | null | undefined): string {
 }
 
 export function AssetTable({ assets, loading = false, selectedSymbol = null, emptyMessage, pageSize = 5, resetKey = '', onSelectAsset }: AssetTableProps) {
+  const dict = useDictionary().assetTable
   const [sortKey, setSortKey] = useState<SortKey>('marketCap')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(0)
   const [seenResetKey, setSeenResetKey] = useState(resetKey)
   const flashes = usePriceFlash(assets)
+
+  const columns: { key: SortKey; label: string; align?: 'right' | 'left' }[] = [
+    { key: 'name', label: dict.colAsset, align: 'left' },
+    { key: 'close', label: dict.colPrice, align: 'right' },
+    { key: 'change', label: dict.colChange, align: 'right' },
+    { key: 'volume', label: dict.colVolume, align: 'right' },
+    { key: 'marketCap', label: dict.colMarketCap, align: 'right' },
+    { key: 'rsi', label: dict.colRsi, align: 'right' },
+    { key: 'adx', label: dict.colAdx, align: 'right' },
+    { key: 'recommendAll', label: dict.colSignal, align: 'right' },
+    { key: 'perf1M', label: dict.colPerf1M, align: 'right' },
+    { key: 'perf3M', label: dict.colPerf3M, align: 'right' },
+    { key: 'perfY', label: dict.colPerfY, align: 'right' },
+  ]
 
   // Resetting state while rendering (instead of in an effect) avoids painting the old page for a frame
   if (seenResetKey !== resetKey) {
@@ -126,7 +128,7 @@ export function AssetTable({ assets, loading = false, selectedSymbol = null, emp
 
   if (loading) {
     return (
-      <div className="space-y-1" aria-busy="true" aria-label="Cargando activos">
+      <div className="space-y-1" aria-busy="true" aria-label={dict.loadingAria}>
         {Array.from({ length: 8 }, (_, index) => (
           <div key={index} className="h-11 animate-pulse rounded-sm bg-surface-1" />
         ))}
@@ -135,7 +137,7 @@ export function AssetTable({ assets, loading = false, selectedSymbol = null, emp
   }
 
   if (sorted.length === 0) {
-    return <p className="border-y border-hairline-soft py-10 text-center text-[13px] text-ink-muted">{emptyMessage ?? 'No hay activos para mostrar.'}</p>
+    return <p className="border-y border-hairline-soft py-10 text-center text-[13px] text-ink-muted">{emptyMessage ?? dict.emptyDefault}</p>
   }
 
   return (
@@ -170,11 +172,11 @@ export function AssetTable({ assets, loading = false, selectedSymbol = null, emp
                 </span>
                 <span className="col-span-2 flex items-center gap-4 text-[12px] text-ink-muted">
                   <span>
-                    RSI <span className="tabular-nums text-ink">{asset.rsi ? asset.rsi.toFixed(0) : '—'}</span>
+                    {dict.colRsi} <span className="tabular-nums text-ink">{asset.rsi ? asset.rsi.toFixed(0) : '—'}</span>
                     {asset.rsi ? <span className="sr-only"> ({rsiReading(asset.rsi).label})</span> : null}
                   </span>
                   <span>
-                    1 mes <span className={clsx('tabular-nums', tone(asset.perf1M))}>{pct(asset.perf1M, 1)}</span>
+                    {dict.colPerf1M} <span className={clsx('tabular-nums', tone(asset.perf1M))}>{pct(asset.perf1M, 1)}</span>
                   </span>
                   <span className={clsx('ml-auto', TONE_TEXT[rec.tone])}>{rec.label}</span>
                 </span>
@@ -188,7 +190,7 @@ export function AssetTable({ assets, loading = false, selectedSymbol = null, emp
         <table className="w-full text-[13px]">
           <thead>
             <tr className="border-b border-hairline">
-              {COLUMNS.map((column) => (
+              {columns.map((column) => (
                 <th
                   key={column.key}
                   scope="col"
@@ -269,7 +271,7 @@ export function AssetTable({ assets, loading = false, selectedSymbol = null, emp
         </table>
       </div>
 
-      <PageControls page={currentPage} total={sorted.length} pageSize={pageSize} onPageChange={setPage} label="Paginación del análisis técnico" className="mt-4" />
+      <PageControls page={currentPage} total={sorted.length} pageSize={pageSize} onPageChange={setPage} label={dict.paginationLabel} className="mt-4" />
     </div>
   )
 }

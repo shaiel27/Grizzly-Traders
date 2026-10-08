@@ -10,20 +10,28 @@ import { MarketAssetHeader } from '@/components/ui/MarketAssetHeader'
 import type { ChartLevel } from '@/components/ui/MarketChart'
 import { MarketOverview } from '@/components/ui/MarketOverview'
 import { MarketWatchlist, type WatchlistCategory, type WatchlistSort } from '@/components/ui/MarketWatchlist'
+import { t } from '@/lib/i18n/get-dictionary'
+import { useDictionary, useLocale } from '@/lib/i18n/LocaleProvider'
 import type { MarketCategory } from '@/lib/market-assets'
 import type { MarketItem as MarketAsset } from '@/lib/markets'
 import type { PivotQuote } from '@/lib/pivot-types'
 import { calculatePivots, levelsFor } from '@/lib/pivots'
 import { useWatchlist } from '@/lib/watchlist'
 
+// next/dynamic still renders `loading` as a regular component, so it can use hooks like any other
+function ChartLoading() {
+  const dict = useDictionary().markets
+  return (
+    <div className="h-[520px] animate-pulse motion-reduce:animate-none bg-surface-1" role="status" aria-live="polite">
+      <span className="sr-only">{dict.chartLoading}</span>
+    </div>
+  )
+}
+
 // lightweight-charts touches the DOM, so it is loaded on the client only and kept out of the initial bundle
 const MarketChart = dynamic(() => import('@/components/ui/MarketChart').then((mod) => mod.MarketChart), {
   ssr: false,
-  loading: () => (
-    <div className="h-[520px] animate-pulse motion-reduce:animate-none bg-surface-1" role="status" aria-live="polite">
-      <span className="sr-only">Cargando gráfico…</span>
-    </div>
-  ),
+  loading: ChartLoading,
 })
 
 const PIVOT_COLOR = { resistance: '#22c55e', pivot: '#0099ff', support: '#ff3b30' } as const
@@ -35,6 +43,8 @@ interface MarketsClientProps {
 }
 
 export function MarketsClient({ initialAssets, initialSymbol = null }: MarketsClientProps) {
+  const { locale } = useLocale()
+  const dict = useDictionary().markets
   const [assets, setAssets] = useState<MarketAsset[]>(initialAssets)
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(initialSymbol)
   const [loading, setLoading] = useState(initialAssets.length === 0)
@@ -150,25 +160,25 @@ export function MarketsClient({ initialAssets, initialSymbol = null }: MarketsCl
       <div className="container-wide pt-8">
         <header className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
           <div>
-            <h1 className="text-[32px] font-semibold leading-tight tracking-tight text-ink">Terminal de mercados</h1>
-            <p className="mt-1 text-[14px] text-ink-muted">{assets.length} activos de cripto, forex, materias primas, índices y acciones.</p>
+            <h1 className="text-[32px] font-semibold leading-tight tracking-tight text-ink">{dict.pageTitle}</h1>
+            <p className="mt-1 text-[14px] text-ink-muted">{t(dict.assetCount, { n: assets.length })}</p>
           </div>
           <p className="flex items-center gap-2 text-[13px] text-ink-muted">
             <span className="relative flex size-1.5" aria-hidden="true">
               {!error && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-semantic-success opacity-70 motion-reduce:animate-none" />}
               <span className={error ? 'relative inline-flex size-1.5 rounded-full bg-semantic-warning' : 'relative inline-flex size-1.5 rounded-full bg-semantic-success'} />
             </span>
-            {lastUpdate ? `Actualizado a las ${lastUpdate.toLocaleTimeString('es-ES')}` : 'Datos en vivo'}
+            {lastUpdate ? t(dict.updatedAt, { time: lastUpdate.toLocaleTimeString(locale === 'en' ? 'en-US' : 'es-ES') }) : dict.liveData}
           </p>
         </header>
 
         {error && (
           <p role="alert" className="mb-6 rounded-[8px] border border-semantic-warning/40 bg-semantic-warning/10 px-4 py-3 text-[13px] text-ink">
-            No se pudieron actualizar los datos de mercado. Se reintentará en un minuto.
+            {dict.dataError}
           </p>
         )}
 
-        <section ref={terminalRef} aria-label="Terminal" className="scroll-mt-[var(--header-scroll-offset)] flex flex-col gap-4 xl:grid xl:grid-cols-[340px_minmax(0,1fr)] xl:gap-6">
+        <section ref={terminalRef} aria-label={dict.terminalAria} className="scroll-mt-[var(--header-scroll-offset)] flex flex-col gap-4 xl:grid xl:grid-cols-[340px_minmax(0,1fr)] xl:gap-6">
           <div className="relative order-2 overflow-hidden rounded-[10px] border border-hairline bg-surface-container-lowest xl:order-1">
             <div className="flex max-h-[460px] min-h-0 flex-col xl:absolute xl:inset-0 xl:max-h-none">
               <MarketWatchlist
@@ -199,7 +209,7 @@ export function MarketsClient({ initialAssets, initialSymbol = null }: MarketsCl
                     name={selectedAsset.name}
                     height={440}
                     levels={pivotLevels}
-                    levelsLabel="Pivotes diarios"
+                    levelsLabel={dict.pivotLevelsLabel}
                     initialTimeframe={pivotLevels.length > 0 ? '1h' : '1d'}
                   />
                 </div>
@@ -207,7 +217,7 @@ export function MarketsClient({ initialAssets, initialSymbol = null }: MarketsCl
               </>
             ) : (
               <div className="h-[720px] animate-pulse motion-reduce:animate-none bg-surface-1" role="status" aria-live="polite">
-                <span className="sr-only">Cargando activo…</span>
+                <span className="sr-only">{dict.assetLoading}</span>
               </div>
             )}
           </div>
@@ -215,9 +225,9 @@ export function MarketsClient({ initialAssets, initialSymbol = null }: MarketsCl
 
         <section className="mt-20" aria-labelledby="overview-heading">
           <h2 id="overview-heading" className="text-[22px] font-semibold tracking-tight text-ink">
-            Panorama del mercado
+            {dict.overviewHeading}
           </h2>
-          <p className="mb-10 mt-1 max-w-2xl text-[14px] text-ink-muted">Una lectura rápida de cómo va hoy el mercado.</p>
+          <p className="mb-10 mt-1 max-w-2xl text-[14px] text-ink-muted">{dict.overviewSubtitle}</p>
           <MarketOverview assets={assets} onSelect={(asset) => select(asset)} onSelectCategory={showCategory} />
         </section>
 
@@ -229,17 +239,15 @@ export function MarketsClient({ initialAssets, initialSymbol = null }: MarketsCl
           <div className="mb-4 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
             <div>
               <h2 id="screener-heading" className="text-[22px] font-semibold tracking-tight text-ink">
-                Análisis técnico
+                {dict.screenerHeading}
               </h2>
-              <p className="mt-1 max-w-2xl text-[14px] text-ink-muted">
-                Ordena por RSI, ADX, señal o rentabilidad para encontrar activos. Sigue la categoría y la búsqueda de la lista.
-              </p>
+              <p className="mt-1 max-w-2xl text-[14px] text-ink-muted">{dict.screenerSubtitle}</p>
             </div>
             <p className="text-[13px] text-ink-muted">
-              {filtered.length} de {assets.length} activos
+              {t(dict.screenerCount, { filtered: filtered.length, total: assets.length })}
               {filtersActive && (
                 <button type="button" onClick={clearFilters} className="ml-3 text-accent-blue hover:text-accent-blue-hover">
-                  Quitar filtros
+                  {dict.clearFilters}
                 </button>
               )}
             </p>
@@ -250,7 +258,7 @@ export function MarketsClient({ initialAssets, initialSymbol = null }: MarketsCl
             selectedSymbol={selectedAsset?.symbol ?? null}
             onSelectAsset={(asset) => select(asset)}
             resetKey={`${category}|${search}`}
-            emptyMessage={category === 'favorites' ? 'Todavía no tienes favoritos.' : 'Ningún activo coincide con los filtros.'}
+            emptyMessage={category === 'favorites' ? dict.emptyFavorites : dict.emptyFiltered}
           />
         </section>
       </div>
