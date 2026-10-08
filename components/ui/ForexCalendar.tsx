@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { clsx } from 'clsx'
+import { useLocale } from '@/lib/i18n/LocaleProvider'
+import { t, type Dictionary, type Locale } from '@/lib/i18n/get-dictionary'
 
 interface ForexEvent {
   id: string
@@ -20,17 +22,21 @@ interface ForexEvent {
   is_all_day: boolean
 }
 
-const IMPACT_STYLES: Record<string, { dot: string; border: string; label: string }> = {
-  high: { dot: 'bg-semantic-danger', border: 'border-l-semantic-danger', label: 'Alto impacto' },
-  medium: { dot: 'bg-semantic-warning', border: 'border-l-semantic-warning', label: 'Impacto medio' },
-  low: { dot: 'bg-ink-subtle', border: 'border-l-transparent', label: 'Impacto bajo' },
-  holiday: { dot: 'bg-ink-subtle', border: 'border-l-transparent', label: 'Feriado' },
+const IMPACT_STYLES: Record<string, { dot: string; border: string; labelKey: keyof Dictionary['calendar'] }> = {
+  high: { dot: 'bg-semantic-danger', border: 'border-l-semantic-danger', labelKey: 'impactHigh' },
+  medium: { dot: 'bg-semantic-warning', border: 'border-l-semantic-warning', labelKey: 'impactMedium' },
+  low: { dot: 'bg-ink-subtle', border: 'border-l-transparent', labelKey: 'impactLow' },
+  holiday: { dot: 'bg-ink-subtle', border: 'border-l-transparent', labelKey: 'holiday' },
 }
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'NZD']
 
 function impactStyle(impact: string) {
   return IMPACT_STYLES[impact] ?? IMPACT_STYLES.low
+}
+
+function impactLabel(impact: string, dict: Dictionary): string {
+  return dict.calendar[impactStyle(impact).labelKey]
 }
 
 function eventDate(event: ForexEvent): Date | null {
@@ -41,37 +47,42 @@ function eventDate(event: ForexEvent): Date | null {
   return null
 }
 
-function formatClock(event: ForexEvent): string {
-  if (event.is_all_day) return 'Todo el día'
+function localeTag(locale: Locale): string {
+  return locale === 'en' ? 'en-US' : 'es-ES'
+}
+
+function formatClock(event: ForexEvent, locale: Locale, dict: Dictionary): string {
+  if (event.is_all_day) return dict.calendar.allDay
   const date = eventDate(event)
   if (!date) return event.event_time ?? '—'
-  return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+  return date.toLocaleTimeString(localeTag(locale), { hour: '2-digit', minute: '2-digit' })
 }
 
 function dayKey(event: ForexEvent): string {
   return event.event_date
 }
 
-function formatDayLabel(dateStr: string): string {
+function formatDayLabel(dateStr: string, locale: Locale, dict: Dictionary): string {
   const date = new Date(`${dateStr}T00:00:00`)
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const diffDays = Math.round((date.getTime() - today.getTime()) / 86_400_000)
-  if (diffDays === 0) return 'Hoy'
-  if (diffDays === 1) return 'Mañana'
-  return date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })
+  if (diffDays === 0) return dict.calendar.today
+  if (diffDays === 1) return dict.calendar.tomorrow
+  return date.toLocaleDateString(localeTag(locale), { weekday: 'long', day: 'numeric', month: 'short' })
 }
 
-function formatCountdown(target: Date, now: Date): string {
+function formatCountdown(target: Date, now: Date, dict: Dictionary): string {
   const diffMs = target.getTime() - now.getTime()
-  if (diffMs <= 0) return 'en curso'
+  if (diffMs <= 0) return dict.calendar.inProgress
   const totalMinutes = Math.round(diffMs / 60_000)
   const hours = Math.floor(totalMinutes / 60)
   const minutes = totalMinutes % 60
-  if (hours === 0) return `en ${minutes} min`
-  if (hours < 24) return minutes > 0 ? `en ${hours} h ${minutes} min` : `en ${hours} h`
+  if (hours === 0) return t(dict.calendar.inMinutes, { n: minutes })
+  if (hours < 24) return minutes > 0 ? t(dict.calendar.inHoursMinutes, { h: hours, n: minutes }) : t(dict.calendar.inHours, { n: hours })
   const days = Math.floor(hours / 24)
-  return `en ${days} ${days === 1 ? 'día' : 'días'}`
+  const unit = days === 1 ? dict.calendar.dayUnitSingular : dict.calendar.dayUnitPlural
+  return t(dict.calendar.inDays, { n: days, unit })
 }
 
 function DeltaGlyph({ event }: { event: ForexEvent }) {
@@ -87,6 +98,7 @@ function DeltaGlyph({ event }: { event: ForexEvent }) {
 
 export function ForexCalendar({ headingLevel = 'h2' }: { headingLevel?: 'h1' | 'h2' }) {
   const Heading = headingLevel
+  const { locale, dictionary: dict } = useLocale()
   const [events, setEvents] = useState<ForexEvent[] | null>(null)
   const [failed, setFailed] = useState(false)
   const [activeCurrency, setActiveCurrency] = useState<string | null>(null)
@@ -160,21 +172,21 @@ export function ForexCalendar({ headingLevel = 'h2' }: { headingLevel?: 'h1' | '
             <span className="size-1.5 rounded-full bg-semantic-success" aria-hidden="true" />
             FOREXFACTORY://CALENDAR
           </span>
-          {events !== null && !failed && <span className="tabular-nums">{filtered.length} eventos</span>}
+          {events !== null && !failed && <span className="tabular-nums">{t(dict.calendar.eventsCount, { n: filtered.length })}</span>}
         </div>
 
         <div className="px-5 py-6 md:px-8 md:py-8">
           <Heading id="forex-calendar-heading" className="text-headline text-ink">
-            Calendario económico
+            {dict.calendar.pageTitle}
           </Heading>
           <p className="mb-8 mt-1.5 max-w-2xl text-body-sm text-ink-muted">
-            Publicaciones macro que mueven el mercado forex, con dato real, previsión y dato anterior.
+            {dict.calendar.description}
           </p>
 
-          {failed && <p className="text-body-sm text-ink-muted">No se pudo cargar el calendario económico. Intenta de nuevo en unos minutos.</p>}
+          {failed && <p className="text-body-sm text-ink-muted">{dict.calendar.errorMessage}</p>}
 
           {!failed && events?.length === 0 && (
-            <p className="text-body-sm text-ink-muted">No hay eventos económicos programados en las próximas 24 horas.</p>
+            <p className="text-body-sm text-ink-muted">{dict.calendar.emptyMessage}</p>
           )}
 
           {!failed && events?.length !== 0 && (
@@ -199,7 +211,7 @@ export function ForexCalendar({ headingLevel = 'h2' }: { headingLevel?: 'h1' | '
                       </ul>
                     </div>
                   ))}
-                  <span className="sr-only">Cargando calendario económico…</span>
+                  <span className="sr-only">{dict.calendar.loadingLabel}</span>
                 </div>
               ) : (
                 <>
@@ -215,17 +227,17 @@ export function ForexCalendar({ headingLevel = 'h2' }: { headingLevel?: 'h1' | '
                           <span className="text-accent-blue" aria-hidden="true">
                             ❯
                           </span>
-                          Próximo evento
+                          {dict.calendar.nextEvent}
                           <span aria-hidden="true">·</span>
                           <span className="rounded-[4px] bg-surface-2 px-1.5 py-0.5 font-medium text-ink">{nextEvent.currency}</span>
-                          <span>{impactStyle(nextEvent.impact).label}</span>
+                          <span>{impactLabel(nextEvent.impact, dict)}</span>
                         </div>
                         <p className="mt-1.5 truncate text-body font-medium text-ink">{nextEvent.title}</p>
                         {(nextEvent.forecast || nextEvent.previous) && (
                           <p className="mt-1 font-mono text-micro text-ink-muted">
-                            {nextEvent.previous && <>anterior {nextEvent.previous}</>}
+                            {nextEvent.previous && <>{dict.calendar.previous} {nextEvent.previous}</>}
                             {nextEvent.previous && nextEvent.forecast && <span className="mx-1.5 text-ink-subtle">→</span>}
-                            {nextEvent.forecast && <>previsto {nextEvent.forecast}</>}
+                            {nextEvent.forecast && <>{dict.calendar.forecast} {nextEvent.forecast}</>}
                           </p>
                         )}
                       </div>
@@ -233,10 +245,10 @@ export function ForexCalendar({ headingLevel = 'h2' }: { headingLevel?: 'h1' | '
                         <p className="font-mono text-[20px] font-semibold tabular-nums text-accent-blue">
                           {(() => {
                             const date = eventDate(nextEvent)
-                            return date ? formatCountdown(date, now) : ''
+                            return date ? formatCountdown(date, now, dict) : ''
                           })()}
                         </p>
-                        <p className="font-mono text-micro tabular-nums text-ink-subtle">{formatClock(nextEvent)}</p>
+                        <p className="font-mono text-micro tabular-nums text-ink-subtle">{formatClock(nextEvent, locale, dict)}</p>
                       </div>
                     </div>
                   )}
@@ -251,7 +263,7 @@ export function ForexCalendar({ headingLevel = 'h2' }: { headingLevel?: 'h1' | '
                           activeCurrency === null ? 'border-accent-blue bg-accent-blue/10 text-accent-blue' : 'border-hairline text-ink-muted hover:border-ink-subtle'
                         )}
                       >
-                        Todas
+                        {dict.calendar.allCurrencies}
                       </button>
                       {availableCurrencies.map((code) => (
                         <button
@@ -276,7 +288,7 @@ export function ForexCalendar({ headingLevel = 'h2' }: { headingLevel?: 'h1' | '
                           <span className="font-mono text-accent-blue" aria-hidden="true">
                             ❯
                           </span>
-                          {formatDayLabel(day)}
+                          {formatDayLabel(day, locale, dict)}
                         </h2>
                         <ul>
                           {dayEvents.map((event) => (
@@ -284,18 +296,18 @@ export function ForexCalendar({ headingLevel = 'h2' }: { headingLevel?: 'h1' | '
                               key={event.id}
                               className={clsx('grid grid-cols-[4.5rem_3rem_1fr_auto] items-center gap-4 border-b border-l-2 border-hairline-soft py-3 pl-3 last:border-b-0', impactStyle(event.impact).border)}
                             >
-                              <span className="font-mono text-micro tabular-nums text-ink-subtle">{formatClock(event)}</span>
+                              <span className="font-mono text-micro tabular-nums text-ink-subtle">{formatClock(event, locale, dict)}</span>
                               <span className="flex items-center gap-1.5">
                                 <span className={clsx('size-1.5 shrink-0 rounded-full', impactStyle(event.impact).dot)} aria-hidden="true" />
                                 <span className="font-mono text-[11px] text-ink-subtle">{event.currency}</span>
                               </span>
                               <span className="min-w-0 truncate text-body-sm text-ink">
                                 {event.title}
-                                <span className="sr-only">, {impactStyle(event.impact).label}</span>
+                                <span className="sr-only">, {impactLabel(event.impact, dict)}</span>
                               </span>
                               <span className="flex items-center gap-3 whitespace-nowrap text-right font-mono text-micro tabular-nums text-ink-muted">
-                                {event.previous && <span className="hidden text-ink-subtle sm:inline">ant. {event.previous}</span>}
-                                {event.forecast && <span className="hidden text-ink-subtle sm:inline">prev. {event.forecast}</span>}
+                                {event.previous && <span className="hidden text-ink-subtle sm:inline">{dict.calendar.previousAbbr} {event.previous}</span>}
+                                {event.forecast && <span className="hidden text-ink-subtle sm:inline">{dict.calendar.forecastAbbr} {event.forecast}</span>}
                                 <span className="text-ink">
                                   {event.actual ?? '—'}
                                   <DeltaGlyph event={event} />
@@ -310,7 +322,7 @@ export function ForexCalendar({ headingLevel = 'h2' }: { headingLevel?: 'h1' | '
                 </>
               )}
 
-              <p className="mt-4 font-mono text-[11px] text-ink-subtle">Fuente: ForexFactory.</p>
+              <p className="mt-4 font-mono text-[11px] text-ink-subtle">{dict.calendar.source}</p>
             </>
           )}
         </div>

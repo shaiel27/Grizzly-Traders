@@ -257,5 +257,48 @@
     "englishNotice": "English version coming soon. This legal document is currently published in Spanish only.",
     "draftNotice": "Draft pending external legal review. This document does not constitute legal advice.",
     "lastUpdated": "Last updated: {date}"
+  },
+  "calendar": {
+    "pageTitle": "Economic calendar",
+    "metaDescription": "Real-time forex economic calendar, synced with ForexFactory: macro releases from the US, the eurozone, the UK, Japan and more, with actual, forecast and previous readings.",
+    "breadcrumb": "Economic calendar",
+    "description": "Macro releases that move the forex market, with actual, forecast and previous readings.",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "inProgress": "in progress",
+    "inMinutes": "in {n} min",
+    "inHours": "in {n}h",
+    "inHoursMinutes": "in {h}h {n}min",
+    "inDays": "in {n} {unit}",
+    "dayUnitSingular": "day",
+    "dayUnitPlural": "days",
+    "impactHigh": "High impact",
+    "impactMedium": "Medium impact",
+    "impactLow": "Low impact",
+    "holiday": "Holiday",
+    "allDay": "All day",
+    "nextEvent": "Next event",
+    "previous": "previous",
+    "forecast": "forecast",
+    "previousAbbr": "prev.",
+    "forecastAbbr": "fcst.",
+    "allCurrencies": "All",
+    "eventsCount": "{n} events",
+    "loadingLabel": "Loading economic calendar…",
+    "emptyMessage": "No economic events scheduled in the next 24 hours.",
+    "errorMessage": "We couldn't load the economic calendar. Please try again in a few minutes.",
+    "source": "Source: ForexFactory."
+  },
+  "marketChart": {
+    "indicatorsLabel": "Indicators",
+    "volumeLabel": "Volume",
+    "pivotsLabel": "Pivots",
+    "noVolumeTooltip": "This asset doesn't report volume"
+  },
+  "indicators": {
+    "sma20": "SMA 20",
+    "sma50": "SMA 50",
+    "sma200": "SMA 200",
+    "ema20": "EMA 20"
   }
 }
