@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { clsx } from 'clsx'
 import { formatCompact, formatNumber, formatPrice } from '@/lib/format'
+import { useLocale, useDictionary } from '@/lib/i18n/LocaleProvider'
 import { pageCount, pageSlice } from '@/lib/pagination'
 import { PageControls } from './PageControls'
 import { rsiReading, signalFor, type Tone } from '@/lib/market-analysis'
 import type { MarketItem as MarketAsset } from '@/lib/markets'
-import { useLocale, useDictionary } from '@/lib/i18n/LocaleProvider'
 
 // Fase 5 del plan de cobertura en inglés: `description` llega en español desde el catálogo
 // (lib/assets-catalog.ts); en inglés se usa `descriptionEn` cuando existe, nunca al revés.
@@ -70,20 +70,6 @@ const TONE_TEXT: Record<Tone, string> = {
   neutral: 'text-ink-muted',
 }
 
-const COLUMNS: { key: SortKey; label: string; align?: 'right' | 'left' }[] = [
-  { key: 'name', label: 'Activo', align: 'left' },
-  { key: 'close', label: 'Precio', align: 'right' },
-  { key: 'change', label: 'Variación', align: 'right' },
-  { key: 'volume', label: 'Volumen', align: 'right' },
-  { key: 'marketCap', label: 'Capitalización', align: 'right' },
-  { key: 'rsi', label: 'RSI', align: 'right' },
-  { key: 'adx', label: 'ADX', align: 'right' },
-  { key: 'recommendAll', label: 'Señal', align: 'right' },
-  { key: 'perf1M', label: '1 mes', align: 'right' },
-  { key: 'perf3M', label: '3 meses', align: 'right' },
-  { key: 'perfY', label: '1 año', align: 'right' },
-]
-
 function pct(value: number | null | undefined, decimals = 2): string {
   return value == null || !Number.isFinite(value) ? '—' : `${value > 0 ? '+' : ''}${value.toFixed(decimals)}%`
 }
@@ -100,6 +86,20 @@ export function AssetTable({ assets, loading = false, selectedSymbol = null, emp
   const [page, setPage] = useState(0)
   const [seenResetKey, setSeenResetKey] = useState(resetKey)
   const flashes = usePriceFlash(assets)
+
+  const columns: { key: SortKey; label: string; align?: 'right' | 'left' }[] = [
+    { key: 'name', label: dict.assetTable.colAsset, align: 'left' },
+    { key: 'close', label: dict.assetTable.colPrice, align: 'right' },
+    { key: 'change', label: dict.assetTable.colChange, align: 'right' },
+    { key: 'volume', label: dict.assetTable.colVolume, align: 'right' },
+    { key: 'marketCap', label: dict.assetTable.colMarketCap, align: 'right' },
+    { key: 'rsi', label: dict.assetTable.colRsi, align: 'right' },
+    { key: 'adx', label: dict.assetTable.colAdx, align: 'right' },
+    { key: 'recommendAll', label: dict.assetTable.colSignal, align: 'right' },
+    { key: 'perf1M', label: dict.assetTable.colPerf1M, align: 'right' },
+    { key: 'perf3M', label: dict.assetTable.colPerf3M, align: 'right' },
+    { key: 'perfY', label: dict.assetTable.colPerfY, align: 'right' },
+  ]
 
   // Resetting state while rendering (instead of in an effect) avoids painting the old page for a frame
   if (seenResetKey !== resetKey) {
@@ -135,7 +135,7 @@ export function AssetTable({ assets, loading = false, selectedSymbol = null, emp
 
   if (loading) {
     return (
-      <div className="space-y-1" aria-busy="true" aria-label="Cargando activos">
+      <div className="space-y-1" aria-busy="true" aria-label={dict.assetTable.loadingAria}>
         {Array.from({ length: 8 }, (_, index) => (
           <div key={index} className="h-11 animate-pulse rounded-sm bg-surface-1" />
         ))}
@@ -144,7 +144,7 @@ export function AssetTable({ assets, loading = false, selectedSymbol = null, emp
   }
 
   if (sorted.length === 0) {
-    return <p className="border-y border-hairline-soft py-10 text-center text-[13px] text-ink-muted">{emptyMessage ?? 'No hay activos para mostrar.'}</p>
+    return <p className="border-y border-hairline-soft py-10 text-center text-[13px] text-ink-muted">{emptyMessage ?? dict.assetTable.emptyDefault}</p>
   }
 
   return (
@@ -179,11 +179,11 @@ export function AssetTable({ assets, loading = false, selectedSymbol = null, emp
                 </span>
                 <span className="col-span-2 flex items-center gap-4 text-[12px] text-ink-muted">
                   <span>
-                    RSI <span className="tabular-nums text-ink">{asset.rsi ? asset.rsi.toFixed(0) : '—'}</span>
+                    {dict.assetTable.colRsi} <span className="tabular-nums text-ink">{asset.rsi ? asset.rsi.toFixed(0) : '—'}</span>
                     {asset.rsi ? <span className="sr-only"> ({dict.marketAnalysis[rsiReading(asset.rsi).key]})</span> : null}
                   </span>
                   <span>
-                    1 mes <span className={clsx('tabular-nums', tone(asset.perf1M))}>{pct(asset.perf1M, 1)}</span>
+                    {dict.assetTable.colPerf1M} <span className={clsx('tabular-nums', tone(asset.perf1M))}>{pct(asset.perf1M, 1)}</span>
                   </span>
                   <span className={clsx('ml-auto', TONE_TEXT[rec.tone])}>{dict.marketAnalysis[rec.key]}</span>
                 </span>
@@ -197,7 +197,7 @@ export function AssetTable({ assets, loading = false, selectedSymbol = null, emp
         <table className="w-full text-[13px]">
           <thead>
             <tr className="border-b border-hairline">
-              {COLUMNS.map((column) => (
+              {columns.map((column) => (
                 <th
                   key={column.key}
                   scope="col"
@@ -278,7 +278,7 @@ export function AssetTable({ assets, loading = false, selectedSymbol = null, emp
         </table>
       </div>
 
-      <PageControls page={currentPage} total={sorted.length} pageSize={pageSize} onPageChange={setPage} label="Paginación del análisis técnico" className="mt-4" />
+      <PageControls page={currentPage} total={sorted.length} pageSize={pageSize} onPageChange={setPage} label={dict.assetTable.paginationLabel} className="mt-4" />
     </div>
   )
 }
