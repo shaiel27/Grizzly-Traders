@@ -7,7 +7,7 @@ import { pageCount, pageSlice } from '@/lib/pagination'
 import { PageControls } from './PageControls'
 import { rsiReading, signalFor, type Tone } from '@/lib/market-analysis'
 import type { MarketItem as MarketAsset } from '@/lib/markets'
-import { useLocale } from '@/lib/i18n/LocaleProvider'
+import { useLocale, useDictionary } from '@/lib/i18n/LocaleProvider'
 
 // Fase 5 del plan de cobertura en inglés: `description` llega en español desde el catálogo
 // (lib/assets-catalog.ts); en inglés se usa `descriptionEn` cuando existe, nunca al revés.
@@ -94,6 +94,7 @@ function tone(value: number | null | undefined): string {
 
 export function AssetTable({ assets, loading = false, selectedSymbol = null, emptyMessage, pageSize = 5, resetKey = '', onSelectAsset }: AssetTableProps) {
   const { locale } = useLocale()
+  const dict = useDictionary()
   const [sortKey, setSortKey] = useState<SortKey>('marketCap')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(0)
@@ -179,12 +180,12 @@ export function AssetTable({ assets, loading = false, selectedSymbol = null, emp
                 <span className="col-span-2 flex items-center gap-4 text-[12px] text-ink-muted">
                   <span>
                     RSI <span className="tabular-nums text-ink">{asset.rsi ? asset.rsi.toFixed(0) : '—'}</span>
-                    {asset.rsi ? <span className="sr-only"> ({rsiReading(asset.rsi).label})</span> : null}
+                    {asset.rsi ? <span className="sr-only"> ({dict.marketAnalysis[rsiReading(asset.rsi).key]})</span> : null}
                   </span>
                   <span>
                     1 mes <span className={clsx('tabular-nums', tone(asset.perf1M))}>{pct(asset.perf1M, 1)}</span>
                   </span>
-                  <span className={clsx('ml-auto', TONE_TEXT[rec.tone])}>{rec.label}</span>
+                  <span className={clsx('ml-auto', TONE_TEXT[rec.tone])}>{dict.marketAnalysis[rec.key]}</span>
                 </span>
               </button>
             </li>
@@ -261,12 +262,12 @@ export function AssetTable({ assets, loading = false, selectedSymbol = null, emp
                   <td className={clsx('px-3 py-2.5 text-right tabular-nums', tone(asset.change))}>{pct(asset.change)}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums text-ink-muted">{asset.volume > 0 ? formatCompact(asset.volume) : '—'}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums text-ink-muted">{asset.marketCap > 0 ? formatNumber(asset.marketCap, 0, 1) : '—'}</td>
-                  <td className={clsx('px-3 py-2.5 text-right tabular-nums', asset.rsi ? TONE_TEXT[rsi.tone] : 'text-ink-subtle')} title={rsi.label}>
+                  <td className={clsx('px-3 py-2.5 text-right tabular-nums', asset.rsi ? TONE_TEXT[rsi.tone] : 'text-ink-subtle')} title={dict.marketAnalysis[rsi.key]}>
                     {asset.rsi ? asset.rsi.toFixed(1) : '—'}
-                    {asset.rsi ? <span className="sr-only"> ({rsi.label})</span> : null}
+                    {asset.rsi ? <span className="sr-only"> ({dict.marketAnalysis[rsi.key]})</span> : null}
                   </td>
                   <td className={clsx('px-3 py-2.5 text-right tabular-nums', asset.adx >= 25 ? 'text-ink' : 'text-ink-muted')}>{asset.adx ? asset.adx.toFixed(1) : '—'}</td>
-                  <td className={clsx('whitespace-nowrap px-3 py-2.5 text-right', TONE_TEXT[rec.tone])}>{rec.label}</td>
+                  <td className={clsx('whitespace-nowrap px-3 py-2.5 text-right', TONE_TEXT[rec.tone])}>{dict.marketAnalysis[rec.key]}</td>
                   <td className={clsx('px-3 py-2.5 text-right tabular-nums', tone(asset.perf1M))}>{pct(asset.perf1M, 1)}</td>
                   <td className={clsx('px-3 py-2.5 text-right tabular-nums', tone(asset.perf3M))}>{pct(asset.perf3M, 1)}</td>
                   <td className={clsx('px-3 py-2.5 text-right tabular-nums', tone(asset.perfY))}>{pct(asset.perfY, 1)}</td>
