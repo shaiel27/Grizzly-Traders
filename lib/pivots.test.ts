@@ -105,7 +105,7 @@ describe('analyzePosition', () => {
     const position = analyzePosition(levels, 95)
     expect(position.support?.label).toBe('S1')
     expect(position.resistance?.label).toBe('PP')
-    expect(position.zone).toBe('Entre S1 y PP')
+    expect(position.zoneKind).toBe('between')
     expect(position.bias).toBe('bearish')
   })
 
@@ -114,8 +114,8 @@ describe('analyzePosition', () => {
   })
 
   it('reports prices beyond the outer levels', () => {
-    expect(analyzePosition(levels, 140)).toMatchObject({ resistance: null, zone: 'Sobre R3' })
-    expect(analyzePosition(levels, 60)).toMatchObject({ support: null, zone: 'Bajo S3' })
+    expect(analyzePosition(levels, 140)).toMatchObject({ resistance: null, zoneKind: 'above' })
+    expect(analyzePosition(levels, 60)).toMatchObject({ support: null, zoneKind: 'below' })
   })
 
   it('does not treat a level equal to the price as either side', () => {
@@ -192,21 +192,21 @@ describe('validateOhlc', () => {
   })
 
   it('asks for the required fields', () => {
-    expect(validateOhlc({ high: NaN, low: NaN, close: NaN })).toEqual({ high: 'Requerido', low: 'Requerido', close: 'Requerido' })
+    expect(validateOhlc({ high: NaN, low: NaN, close: NaN })).toEqual({ high: 'required', low: 'required', close: 'required' })
   })
 
   it('rejects zero and negative prices', () => {
-    expect(validateOhlc({ high: 0, low: -1, close: 5 })).toMatchObject({ high: expect.any(String), low: expect.any(String) })
+    expect(validateOhlc({ high: 0, low: -1, close: 5 })).toMatchObject({ high: 'mustBePositive', low: 'mustBePositive' })
   })
 
   it('rejects a high below the low', () => {
-    expect(validateOhlc({ high: 90, low: 110, close: 100 }).high).toMatch(/máximo/)
+    expect(validateOhlc({ high: 90, low: 110, close: 100 }).high).toBe('highBelowLow')
   })
 
   it('keeps the close and the open inside the range', () => {
     const errors = validateOhlc({ high: 110, low: 90, close: 120, open: 80 })
-    expect(errors.close).toMatch(/cierre/)
-    expect(errors.open).toMatch(/apertura/)
+    expect(errors.close).toBe('closeOutOfRange')
+    expect(errors.open).toBe('openOutOfRange')
   })
 
   it('does not pile range errors onto an inverted range', () => {

@@ -96,7 +96,7 @@ export function MarketOverview({ assets, onSelect, onSelectCategory }: MarketOve
   const { locale } = useLocale()
   const dict = useDictionary().marketOverview
   const summary = useMemo(() => summarizeMarket(assets), [assets])
-  const categories = useMemo(() => summarizeCategories(assets), [assets])
+  const categories = useMemo(() => summarizeCategories(assets, locale), [assets, locale])
   const scale = barScale(categories)
   const layout: BarLayout = categories.every((item) => item.average >= 0) ? 'positive' : categories.every((item) => item.average <= 0) ? 'negative' : 'both'
 

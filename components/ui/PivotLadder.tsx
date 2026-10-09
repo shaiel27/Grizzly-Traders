@@ -5,6 +5,8 @@ import { clsx } from 'clsx'
 import { formatLevel } from '@/lib/format'
 import { ladderDomain, spreadLabels } from '@/lib/pivot-layout'
 import { analyzePosition, distancePct, type PivotLevel, type PivotLevelKind } from '@/lib/pivots'
+import { t } from '@/lib/i18n/get-dictionary'
+import { useDictionary } from '@/lib/i18n/LocaleProvider'
 
 interface PivotLadderProps {
   levels: PivotLevel[]
@@ -29,6 +31,9 @@ function signed(value: number, decimals = 2): string {
 
 // To-scale ladder: every level sits at its real price, labels are spread so clustered levels stay readable
 export function PivotLadder({ levels, price, symbol = '', height = 400, className }: PivotLadderProps) {
+  const dict = useDictionary()
+  const ladderDict = dict.pivotLadder
+  const zoneDict = dict.pivotZone
   const gradientId = useId()
   const [active, setActive] = useState<string | null>(null)
   // Entrada en cascada de los botones de nivel al montar (antes aparecian todos de un salto).
@@ -64,7 +69,7 @@ export function PivotLadder({ levels, price, symbol = '', height = 400, classNam
     position.bias === 'bullish' ? 'var(--semantic-success)' : position.bias === 'bearish' ? 'var(--semantic-danger)' : 'var(--ink-muted)'
 
   return (
-    <div className={clsx('flex', className)} style={{ height }} role="group" aria-label="Escalera de niveles de pivote">
+    <div className={clsx('flex', className)} style={{ height }} role="group" aria-label={ladderDict.ladderAria}>
       <div className="relative min-w-0 flex-1 overflow-hidden rounded-xl border border-hairline-soft bg-surface-1/40">
         <svg className="absolute inset-0 h-full w-full" viewBox={`0 0 100 ${height}`} preserveAspectRatio="none" aria-hidden="true">
           <defs>
@@ -147,7 +152,7 @@ export function PivotLadder({ levels, price, symbol = '', height = 400, classNam
               onMouseLeave={() => setActive(null)}
               onFocus={() => setActive(level.key)}
               onBlur={() => setActive(null)}
-              title={`${level.label}: ${formatLevel(level.value, price, symbol)} (${signed(distance)} desde el precio)`}
+              title={t(ladderDict.levelTooltip, { label: level.label, value: formatLevel(level.value, price, symbol), distance: signed(distance) })}
               className={clsx(
                 'absolute left-0 right-0 -translate-y-1/2 rounded-lg border px-2 py-1 text-left transition-colors focus-visible:outline-2 focus-visible:outline-accent-blue',
                 active === level.key || isNearest ? 'border-hairline bg-surface-2' : 'border-transparent hover:bg-surface-2/60',
@@ -170,10 +175,13 @@ export function PivotLadder({ levels, price, symbol = '', height = 400, classNam
       <ul className="sr-only">
         {sorted.map((level) => (
           <li key={level.key}>
-            {level.label}: {formatLevel(level.value, price, symbol)}, {signed(distancePct(level.value, price))} desde el precio actual
+            {t(ladderDict.srLevelLine, { label: level.label, value: formatLevel(level.value, price, symbol), distance: signed(distancePct(level.value, price)) })}
           </li>
         ))}
-        <li>Precio actual: {formatLevel(price, price, symbol)}. {position.zone}.</li>
+        <li>
+          {ladderDict.currentPriceLabel}: {formatLevel(price, price, symbol)}.{' '}
+          {t(zoneDict[position.zoneKind], { support: position.support?.label ?? '', resistance: position.resistance?.label ?? '' })}.
+        </li>
       </ul>
     </div>
   )

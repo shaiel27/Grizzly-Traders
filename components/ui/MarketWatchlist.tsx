@@ -48,12 +48,13 @@ export function MarketWatchlist({
   onToggleFavorite,
 }: MarketWatchlistProps) {
   const { locale } = useLocale()
-  const dict = useDictionary().marketWatchlist
+  const fullDict = useDictionary()
+  const dict = fullDict.marketWatchlist
 
   const categories: { key: WatchlistCategory; label: string }[] = [
     { key: 'all', label: dict.categoryAll },
     { key: 'favorites', label: dict.categoryFavorites },
-    ...(Object.entries(MARKET_CATEGORY_LABELS) as [MarketCategory, string][]).map(([key, label]) => ({ key, label })),
+    ...(Object.keys(MARKET_CATEGORY_LABELS) as MarketCategory[]).map((key) => ({ key, label: fullDict.marketCategories[key] })),
   ]
 
   const sorts: { key: WatchlistSort; label: string }[] = [

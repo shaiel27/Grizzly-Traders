@@ -101,11 +101,15 @@ export function levelsFor(result: PivotResult, method: PivotMethod): PivotLevel[
 
 export type PivotBias = 'bullish' | 'bearish' | 'neutral'
 
+export type PivotZoneKind = 'none' | 'between' | 'below' | 'above'
+
 export interface PricePosition {
   bias: PivotBias
   resistance: PivotLevel | null
   support: PivotLevel | null
-  zone: string
+  // The sentence itself is locale-dependent, so this only reports which shape it has — the
+  // caller builds the actual text (dict.pivotZone.*) from this plus support/resistance.label.
+  zoneKind: PivotZoneKind
 }
 
 // Where the price sits relative to the ladder: bias from the pivot, and the levels that box it in
@@ -121,12 +125,12 @@ export function analyzePosition(levels: PivotLevel[], price: number): PricePosit
     if (level.value < price && (!support || level.value > support.value)) support = level
   }
 
-  let zone = 'Sin niveles'
-  if (resistance && support) zone = `Entre ${support.label} y ${resistance.label}`
-  else if (resistance) zone = `Bajo ${resistance.label}`
-  else if (support) zone = `Sobre ${support.label}`
+  let zoneKind: PivotZoneKind = 'none'
+  if (resistance && support) zoneKind = 'between'
+  else if (resistance) zoneKind = 'below'
+  else if (support) zoneKind = 'above'
 
-  return { bias, resistance, support, zone }
+  return { bias, resistance, support, zoneKind }
 }
 
 export function distancePct(value: number, price: number): number {
@@ -192,7 +196,9 @@ export interface OhlcInput {
   open?: number
 }
 
-export type OhlcErrors = Partial<Record<'high' | 'low' | 'close' | 'open', string>>
+// Keys only — the message itself is locale-dependent (dict.pivotCalculator.error*), resolved by the caller
+export type OhlcErrorKey = 'required' | 'mustBePositive' | 'highBelowLow' | 'closeOutOfRange' | 'openOutOfRange'
+export type OhlcErrors = Partial<Record<'high' | 'low' | 'close' | 'open', OhlcErrorKey>>
 
 const isPrice = (value: number | undefined): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0
 
@@ -200,19 +206,19 @@ const isPrice = (value: number | undefined): value is number => typeof value ===
 export function validateOhlc({ high, low, close, open }: OhlcInput): OhlcErrors {
   const errors: OhlcErrors = {}
 
-  if (Number.isNaN(high)) errors.high = 'Requerido'
-  else if (!isPrice(high)) errors.high = 'Debe ser mayor que 0'
-  if (Number.isNaN(low)) errors.low = 'Requerido'
-  else if (!isPrice(low)) errors.low = 'Debe ser mayor que 0'
-  if (Number.isNaN(close)) errors.close = 'Requerido'
-  else if (!isPrice(close)) errors.close = 'Debe ser mayor que 0'
-  if (open !== undefined && !Number.isNaN(open) && !isPrice(open)) errors.open = 'Debe ser mayor que 0'
+  if (Number.isNaN(high)) errors.high = 'required'
+  else if (!isPrice(high)) errors.high = 'mustBePositive'
+  if (Number.isNaN(low)) errors.low = 'required'
+  else if (!isPrice(low)) errors.low = 'mustBePositive'
+  if (Number.isNaN(close)) errors.close = 'required'
+  else if (!isPrice(close)) errors.close = 'mustBePositive'
+  if (open !== undefined && !Number.isNaN(open) && !isPrice(open)) errors.open = 'mustBePositive'
 
-  if (isPrice(high) && isPrice(low) && high < low) errors.high = 'El máximo no puede ser menor que el mínimo'
+  if (isPrice(high) && isPrice(low) && high < low) errors.high = 'highBelowLow'
 
   if (isPrice(high) && isPrice(low) && high >= low) {
-    if (isPrice(close) && (close > high || close < low)) errors.close = 'El cierre debe estar entre el mínimo y el máximo'
-    if (isPrice(open) && (open > high || open < low)) errors.open = 'La apertura debe estar entre el mínimo y el máximo'
+    if (isPrice(close) && (close > high || close < low)) errors.close = 'closeOutOfRange'
+    if (isPrice(open) && (open > high || open < low)) errors.open = 'openOutOfRange'
   }
 
   return errors

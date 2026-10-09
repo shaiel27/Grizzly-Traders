@@ -5,6 +5,8 @@ import { formatLevel } from '@/lib/format'
 import type { PivotAsset } from '@/lib/pivot-assets'
 import type { PivotQuote } from '@/lib/pivot-data'
 import { distancePct, type PivotLevel, type PricePosition } from '@/lib/pivots'
+import { t } from '@/lib/i18n/get-dictionary'
+import { useLocale, useDictionary } from '@/lib/i18n/LocaleProvider'
 
 export interface PivotRow {
   asset: PivotAsset
@@ -72,9 +74,13 @@ function LevelCell({ level, price, symbol }: { level: PivotLevel | null; price: 
 }
 
 export function PivotAssetList({ rows, selected, favorites, loading = false, onSelect, onToggleFavorite }: PivotAssetListProps) {
+  const { locale } = useLocale()
+  const dict = useDictionary()
+  const listDict = dict.pivotAssetList
+
   if (loading) {
     return (
-      <ul className="divide-y divide-hairline-soft" aria-busy="true" aria-label="Cargando activos">
+      <ul className="divide-y divide-hairline-soft" aria-busy="true" aria-label={listDict.loadingAria}>
         {Array.from({ length: 7 }, (_, index) => (
           <li key={index} className="px-4 py-4">
             <div className="h-10 animate-pulse rounded-lg bg-surface-2" />
@@ -90,11 +96,11 @@ export function PivotAssetList({ rows, selected, favorites, loading = false, onS
         className={clsx(GRID, 'hidden border-b border-outline-variant/40 py-2.5 pl-12 pr-4 text-micro font-bold uppercase tracking-wider text-ink-muted md:grid')}
         aria-hidden="true"
       >
-        <span>Activo</span>
-        <span>Precio</span>
-        <span>Soporte próximo</span>
-        <span>Resistencia próxima</span>
-        <span>Rango de niveles</span>
+        <span>{listDict.colAsset}</span>
+        <span>{listDict.colPrice}</span>
+        <span>{listDict.colNextSupport}</span>
+        <span>{listDict.colNextResistance}</span>
+        <span>{listDict.colLevelRange}</span>
       </div>
 
       <ul className="divide-y divide-hairline-soft">
@@ -121,13 +127,13 @@ export function PivotAssetList({ rows, selected, favorites, loading = false, onS
                       <span
                         className={clsx('text-[9px]', position.bias === 'bullish' ? 'text-semantic-success' : 'text-semantic-danger')}
                         role="img"
-                        aria-label={position.bias === 'bullish' ? 'Sesgo alcista' : 'Sesgo bajista'}
+                        aria-label={position.bias === 'bullish' ? listDict.biasBullishAria : listDict.biasBearishAria}
                       >
                         {position.bias === 'bullish' ? '▲' : '▼'}
                       </span>
                     )}
                   </span>
-                  <span className="block truncate text-micro text-ink-muted">{asset.name}</span>
+                  <span className="block truncate text-micro text-ink-muted">{locale === 'en' ? asset.nameEn : asset.name}</span>
                 </span>
 
                 <span>
@@ -150,7 +156,7 @@ export function PivotAssetList({ rows, selected, favorites, loading = false, onS
               <button
                 type="button"
                 aria-pressed={isFavorite}
-                aria-label={isFavorite ? `Quitar ${asset.label} de favoritos` : `Añadir ${asset.label} a favoritos`}
+                aria-label={t(isFavorite ? dict.marketWatchlist.removeAria : dict.marketWatchlist.addAria, { name: asset.label })}
                 onClick={() => onToggleFavorite(asset.tv)}
                 className="absolute left-2.5 top-3 flex size-8 items-center justify-center rounded-full text-ink-subtle transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-accent-blue"
               >
