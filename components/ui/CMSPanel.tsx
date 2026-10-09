@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { clsx } from 'clsx'
 import { Header, Button, Card, Footer } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
+import { t } from '@/lib/i18n/get-dictionary'
+import { useLocale, useDictionary } from '@/lib/i18n/LocaleProvider'
 import type { Category, Tag, Asset, AssetType, Source } from '@/lib/types'
 
 interface CMSPanelProps {
@@ -67,6 +69,8 @@ const inputClass =
 const labelClass = 'text-micro font-bold text-ink-muted uppercase tracking-wider block mb-2'
 
 export function CMSPanel({ initialCategories, initialTags, initialAssets, initialSources, initialAssetTypes }: CMSPanelProps) {
+  const { locale } = useLocale()
+  const dict = useDictionary().cms
   const [activeTab, setActiveTab] = useState<'editor' | 'posts' | 'settings'>('editor')
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
@@ -139,10 +143,10 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
       if (data.success) {
         setAutomation((prev) => ({ ...prev, active: data.active }))
       } else {
-        window.alert(data.error ?? 'No se pudo cambiar el estado de la automatización')
+        window.alert(data.error ?? dict.posts.automationToggleFailed)
       }
     } catch {
-      window.alert('Error de conexión')
+      window.alert(dict.connectionError)
     } finally {
       setAutomation((prev) => ({ ...prev, toggling: false }))
     }
@@ -178,7 +182,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
       }
       const data = await res.json()
       if (!data.success) {
-        window.alert(data.error ?? 'No se pudo cargar el artículo')
+        window.alert(data.error ?? dict.editor.loadPostFailed)
         return
       }
 
@@ -229,7 +233,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (e) {
       console.error('Failed to load post for edit:', e)
-      window.alert('Error de conexión')
+      window.alert(dict.connectionError)
     } finally {
       setLoadingEdit(false)
     }
@@ -238,7 +242,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!current.title || !current.content_html) {
-      setSaveMsg('✗ Título y contenido son requeridos')
+      setSaveMsg(dict.editor.titleAndContentRequired)
       return
     }
 
@@ -265,7 +269,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
         setSaveMsg(`✗ ${data.error}`)
       }
     } catch {
-      setSaveMsg('✗ Error de conexión')
+      setSaveMsg(`✗ ${dict.connectionError}`)
     } finally {
       setSaving(false)
     }
@@ -280,18 +284,18 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
       }
       const data = await res.json().catch(() => null)
       if (!res.ok || !data?.success) {
-        window.alert(data?.error ?? 'No se pudo completar la acción')
+        window.alert(data?.error ?? dict.genericActionError)
         return
       }
       loadPosts()
     } catch (e) {
       console.error('Manage request error:', e)
-      window.alert('Error de conexión')
+      window.alert(dict.connectionError)
     }
   }
 
   const handleDeletePost = async (id: string) => {
-    if (!confirm('¿Eliminar este artículo?')) return
+    if (!confirm(dict.posts.confirmDeletePost)) return
     if (editingId === id) resetForm()
     await manageRequest(`/api/posts/manage?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
   }
@@ -320,13 +324,13 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
       const res = await fetch('/api/posts/trigger-pipeline', { method: 'POST' })
       const data = await res.json()
       if (data.success) {
-        setPipelineMsg(`✓ Pipeline ejecutado. ID: ${data.executionId || 'N/A'}`)
+        setPipelineMsg(t(dict.posts.pipelineRan, { id: data.executionId || dict.posts.naFallback }))
         setTimeout(() => loadPosts(), 5000)
       } else {
         setPipelineMsg(`✗ ${data.error}`)
       }
     } catch {
-      setPipelineMsg('✗ Error de conexión')
+      setPipelineMsg(`✗ ${dict.connectionError}`)
     } finally {
       setPipelineRunning(false)
     }
@@ -354,16 +358,14 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
     }
     const data = await res.json()
     if (!data.success) {
-      window.alert(data.error ?? 'No se pudo crear el elemento')
+      window.alert(data.error ?? dict.settings.createFailed)
       return null
     }
     return data.data
   }
 
   const deleteCatalogItem = async (type: string, id: number, warnAboutUsage: boolean) => {
-    const message = warnAboutUsage
-      ? '¿Eliminar? Los artículos que lo usan lo perderán.'
-      : '¿Eliminar este elemento?'
+    const message = warnAboutUsage ? dict.settings.confirmDeleteWithUsage : dict.settings.confirmDeleteSimple
     if (!confirm(message)) return false
     const res = await fetch(`/api/catalog?type=${type}&id=${id}`, { method: 'DELETE' })
     if (res.status === 401 || res.status === 403) {
@@ -372,7 +374,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
     }
     const data = await res.json().catch(() => null)
     if (!res.ok || !data?.success) {
-      window.alert(data?.error ?? 'No se pudo eliminar')
+      window.alert(data?.error ?? dict.settings.deleteFailed)
       return false
     }
     return true
@@ -394,9 +396,9 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-1 p-1 rounded-xl bg-surface-2 w-fit">
               {([
-                { key: 'editor', label: 'Editor', icon: 'edit' },
-                { key: 'posts', label: 'Artículos', icon: 'article' },
-                { key: 'settings', label: 'Configuración', icon: 'settings' },
+                { key: 'editor', label: dict.tabEditor, icon: 'edit' },
+                { key: 'posts', label: dict.tabPosts, icon: 'article' },
+                { key: 'settings', label: dict.tabSettings, icon: 'settings' },
               ] as const).map((tab) => (
                 <button
                   key={tab.key}
@@ -418,7 +420,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
               onClick={handleSignOut}
               className="text-body-sm text-ink-muted transition-colors hover:text-ink"
             >
-              Cerrar sesión
+              {dict.signOut}
             </button>
           </div>
 
@@ -429,23 +431,23 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-accent-blue/30 bg-accent-blue/5 px-4 py-3">
                   <span className="text-body-sm text-ink">
                     <span className="material-symbols-outlined text-[16px] align-text-bottom mr-1.5">edit_note</span>
-                    Editando artículo existente
+                    {dict.editor.editingExisting}
                   </span>
                   <button type="button" onClick={resetForm} className="text-body-sm font-bold text-accent-blue hover:underline">
-                    Cancelar y crear nuevo
+                    {dict.editor.cancelNew}
                   </button>
                 </div>
               )}
 
               {loadingEdit && (
                 <div className="rounded-xl border border-outline-variant/40 bg-surface-2 px-4 py-3 text-body-sm text-ink-muted">
-                  Cargando artículo...
+                  {dict.editor.loadingPost}
                 </div>
               )}
 
               {/* Locale Switcher */}
               <div className="flex items-center gap-3">
-                <span className={labelClass.replace('block mb-2', '')}>Idioma:</span>
+                <span className={labelClass.replace('block mb-2', '')}>{dict.editor.languageLabel}</span>
                 {(['es', 'en'] as const).map((loc) => (
                   <button
                     key={loc}
@@ -457,7 +459,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                         : 'bg-surface-2 text-ink-muted hover:text-ink'
                     }`}
                   >
-                    {loc === 'es' ? 'Español' : 'English'}
+                    {loc === 'es' ? dict.editor.localeEs : dict.editor.localeEn}
                     {translations[loc].title && loc !== postData.locale && (
                       <span className="ml-1.5 text-[10px] opacity-70">●</span>
                     )}
@@ -471,12 +473,12 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                 <div className="space-y-6 min-w-0">
                   {/* Title */}
                   <div>
-                    <label className={labelClass}>Título</label>
+                    <label className={labelClass}>{dict.editor.titleLabel}</label>
                     <input
                       type="text"
                       value={current.title}
                       onChange={(e) => handleTitleChange(e.target.value)}
-                      placeholder="Título del artículo..."
+                      placeholder={dict.editor.titlePlaceholder}
                       className="w-full rounded-xl border border-outline-variant/40 bg-surface-2 px-4 py-3 text-lg font-bold text-ink placeholder:text-ink-subtle focus:border-accent-blue focus:ring-1 focus:ring-accent-blue/30 focus:outline-none"
                     />
                     {current.slug && <p className="mt-1.5 text-[11px] text-ink-subtle">/articulos/{current.slug}</p>}
@@ -484,11 +486,11 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
 
                   {/* Content */}
                   <div>
-                    <label className={labelClass}>Contenido (HTML)</label>
+                    <label className={labelClass}>{dict.editor.contentLabel}</label>
                     <textarea
                       value={current.content_html}
                       onChange={(e) => updateTranslationField('content_html', e.target.value)}
-                      placeholder="<p>Escribe tu artículo aquí...</p>"
+                      placeholder={dict.editor.contentPlaceholder}
                       rows={18}
                       className="w-full rounded-xl border border-outline-variant/40 bg-surface-2 px-4 py-3 text-sm text-ink font-mono placeholder:text-ink-subtle focus:border-accent-blue focus:ring-1 focus:ring-accent-blue/30 focus:outline-none resize-y"
                     />
@@ -496,25 +498,25 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
 
                   {/* SEO meta rides along with the content it describes, at lower visual weight */}
                   <div className="rounded-xl border border-outline-variant/30 p-4">
-                    <p className="mb-3 text-xs font-bold text-ink-muted">SEO</p>
+                    <p className="mb-3 text-xs font-bold text-ink-muted">{dict.editor.seoHeading}</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className={labelClass}>Meta Title</label>
+                        <label className={labelClass}>{dict.editor.metaTitleLabel}</label>
                         <input
                           type="text"
                           value={current.meta_title}
                           onChange={(e) => updateTranslationField('meta_title', e.target.value)}
-                          placeholder="SEO title..."
+                          placeholder={dict.editor.metaTitlePlaceholder}
                           className={inputClass}
                         />
                       </div>
                       <div>
-                        <label className={labelClass}>Meta Description</label>
+                        <label className={labelClass}>{dict.editor.metaDescLabel}</label>
                         <input
                           type="text"
                           value={current.meta_description}
                           onChange={(e) => updateTranslationField('meta_description', e.target.value)}
-                          placeholder="SEO description..."
+                          placeholder={dict.editor.metaDescPlaceholder}
                           className={inputClass}
                         />
                       </div>
@@ -526,21 +528,21 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                 <aside className="space-y-6 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-5 lg:sticky lg:top-[calc(var(--header-height)+24px)]">
                   <div className="space-y-4">
                     <div>
-                      <label className={labelClass}>Estado</label>
+                      <label className={labelClass}>{dict.editor.statusLabel}</label>
                       <select
                         value={postData.status}
                         onChange={(e) => setPostData({ ...postData, status: e.target.value as typeof postData.status })}
                         className={inputClass}
                       >
-                        <option value="draft">Borrador</option>
-                        <option value="published">Publicado</option>
-                        <option value="scheduled">Programado</option>
+                        <option value="draft">{dict.editor.statusDraft}</option>
+                        <option value="published">{dict.editor.statusPublished}</option>
+                        <option value="scheduled">{dict.editor.statusScheduled}</option>
                       </select>
                     </div>
 
                     {postData.status === 'scheduled' && (
                       <div>
-                        <label className={labelClass}>Fecha de publicación</label>
+                        <label className={labelClass}>{dict.editor.scheduledDateLabel}</label>
                         <input
                           type="datetime-local"
                           value={postData.scheduled_at}
@@ -551,13 +553,13 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                     )}
 
                     <div>
-                      <label className={labelClass}>Categoría</label>
+                      <label className={labelClass}>{dict.editor.categoryLabel}</label>
                       <select
                         value={postData.category_id}
                         onChange={(e) => setPostData({ ...postData, category_id: e.target.value })}
                         className={inputClass}
                       >
-                        <option value="">Sin categoría</option>
+                        <option value="">{dict.editor.noCategoryOption}</option>
                         {categories.map((cat) => (
                           <option key={cat.id} value={cat.id}>{cat.name}</option>
                         ))}
@@ -565,15 +567,15 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                     </div>
 
                     <div>
-                      <label className={labelClass}>Sentimiento</label>
+                      <label className={labelClass}>{dict.editor.sentimentLabel}</label>
                       <select
                         value={postData.sentiment}
                         onChange={(e) => setPostData({ ...postData, sentiment: e.target.value as typeof postData.sentiment })}
                         className={inputClass}
                       >
-                        <option value="bullish">Alcista</option>
-                        <option value="bearish">Bajista</option>
-                        <option value="neutral">Neutral</option>
+                        <option value="bullish">{dict.editor.sentimentBullish}</option>
+                        <option value="bearish">{dict.editor.sentimentBearish}</option>
+                        <option value="neutral">{dict.editor.sentimentNeutral}</option>
                       </select>
                     </div>
 
@@ -584,14 +586,14 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                         onChange={(e) => setPostData({ ...postData, is_featured: e.target.checked })}
                         className="w-4 h-4 rounded border-hairline bg-surface-2 accent-accent-blue"
                       />
-                      <span className="text-body-sm text-ink">Marcar como destacado</span>
+                      <span className="text-body-sm text-ink">{dict.editor.featuredCheckbox}</span>
                     </label>
                   </div>
 
                   <div className="space-y-4 border-t border-outline-variant/30 pt-4">
-                    <p className="text-xs font-bold text-ink-muted">Imágenes</p>
+                    <p className="text-xs font-bold text-ink-muted">{dict.editor.imagesHeading}</p>
                     <div>
-                      <label className={labelClass}>Cover Image URL</label>
+                      <label className={labelClass}>{dict.editor.coverImageLabel}</label>
                       <input
                         type="text"
                         value={postData.cover_image_url}
@@ -601,34 +603,34 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                       />
                     </div>
                     <div>
-                      <label className={labelClass}>OG Image URL</label>
+                      <label className={labelClass}>{dict.editor.ogImageLabel}</label>
                       <input
                         type="text"
                         value={postData.og_image_url}
                         onChange={(e) => setPostData({ ...postData, og_image_url: e.target.value })}
-                        placeholder="https://... (para compartir en redes)"
+                        placeholder={dict.editor.ogImagePlaceholder}
                         className={inputClass}
                       />
                     </div>
                   </div>
 
                   <div className="space-y-4 border-t border-outline-variant/30 pt-4">
-                    <p className="text-xs font-bold text-ink-muted">Fuente</p>
+                    <p className="text-xs font-bold text-ink-muted">{dict.editor.sourceHeading}</p>
                     <div>
-                      <label className={labelClass}>Fuente</label>
+                      <label className={labelClass}>{dict.editor.sourceLabel}</label>
                       <select
                         value={postData.source_id}
                         onChange={(e) => setPostData({ ...postData, source_id: e.target.value })}
                         className={inputClass}
                       >
-                        <option value="">Sin fuente</option>
+                        <option value="">{dict.editor.noSourceOption}</option>
                         {sources.map((src) => (
                           <option key={src.id} value={src.id}>{src.name}</option>
                         ))}
                       </select>
                     </div>
                     <div>
-                      <label className={labelClass}>Source URL</label>
+                      <label className={labelClass}>{dict.editor.sourceUrlLabel}</label>
                       <input
                         type="text"
                         value={postData.source_url}
@@ -641,7 +643,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
 
                   <div className="space-y-4 border-t border-outline-variant/30 pt-4">
                     <div>
-                      <label className={labelClass}>Activos relacionados</label>
+                      <label className={labelClass}>{dict.editor.relatedAssetsLabel}</label>
                       <div className="flex flex-wrap gap-2">
                         {assets.map((asset) => (
                           <button
@@ -661,7 +663,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                     </div>
 
                     <div>
-                      <label className={labelClass}>Tags</label>
+                      <label className={labelClass}>{dict.editor.tagsLabel}</label>
                       <div className="flex flex-wrap gap-2">
                         {tags.map((tag) => (
                           <button
@@ -685,12 +687,12 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                   <div className="space-y-3 border-t border-outline-variant/30 pt-4">
                     <Button type="submit" variant="accent" disabled={saving} className="w-full">
                       {saving
-                        ? 'Guardando...'
+                        ? dict.editor.saving
                         : editingId
-                          ? 'Guardar cambios'
+                          ? dict.editor.saveChanges
                           : postData.status === 'published'
-                            ? 'Publicar Ahora'
-                            : 'Guardar Borrador'}
+                            ? dict.editor.publishNow
+                            : dict.editor.saveDraft}
                     </Button>
                     {saveMsg && (
                       <p className={`text-sm font-medium ${saveMsg.startsWith('✓') ? 'text-semantic-success' : 'text-semantic-danger'}`}>
@@ -726,15 +728,15 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                     </span>
                   </span>
                   <div>
-                    <p className="text-sm font-bold text-ink">Automatización de publicación</p>
+                    <p className="text-sm font-bold text-ink">{dict.posts.automationHeading}</p>
                     <p className="text-[12px] text-ink-muted">
                       {automation.loading
-                        ? 'Consultando estado...'
+                        ? dict.posts.automationLoading
                         : !automation.configured
-                          ? 'No conectada: falta configurar N8N_API_KEY para controlarla desde acá.'
+                          ? dict.posts.automationNotConnected
                           : automation.active
-                            ? 'Activa: publica artículos nuevos automáticamente.'
-                            : 'Pausada: no va a publicar nada hasta que la reanudes.'}
+                            ? dict.posts.automationActive
+                            : dict.posts.automationPaused}
                     </p>
                   </div>
                 </div>
@@ -743,17 +745,17 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                   size="sm"
                   onClick={handleToggleAutomation}
                   disabled={!automation.configured || automation.loading || automation.toggling || automation.active === null}
-                  title={!automation.configured ? 'Configura N8N_API_KEY para habilitar este control' : undefined}
+                  title={!automation.configured ? dict.posts.automationConfigureTitle : undefined}
                 >
                   <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
                     {automation.active ? 'pause' : 'play_arrow'}
                   </span>
-                  {automation.toggling ? 'Aplicando...' : automation.active ? 'Pausar' : 'Reanudar'}
+                  {automation.toggling ? dict.posts.automationApplying : automation.active ? dict.posts.automationPause : dict.posts.automationResume}
                 </Button>
               </div>
 
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-headline font-bold text-ink">Artículos ({postsList.length})</h2>
+                <h2 className="text-headline font-bold text-ink">{t(dict.posts.articlesHeading, { n: postsList.length })}</h2>
                 <div className="flex items-center gap-2">
                   <Button
                     variant="secondary"
@@ -764,11 +766,11 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                     <span className="material-symbols-outlined text-[16px]">
                       {pipelineRunning ? 'hourglass_empty' : 'play_arrow'}
                     </span>
-                    {pipelineRunning ? 'Ejecutando...' : 'Ejecutar Pipeline'}
+                    {pipelineRunning ? dict.posts.runningPipeline : dict.posts.runPipeline}
                   </Button>
                   <Button variant="accent" size="sm" onClick={() => { resetForm(); setActiveTab('editor') }}>
                     <span className="material-symbols-outlined text-[16px]">add</span>
-                    Nuevo Artículo
+                    {dict.posts.newArticle}
                   </Button>
                 </div>
               </div>
@@ -789,7 +791,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
               ) : postsList.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-outline-variant/40 py-16 text-center">
                   <span className="material-symbols-outlined text-5xl text-ink-subtle mb-3 block">article</span>
-                  <p className="text-body text-ink-muted">No hay artículos. Crea tu primer artículo en la pestaña Editor.</p>
+                  <p className="text-body text-ink-muted">{dict.posts.emptyPosts}</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -811,7 +813,11 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                                 ? 'bg-surface-2 text-ink-muted'
                                 : 'bg-accent-blue/15 text-accent-blue'
                             }`}>
-                              {post.status === 'published' ? 'Publicado' : post.status === 'draft' ? 'Borrador' : 'Programado'}
+                              {post.status === 'published'
+                                ? dict.editor.statusPublished
+                                : post.status === 'draft'
+                                  ? dict.editor.statusDraft
+                                  : dict.editor.statusScheduled}
                             </span>
                             {post.category && (
                               <span className="text-[10px] text-ink-muted">{post.category.name}</span>
@@ -819,7 +825,10 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                           </div>
                           <p className="text-sm font-bold text-ink truncate">{post.title}</p>
                           <p className="text-[11px] text-ink-muted">
-                            {post.published_at ? new Date(post.published_at).toLocaleDateString('es-AR') : 'Sin fecha'} · {post.view_count} vistas
+                            {post.published_at
+                              ? new Date(post.published_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'es-AR')
+                              : dict.posts.noDate}{' '}
+                            · {post.view_count} {dict.posts.viewsSuffix}
                           </p>
                         </div>
 
@@ -828,10 +837,10 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                           <button
                             onClick={() => handleEditPost(post.id)}
                             className="flex items-center gap-1.5 rounded-lg bg-accent-blue/10 px-2.5 py-2 text-accent-blue transition-colors hover:bg-accent-blue/20"
-                            title="Editar"
+                            title={dict.posts.edit}
                           >
                             <span className="material-symbols-outlined text-[16px]" aria-hidden="true">edit</span>
-                            <span className="hidden text-xs font-bold lg:inline">Editar</span>
+                            <span className="hidden text-xs font-bold lg:inline">{dict.posts.edit}</span>
                           </button>
 
                           <span className="mx-1 h-5 w-px bg-hairline" aria-hidden="true" />
@@ -841,14 +850,14 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                             className={`p-2 rounded-lg transition-colors ${
                               post.is_featured ? 'text-accent-blue bg-accent-blue/10' : 'text-ink-muted hover:text-ink'
                             }`}
-                            title={post.is_featured ? 'Quitar destacado' : 'Marcar destacado'}
+                            title={post.is_featured ? dict.posts.removeFeatured : dict.posts.markFeatured}
                           >
                             <span className="material-symbols-outlined text-[18px]">star</span>
                           </button>
                           <button
                             onClick={() => handleToggleStatus(post.id, post.status)}
                             className="p-2 rounded-lg text-ink-muted hover:text-ink transition-colors"
-                            title={post.status === 'published' ? 'Despublicar' : 'Publicar'}
+                            title={post.status === 'published' ? dict.posts.unpublish : dict.posts.publish}
                           >
                             <span className="material-symbols-outlined text-[18px]">
                               {post.status === 'published' ? 'unpublished' : 'publish'}
@@ -860,7 +869,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                             rel={href ? 'noreferrer' : undefined}
                             aria-disabled={!href}
                             className={`p-2 rounded-lg transition-colors ${href ? 'text-ink-muted hover:text-accent-blue' : 'text-ink-subtle pointer-events-none'}`}
-                            title={href ? 'Ver artículo' : 'Solo disponible para artículos publicados'}
+                            title={href ? dict.posts.viewArticle : dict.posts.onlyPublishedPreview}
                           >
                             <span className="material-symbols-outlined text-[18px]">open_in_new</span>
                           </a>
@@ -871,7 +880,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                           <button
                             onClick={() => handleDeletePost(post.id)}
                             className="p-2 rounded-lg text-semantic-danger/70 transition-colors hover:bg-semantic-danger/10 hover:text-semantic-danger"
-                            title="Eliminar"
+                            title={dict.posts.delete}
                           >
                             <span className="material-symbols-outlined text-[18px]">delete</span>
                           </button>
@@ -888,15 +897,15 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
           {activeTab === 'settings' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <CatalogCard
-                title="Categorías"
+                title={dict.settings.categoriesTitle}
                 items={categories.map((c) => ({ id: c.id, label: c.name, sublabel: c.slug }))}
                 onDelete={async (id) => {
                   if (!(await deleteCatalogItem('category', id, false))) return
                   setCategories((prev) => prev.filter((c) => c.id !== id))
                 }}
                 fields={[
-                  { key: 'name', placeholder: 'Nombre', autoSlug: true },
-                  { key: 'slug', placeholder: 'slug', readOnlyDerived: true },
+                  { key: 'name', placeholder: dict.settings.namePlaceholder, autoSlug: true },
+                  { key: 'slug', placeholder: dict.settings.slugPlaceholder, readOnlyDerived: true },
                 ]}
                 onCreate={async (values) => {
                   const created = await createCatalogItem({ type: 'category', name: values.name, slug: values.slug })
@@ -905,15 +914,15 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
               />
 
               <CatalogCard
-                title="Tags"
+                title={dict.settings.tagsTitle}
                 items={tags.map((t) => ({ id: t.id, label: t.name, sublabel: t.slug }))}
                 onDelete={async (id) => {
                   if (!(await deleteCatalogItem('tag', id, true))) return
                   setTags((prev) => prev.filter((t) => t.id !== id))
                 }}
                 fields={[
-                  { key: 'name', placeholder: 'Nombre', autoSlug: true },
-                  { key: 'slug', placeholder: 'slug', readOnlyDerived: true },
+                  { key: 'name', placeholder: dict.settings.namePlaceholder, autoSlug: true },
+                  { key: 'slug', placeholder: dict.settings.slugPlaceholder, readOnlyDerived: true },
                 ]}
                 onCreate={async (values) => {
                   const created = await createCatalogItem({ type: 'tag', name: values.name, slug: values.slug })
@@ -922,18 +931,18 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
               />
 
               <CatalogCard
-                title="Activos"
+                title={dict.settings.assetsTitle}
                 items={assets.map((a) => ({ id: a.id, label: a.symbol, sublabel: a.name }))}
                 onDelete={async (id) => {
                   if (!(await deleteCatalogItem('asset', id, true))) return
                   setAssets((prev) => prev.filter((a) => a.id !== id))
                 }}
                 fields={[
-                  { key: 'symbol', placeholder: 'Símbolo (ej. BTC)' },
-                  { key: 'name', placeholder: 'Nombre (ej. Bitcoin)' },
+                  { key: 'symbol', placeholder: dict.settings.symbolPlaceholder },
+                  { key: 'name', placeholder: dict.settings.assetNamePlaceholder },
                   {
                     key: 'tipo_id',
-                    placeholder: 'Tipo',
+                    placeholder: dict.settings.typePlaceholder,
                     select: initialAssetTypes.map((t) => ({ value: String(t.id), label: t.name })),
                   },
                 ]}
@@ -949,16 +958,16 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
               />
 
               <CatalogCard
-                title="Fuentes"
+                title={dict.settings.sourcesTitle}
                 items={sources.map((s) => ({ id: s.id, label: s.name, sublabel: `${s.reliability_score}%` }))}
                 onDelete={async (id) => {
                   if (!(await deleteCatalogItem('source', id, false))) return
                   setSources((prev) => prev.filter((s) => s.id !== id))
                 }}
                 fields={[
-                  { key: 'name', placeholder: 'Nombre' },
-                  { key: 'url', placeholder: 'https:// (opcional)' },
-                  { key: 'reliability_score', placeholder: 'Confiabilidad 0-100', type: 'number', defaultValue: '50' },
+                  { key: 'name', placeholder: dict.settings.namePlaceholder },
+                  { key: 'url', placeholder: dict.settings.urlPlaceholder },
+                  { key: 'reliability_score', placeholder: dict.settings.reliabilityPlaceholder, type: 'number', defaultValue: '50' },
                 ]}
                 onCreate={async (values) => {
                   const created = await createCatalogItem({
@@ -1005,6 +1014,7 @@ function CatalogCard({
   onCreate: (values: Record<string, string>) => Promise<void>
   onDelete: (id: number) => Promise<void>
 }) {
+  const dict = useDictionary().cms.settings
   const initialValues = Object.fromEntries(fields.map((f) => [f.key, f.defaultValue ?? '']))
   const [values, setValues] = useState<Record<string, string>>(initialValues)
   const [creating, setCreating] = useState(false)
@@ -1044,7 +1054,7 @@ function CatalogCard({
     <Card>
       <h3 className="text-headline font-bold text-ink mb-4">{title}</h3>
       <div className="space-y-2 mb-4 max-h-64 overflow-y-auto">
-        {items.length === 0 && <p className="text-body-sm text-ink-muted">Todavía no hay elementos.</p>}
+        {items.length === 0 && <p className="text-body-sm text-ink-muted">{dict.noItemsYet}</p>}
         {items.map((item) => (
           <div key={item.id} className="flex items-center justify-between gap-2 p-3 rounded-lg bg-surface-2/50">
             <div className="min-w-0">
@@ -1056,7 +1066,7 @@ function CatalogCard({
               onClick={() => handleDelete(item.id)}
               disabled={deletingId === item.id}
               className="shrink-0 p-1.5 rounded-lg text-ink-muted hover:text-semantic-danger transition-colors disabled:opacity-50"
-              title="Eliminar"
+              title={dict.delete}
             >
               <span className="material-symbols-outlined text-[16px]">delete</span>
             </button>
