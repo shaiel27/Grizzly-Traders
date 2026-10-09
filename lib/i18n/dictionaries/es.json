@@ -702,5 +702,32 @@
     "emptySearch": "Ningún activo coincide con la búsqueda.",
     "removeAria": "Quitar {name} de favoritos",
     "addAria": "Añadir {name} a favoritos"
+  },
+  "login": {
+    "pageTitle": "Acceso editores",
+    "heading": "Acceso editores",
+    "subheading": "Inicia sesión para gestionar el contenido del portal.",
+    "backToHome": "Volver al inicio",
+    "errorInvalidLink": "El enlace no es válido o ya fue usado. Solicita uno nuevo.",
+    "errorEmailNotConfirmed": "Tu correo aún no está confirmado. Confírmalo desde el mensaje que envía Supabase para poder entrar.",
+    "errorInvalidCredentials": "Correo o contraseña incorrectos.",
+    "errorGenericSignIn": "No se pudo iniciar sesión. Inténtalo de nuevo en unos minutos.",
+    "errorResendFailed": "No se pudo reenviar el correo de confirmación.",
+    "infoResendSuccess": "Te enviamos un nuevo correo de confirmación. Revisa también la carpeta de spam.",
+    "errorRecoveryFailed": "No se pudo enviar el enlace de recuperación. Inténtalo de nuevo.",
+    "infoRecoverySuccess": "Te enviamos un enlace de recuperación. Revisa tu correo y spam.",
+    "errorPasswordUpdateFailed": "No se pudo actualizar la contraseña. El enlace puede haber expirado; solicita uno nuevo.",
+    "newPasswordLabel": "Nueva contraseña",
+    "newPasswordPlaceholder": "Mínimo 8 caracteres",
+    "saveNewPassword": "Guardar contraseña",
+    "forbiddenNotice": "Tu cuenta no tiene permisos de editor.",
+    "signOut": "Cerrar sesión",
+    "resendEmail": "Reenviar correo",
+    "emailLabel": "Correo",
+    "emailPlaceholder": "tu@correo.com",
+    "passwordLabel": "Contraseña",
+    "passwordPlaceholder": "Tu contraseña",
+    "forgotPassword": "¿Olvidaste tu contraseña?",
+    "submit": "Entrar"
   }
 }

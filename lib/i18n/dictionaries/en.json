@@ -702,5 +702,32 @@
     "emptySearch": "No asset matches the search.",
     "removeAria": "Remove {name} from favorites",
     "addAria": "Add {name} to favorites"
+  },
+  "login": {
+    "pageTitle": "Editor access",
+    "heading": "Editor access",
+    "subheading": "Sign in to manage the portal's content.",
+    "backToHome": "Back to home",
+    "errorInvalidLink": "The link is invalid or has already been used. Request a new one.",
+    "errorEmailNotConfirmed": "Your email hasn't been confirmed yet. Confirm it from the message Supabase sent to be able to sign in.",
+    "errorInvalidCredentials": "Incorrect email or password.",
+    "errorGenericSignIn": "We couldn't sign you in. Please try again in a few minutes.",
+    "errorResendFailed": "We couldn't resend the confirmation email.",
+    "infoResendSuccess": "We sent you a new confirmation email. Check your spam folder too.",
+    "errorRecoveryFailed": "We couldn't send the recovery link. Please try again.",
+    "infoRecoverySuccess": "We sent you a recovery link. Check your email and spam.",
+    "errorPasswordUpdateFailed": "We couldn't update your password. The link may have expired; request a new one.",
+    "newPasswordLabel": "New password",
+    "newPasswordPlaceholder": "At least 8 characters",
+    "saveNewPassword": "Save password",
+    "forbiddenNotice": "Your account doesn't have editor permissions.",
+    "signOut": "Sign out",
+    "resendEmail": "Resend email",
+    "emailLabel": "Email",
+    "emailPlaceholder": "you@example.com",
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "Your password",
+    "forgotPassword": "Forgot your password?",
+    "submit": "Sign in"
   }
 }
