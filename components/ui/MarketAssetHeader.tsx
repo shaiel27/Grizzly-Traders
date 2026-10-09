@@ -2,9 +2,17 @@
 
 import { clsx } from 'clsx'
 import { formatCompact, formatNumber, formatPrice } from '@/lib/format'
-import { MARKET_CATEGORY_LABELS, type MarketCategory } from '@/lib/market-assets'
+import { type MarketCategory } from '@/lib/market-assets'
 import { rangePosition } from '@/lib/market-analysis'
 import type { MarketItem } from '@/lib/markets'
+import { t } from '@/lib/i18n/get-dictionary'
+import { useLocale, useDictionary } from '@/lib/i18n/LocaleProvider'
+
+// Mismo patron que AssetTable.tsx/MarketWatchlist.tsx: `description` llega en español desde el
+// catálogo (lib/assets-catalog.ts); en inglés se usa `descriptionEn` cuando existe.
+function localizedDescription(asset: MarketItem, locale: string): string {
+  return locale === 'en' && asset.descriptionEn ? asset.descriptionEn : asset.description
+}
 
 interface MarketAssetHeaderProps {
   asset: MarketItem
@@ -12,7 +20,21 @@ interface MarketAssetHeaderProps {
   onToggleFavorite: () => void
 }
 
-function RangeBar({ label, low, high, value, format }: { label: string; low: number; high: number; value: number; format: (value: number) => string }) {
+function RangeBar({
+  label,
+  low,
+  high,
+  value,
+  format,
+  ofRangeTemplate,
+}: {
+  label: string
+  low: number
+  high: number
+  value: number
+  format: (value: number) => string
+  ofRangeTemplate: string
+}) {
   const position = rangePosition(value, low, high)
   if (position === null) return null
 
@@ -20,7 +42,7 @@ function RangeBar({ label, low, high, value, format }: { label: string; low: num
     <div>
       <div className="mb-1.5 flex items-baseline justify-between text-[12px]">
         <span className="text-ink-muted">{label}</span>
-        <span className="tabular-nums text-ink-subtle">{position.toFixed(0)}% del rango</span>
+        <span className="tabular-nums text-ink-subtle">{t(ofRangeTemplate, { pct: position.toFixed(0) })}</span>
       </div>
       <div className="relative h-1 rounded-full bg-surface-2">
         <span className="absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ink ring-2 ring-surface-container-lowest" style={{ left: `${position}%` }} />
@@ -43,9 +65,12 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 export function MarketAssetHeader({ asset, isFavorite, onToggleFavorite }: MarketAssetHeaderProps) {
+  const { locale } = useLocale()
+  const dict = useDictionary()
   const up = asset.change >= 0
   const format = (value: number) => formatPrice(value, asset.symbol)
   const volume = asset.volume > 0 ? formatCompact(asset.volume) : '—'
+  const categoryLabel = dict.marketCategories[asset.category as MarketCategory] ?? asset.category
 
   return (
     <div className="px-5 pt-5">
@@ -56,7 +81,7 @@ export function MarketAssetHeader({ asset, isFavorite, onToggleFavorite }: Marke
             <button
               type="button"
               aria-pressed={isFavorite}
-              aria-label={isFavorite ? `Quitar ${asset.name} de favoritos` : `Añadir ${asset.name} a favoritos`}
+              aria-label={t(isFavorite ? dict.marketWatchlist.removeAria : dict.marketWatchlist.addAria, { name: asset.name })}
               onClick={onToggleFavorite}
               className={clsx(
                 'flex size-7 items-center justify-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-accent-blue',
@@ -69,7 +94,7 @@ export function MarketAssetHeader({ asset, isFavorite, onToggleFavorite }: Marke
             </button>
           </div>
           <p className="text-[13px] text-ink-muted">
-            {asset.description} <span className="text-ink-subtle">({MARKET_CATEGORY_LABELS[asset.category as MarketCategory] ?? asset.category})</span>
+            {localizedDescription(asset, locale)} <span className="text-ink-subtle">({categoryLabel})</span>
           </p>
         </div>
 
@@ -88,13 +113,27 @@ export function MarketAssetHeader({ asset, isFavorite, onToggleFavorite }: Marke
 
       <div className="mt-5 grid gap-x-8 gap-y-4 border-t border-hairline-soft pt-4 md:grid-cols-[auto_1fr_1fr]">
         <dl className="grid grid-cols-4 gap-x-6 md:grid-cols-2 md:gap-y-2">
-          <Stat label="Apertura" value={format(asset.open)} />
-          <Stat label="Volumen" value={volume} />
-          <Stat label="Máximo" value={format(asset.high)} />
-          <Stat label="Mínimo" value={format(asset.low)} />
+          <Stat label={dict.marketAssetHeader.statOpen} value={format(asset.open)} />
+          <Stat label={dict.marketAssetHeader.statVolume} value={volume} />
+          <Stat label={dict.marketAssetHeader.statHigh} value={format(asset.high)} />
+          <Stat label={dict.marketAssetHeader.statLow} value={format(asset.low)} />
         </dl>
-        <RangeBar label="Rango del día" low={asset.low} high={asset.high} value={asset.close} format={format} />
-        <RangeBar label="Rango de 52 semanas" low={asset.low52w} high={asset.high52w} value={asset.close} format={format} />
+        <RangeBar
+          label={dict.marketAssetHeader.dayRange}
+          low={asset.low}
+          high={asset.high}
+          value={asset.close}
+          format={format}
+          ofRangeTemplate={dict.marketAssetHeader.ofRange}
+        />
+        <RangeBar
+          label={dict.marketAssetHeader.range52w}
+          low={asset.low52w}
+          high={asset.high52w}
+          value={asset.close}
+          format={format}
+          ofRangeTemplate={dict.marketAssetHeader.ofRange}
+        />
       </div>
     </div>
   )

@@ -19,6 +19,8 @@ import {
   type PivotLevel,
   type PivotMethod,
 } from '@/lib/pivots'
+import { t } from '@/lib/i18n/get-dictionary'
+import { useLocale, useDictionary } from '@/lib/i18n/LocaleProvider'
 import { PivotLadder } from './PivotLadder'
 
 interface PivotCalculatorProps {
@@ -34,14 +36,6 @@ type FormState = Record<Field, string>
 type FormErrors = OhlcErrors & { price?: string }
 
 const EMPTY_FORM: FormState = { open: '', high: '', low: '', close: '', price: '' }
-
-const FIELDS: { key: Field; label: string; hint: string; accent: string }[] = [
-  { key: 'open', label: 'Apertura (O)', hint: 'Opcional, solo DeMark', accent: 'text-ink' },
-  { key: 'high', label: 'Máximo (H)', hint: 'Del período anterior', accent: 'text-semantic-success' },
-  { key: 'low', label: 'Mínimo (L)', hint: 'Del período anterior', accent: 'text-semantic-danger' },
-  { key: 'close', label: 'Cierre (C)', hint: 'Del período anterior', accent: 'text-accent-blue' },
-  { key: 'price', label: 'Precio actual', hint: 'Opcional, marca la posición', accent: 'text-ink' },
-]
 
 const TOLERANCES = [0.05, 0.1, 0.25, 0.5]
 
@@ -114,6 +108,26 @@ function InputField({
 }
 
 export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedAsset }: PivotCalculatorProps) {
+  const { locale } = useLocale()
+  const dict = useDictionary()
+  const calc = dict.pivotCalculator
+  const zoneDict = dict.pivotZone
+
+  const FIELDS: { key: Field; label: string; hint: string; accent: string }[] = [
+    { key: 'open', label: calc.fieldOpenLabel, hint: calc.fieldOpenHint, accent: 'text-ink' },
+    { key: 'high', label: calc.fieldHighLabel, hint: calc.fieldHighHint, accent: 'text-semantic-success' },
+    { key: 'low', label: calc.fieldLowLabel, hint: calc.fieldLowHint, accent: 'text-semantic-danger' },
+    { key: 'close', label: calc.fieldCloseLabel, hint: calc.fieldCloseHint, accent: 'text-accent-blue' },
+    { key: 'price', label: calc.fieldPriceLabel, hint: calc.fieldPriceHint, accent: 'text-ink' },
+  ]
+  const errorText: Record<string, string> = {
+    required: calc.errorRequired,
+    mustBePositive: calc.errorMustBePositive,
+    highBelowLow: calc.errorHighBelowLow,
+    closeOutOfRange: calc.errorCloseOutOfRange,
+    openOutOfRange: calc.errorOpenOutOfRange,
+  }
+
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [touched, setTouched] = useState<Partial<Record<Field, boolean>>>({})
   const [assetTv, setAssetTv] = useState<string | null>(null)
@@ -138,9 +152,9 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
       price: parseDecimal(priceText),
     }
     const errors: FormErrors = validateOhlc({ high: numbers.high, low: numbers.low, close: numbers.close, open: numbers.open })
-    if (priceText.trim() !== '' && !(numbers.price > 0)) errors.price = 'Debe ser un número mayor que 0'
+    if (priceText.trim() !== '' && !(numbers.price > 0)) errors.price = calc.priceValidation
     return { numbers, errors }
-  }, [form.open, form.high, form.low, form.close, priceText])
+  }, [form.open, form.high, form.low, form.close, priceText, calc.priceValidation])
 
   const { numbers, errors } = parsed
   const ready = Object.keys(errors).length === 0
@@ -159,7 +173,11 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
     [confluences]
   )
 
-  const shownError = (field: Field) => (touched[field] || form[field].trim() !== '' ? errors[field] : undefined)
+  const shownError = (field: Field) => {
+    if (!(touched[field] || form[field].trim() !== '')) return undefined
+    const raw = errors[field]
+    return raw ? (errorText[raw] ?? raw) : undefined
+  }
 
   function setField(field: Field, value: string) {
     setForm((current) => ({ ...current, [field]: value }))
@@ -203,9 +221,11 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
     }
   }
 
+  const methodLabel = locale === 'en' ? PIVOT_METHOD_INFO[method].labelEn : PIVOT_METHOD_INFO[method].label
+
   const copyAllText = (list: PivotLevel[]) =>
     [
-      `${assetTv ? PIVOT_ASSET_BY_TV.get(assetTv)?.label : 'Pivot points'} · ${PIVOT_METHOD_INFO[method].label}`,
+      `${assetTv ? PIVOT_ASSET_BY_TV.get(assetTv)?.label : 'Pivot points'} · ${methodLabel}`,
       ...list.map((level) => `${level.label}: ${formatLevel(level.value, price, symbol)}`),
     ].join('\n')
 
@@ -221,9 +241,9 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
             <span className="material-symbols-outlined text-[20px] text-accent-blue" aria-hidden="true">
               calculate
             </span>
-            Calculadora de Pivot Points
+            {calc.title}
           </h2>
-          <p className="mt-0.5 text-body-sm text-ink-muted">Carga un activo o escribe los datos del período anterior.</p>
+          <p className="mt-0.5 text-body-sm text-ink-muted">{calc.subtitle}</p>
         </div>
         {hasAnyValue && (
           <button
@@ -231,7 +251,7 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
             onClick={clearForm}
             className="rounded-lg border border-outline-variant/40 px-3 py-1.5 text-micro text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
           >
-            Limpiar
+            {calc.clear}
           </button>
         )}
       </div>
@@ -240,10 +260,10 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
         <section aria-labelledby="calc-asset-heading">
           <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
             <h3 id="calc-asset-heading" className="text-micro font-bold uppercase tracking-wider text-ink-muted">
-              Cargar un activo
+              {calc.loadAssetHeading}
             </h3>
             <p className="text-micro text-ink-subtle">
-              Período: <span className="font-bold text-ink">{timeframeLabel}</span> ({periodLabel}). Se cambia arriba en la página.
+              {calc.periodInfoPrefix} <span className="font-bold text-ink">{timeframeLabel}</span> {t(calc.periodInfoSuffix, { period: periodLabel })}
             </p>
           </div>
 
@@ -255,7 +275,7 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
                 disabled={!quoteByTv.has(selectedAsset)}
                 className="rounded-xl border border-accent-blue/50 bg-accent-blue/10 px-3 py-2 text-xs font-bold text-accent-blue transition-colors hover:bg-accent-blue/20 disabled:opacity-40"
               >
-                Usar {PIVOT_ASSET_BY_TV.get(selectedAsset)?.label}
+                {t(calc.useAsset, { label: PIVOT_ASSET_BY_TV.get(selectedAsset)?.label ?? '' })}
               </button>
             )}
             {availablePresets.map((tv) => {
@@ -281,7 +301,7 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
             })}
 
             <label className="sr-only" htmlFor="calc-asset-select">
-              Más activos
+              {calc.moreAssetsLabel}
             </label>
             <select
               id="calc-asset-select"
@@ -289,12 +309,12 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
               onChange={(event) => event.target.value && loadAsset(event.target.value)}
               className="rounded-xl border border-outline-variant/70 bg-surface-2/50 px-3 py-2 text-xs font-bold text-ink-muted transition-colors hover:border-outline-variant focus:border-accent-blue focus:outline-none"
             >
-              <option value="">Más activos…</option>
+              <option value="">{calc.moreAssetsOption}</option>
               {PIVOT_CATEGORIES.map((category) => (
-                <optgroup key={category.key} label={category.label}>
+                <optgroup key={category.key} label={dict.marketCategories[category.key]}>
                   {PIVOT_ASSETS.filter((asset) => asset.category === category.key).map((asset) => (
                     <option key={asset.tv} value={asset.tv} disabled={!quoteByTv.has(asset.tv)}>
-                      {asset.label} — {asset.name}
+                      {asset.label} — {locale === 'en' ? asset.nameEn : asset.name}
                     </option>
                   ))}
                 </optgroup>
@@ -307,16 +327,16 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
               <span className="material-symbols-outlined text-[14px] text-semantic-success" aria-hidden="true">
                 check_circle
               </span>
-              Datos cargados: {source}
-              {modified && ' (modificado)'}
-              {livePrice && <span className="text-ink-subtle"> · precio actual en vivo</span>}
+              {t(calc.dataLoaded, { source })}
+              {modified && ` ${calc.modifiedSuffix}`}
+              {livePrice && <span className="text-ink-subtle"> · {calc.livePriceNote}</span>}
             </p>
           )}
         </section>
 
         <section aria-labelledby="calc-inputs-heading">
           <h3 id="calc-inputs-heading" className="sr-only">
-            Datos del período
+            {calc.periodDataHeading}
           </h3>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
             {FIELDS.map((field) => (
@@ -333,24 +353,22 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
               />
             ))}
           </div>
-          <p className="mt-2 text-micro text-ink-subtle">
-            Los niveles se calculan con el máximo, mínimo y cierre del período anterior. Acepta punto o coma como separador decimal.
-          </p>
+          <p className="mt-2 text-micro text-ink-subtle">{calc.fieldsNote}</p>
         </section>
 
         {ready && result && position ? (
           <>
             <div className="grid grid-cols-3 gap-3 rounded-xl border border-outline-variant/20 bg-surface-2/40 px-4 py-3 text-center sm:flex sm:items-center sm:gap-8 sm:text-left">
               <div>
-                <p className="text-micro text-ink-muted">Rango</p>
+                <p className="text-micro text-ink-muted">{calc.rangeLabel}</p>
                 <p className="font-mono text-sm font-bold tabular-nums text-ink">{formatLevel(range, price, symbol)}</p>
               </div>
               <div>
-                <p className="text-micro text-ink-muted">Volatilidad</p>
+                <p className="text-micro text-ink-muted">{calc.volatilityLabel}</p>
                 <p className="font-mono text-sm font-bold tabular-nums text-ink">{((range / numbers.close) * 100).toFixed(2)}%</p>
               </div>
               <div>
-                <p className="text-micro text-ink-muted">Cierre en el rango</p>
+                <p className="text-micro text-ink-muted">{calc.closeInRangeLabel}</p>
                 <p className={clsx('font-mono text-sm font-bold tabular-nums', numbers.close >= (numbers.high + numbers.low) / 2 ? 'text-semantic-success' : 'text-semantic-danger')}>
                   {range > 0 ? (((numbers.close - numbers.low) / range) * 100).toFixed(0) : '50'}%
                 </p>
@@ -359,9 +377,9 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
 
             <section aria-labelledby="calc-method-heading">
               <h3 id="calc-method-heading" className="sr-only">
-                Método de cálculo
+                {calc.methodHeading}
               </h3>
-              <div className="mb-3 flex gap-1 overflow-x-auto rounded-xl bg-surface-2 p-1" role="group" aria-label="Método">
+              <div className="mb-3 flex gap-1 overflow-x-auto rounded-xl bg-surface-2 p-1" role="group" aria-label={calc.methodAria}>
                 {PIVOT_METHODS.map((option) => (
                   <button
                     key={option}
@@ -373,12 +391,12 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
                       method === option ? 'bg-surface-container-lowest text-ink shadow-sm' : 'text-ink-muted hover:text-ink'
                     )}
                   >
-                    {PIVOT_METHOD_INFO[option].label}
+                    {locale === 'en' ? PIVOT_METHOD_INFO[option].labelEn : PIVOT_METHOD_INFO[option].label}
                   </button>
                 ))}
               </div>
               <div className="rounded-xl border border-accent-blue/20 bg-accent-blue/5 px-4 py-3">
-                <p className="text-body-sm text-ink">{PIVOT_METHOD_INFO[method].description}</p>
+                <p className="text-body-sm text-ink">{locale === 'en' ? PIVOT_METHOD_INFO[method].descriptionEn : PIVOT_METHOD_INFO[method].description}</p>
                 <p className="mt-1 font-mono text-xs text-accent-blue">{PIVOT_METHOD_INFO[method].formula}</p>
               </div>
             </section>
@@ -388,7 +406,7 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
 
               <div className="rounded-xl border border-outline-variant/40 bg-surface-2/30 p-4">
                 <div className="mb-3 flex items-center justify-between gap-2">
-                  <h3 className="text-micro font-bold uppercase tracking-wider text-ink-muted">Niveles · {PIVOT_METHOD_INFO[method].label}</h3>
+                  <h3 className="text-micro font-bold uppercase tracking-wider text-ink-muted">{t(calc.levelsHeading, { method: methodLabel })}</h3>
                   <button
                     type="button"
                     onClick={() => copy(copyAllText(levels), 'all')}
@@ -397,17 +415,17 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
                     <span className="material-symbols-outlined text-[14px]" aria-hidden="true">
                       {copied === 'all' ? 'check' : 'content_copy'}
                     </span>
-                    {copied === 'all' ? 'Copiado' : 'Copiar todo'}
+                    {copied === 'all' ? calc.copied : calc.copyAll}
                   </button>
                 </div>
 
                 <table className="w-full text-left">
-                  <caption className="sr-only">Niveles del método {PIVOT_METHOD_INFO[method].label} y su distancia al precio actual</caption>
+                  <caption className="sr-only">{t(calc.levelsCaption, { method: methodLabel })}</caption>
                   <thead>
                     <tr className="text-[10px] uppercase tracking-wider text-ink-subtle">
-                      <th scope="col" className="pb-2 font-bold">Nivel</th>
-                      <th scope="col" className="pb-2 text-right font-bold">Precio</th>
-                      <th scope="col" className="pb-2 text-right font-bold">Distancia</th>
+                      <th scope="col" className="pb-2 font-bold">{calc.colLevel}</th>
+                      <th scope="col" className="pb-2 text-right font-bold">{calc.colPrice}</th>
+                      <th scope="col" className="pb-2 text-right font-bold">{calc.colDistance}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -422,10 +440,10 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
                             <button
                               type="button"
                               onClick={() => copy(formatLevel(level.value, price, symbol).replace(/,/g, ''), level.key)}
-                              title="Copiar valor"
+                              title={calc.copyValueTitle}
                               className="rounded px-1.5 py-0.5 font-mono text-sm tabular-nums text-ink transition-colors hover:bg-surface-2"
                             >
-                              {copied === level.key ? 'Copiado' : formatLevel(level.value, price, symbol)}
+                              {copied === level.key ? calc.copied : formatLevel(level.value, price, symbol)}
                             </button>
                           </td>
                           <td className="py-2 pr-1 text-right font-mono text-xs tabular-nums text-ink-muted">{signed(distancePct(level.value, price))}</td>
@@ -436,12 +454,14 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
                 </table>
 
                 <p className="mt-3 border-t border-hairline-soft pt-3 text-micro text-ink-muted">
-                  Precio en <span className="font-mono font-bold text-ink">{formatLevel(price, price, symbol)}</span> ·{' '}
-                  <span className="font-bold text-ink">{position.zone}</span>
+                  {calc.priceAtPrefix} <span className="font-mono font-bold text-ink">{formatLevel(price, price, symbol)}</span> ·{' '}
+                  <span className="font-bold text-ink">
+                    {t(zoneDict[position.zoneKind], { support: position.support?.label ?? '', resistance: position.resistance?.label ?? '' })}
+                  </span>
                   {position.bias !== 'neutral' && (
                     <span className={position.bias === 'bullish' ? 'text-semantic-success' : 'text-semantic-danger'}>
                       {' '}
-                      · sesgo {position.bias === 'bullish' ? 'alcista' : 'bajista'}
+                      · {t(calc.biasSuffix, { bias: position.bias === 'bullish' ? calc.biasBullishLower : calc.biasBearishLower })}
                     </span>
                   )}
                 </p>
@@ -452,10 +472,10 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
               <section className="rounded-xl border border-outline-variant/40 bg-surface-2/30 p-4" aria-labelledby="calc-confluence-heading">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <h3 id="calc-confluence-heading" className="text-micro font-bold uppercase tracking-wider text-ink-muted">
-                    Zonas de confluencia
+                    {calc.confluenceHeading}
                   </h3>
                   <label className="flex items-center gap-2 text-micro text-ink-subtle">
-                    Tolerancia
+                    {calc.toleranceLabel}
                     <select
                       value={tolerance}
                       onChange={(event) => setTolerance(Number(event.target.value))}
@@ -471,7 +491,7 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
                 </div>
 
                 {confluences.length === 0 ? (
-                  <p className="text-body-sm text-ink-muted">Ningún nivel de distintos métodos coincide con esta tolerancia.</p>
+                  <p className="text-body-sm text-ink-muted">{calc.noConfluences}</p>
                 ) : (
                   <ul className="space-y-2">
                     {confluences.map((confluence) => (
@@ -479,7 +499,9 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
                         <div className="min-w-0">
                           <p className="font-mono text-sm font-bold tabular-nums text-ink">{formatLevel(confluence.value, price, symbol)}</p>
                           <p className="truncate text-[11px] text-ink-muted">
-                            {confluence.levels.map((level) => `${PIVOT_METHOD_INFO[level.method].short} ${level.label}`).join(' · ')}
+                            {confluence.levels
+                              .map((level) => `${locale === 'en' ? PIVOT_METHOD_INFO[level.method].shortEn : PIVOT_METHOD_INFO[level.method].short} ${level.label}`)
+                              .join(' · ')}
                           </p>
                         </div>
                         <span className="shrink-0 font-mono text-xs tabular-nums text-ink-muted">{signed(distancePct(confluence.value, price))}</span>
@@ -491,16 +513,16 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
 
               <section className="min-w-0 rounded-xl border border-outline-variant/40 bg-surface-2/30 p-4" aria-labelledby="calc-matrix-heading">
                 <h3 id="calc-matrix-heading" className="mb-3 text-micro font-bold uppercase tracking-wider text-ink-muted">
-                  Comparación de métodos
+                  {calc.matrixHeading}
                 </h3>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[26rem] text-right">
                     <thead>
                       <tr className="text-[10px] uppercase tracking-wider text-ink-subtle">
-                        <th scope="col" className="pb-2 text-left font-bold">Nivel</th>
+                        <th scope="col" className="pb-2 text-left font-bold">{calc.matrixColLevel}</th>
                         {PIVOT_METHODS.map((option) => (
                           <th key={option} scope="col" className={clsx('pb-2 pl-2 font-bold', option === method && 'text-accent-blue')}>
-                            {PIVOT_METHOD_INFO[option].short}
+                            {locale === 'en' ? PIVOT_METHOD_INFO[option].shortEn : PIVOT_METHOD_INFO[option].short}
                           </th>
                         ))}
                       </tr>
@@ -522,7 +544,11 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
                                 )}
                               >
                                 {value === undefined ? '—' : formatLevel(value, price, symbol)}
-                                {inConfluence && <span className="ml-1 text-accent-blue" title="Confluencia con otro método" aria-label="en confluencia">●</span>}
+                                {inConfluence && (
+                                  <span className="ml-1 text-accent-blue" title={calc.confluenceTitle} aria-label={calc.confluenceAria}>
+                                    ●
+                                  </span>
+                                )}
                               </td>
                             )
                           })}
@@ -532,7 +558,7 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
                   </table>
                 </div>
                 <p className="mt-2 text-[10px] text-ink-subtle">
-                  <span className="text-accent-blue">●</span> Nivel que coincide con otro método dentro de la tolerancia.
+                  <span className="text-accent-blue">●</span> {calc.matrixFootnote}
                 </p>
               </section>
             </div>
@@ -542,10 +568,8 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
             <span className="material-symbols-outlined mb-3 block text-5xl text-ink-subtle" aria-hidden="true">
               candlestick_chart
             </span>
-            <p className="mb-1 text-body text-ink-muted">
-              {hasAnyValue ? 'Corrige los campos marcados para ver los niveles' : 'Elige un activo o escribe los datos del período anterior'}
-            </p>
-            <p className="text-micro text-ink-subtle">Hacen falta el máximo, el mínimo y el cierre.</p>
+            <p className="mb-1 text-body text-ink-muted">{hasAnyValue ? calc.emptyFixFields : calc.emptyPickAsset}</p>
+            <p className="text-micro text-ink-subtle">{calc.emptyNeedHLC}</p>
           </div>
         )}
       </div>

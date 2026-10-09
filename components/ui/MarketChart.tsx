@@ -21,6 +21,7 @@ import { TIMEFRAMES, TIMEFRAME_KEYS, type Candle, type TimeframeKey } from '@/li
 import { formatCompact, formatLevel } from '@/lib/format'
 import { INDICATORS, toLinePoints, type IndicatorKey } from '@/lib/indicators'
 import { useDictionary } from '@/lib/i18n/LocaleProvider'
+import { t } from '@/lib/i18n/get-dictionary'
 
 export interface ChartLevel {
   price: number
@@ -174,21 +175,21 @@ export function MarketChart({
         const response = await fetch(`/api/candles?symbol=${encodeURIComponent(symbol)}&tf=${timeframe}`, { signal: controller.signal })
         const body = await response.json().catch(() => ({}))
         if (body.noData || response.status === 404) {
-          setState({ key, status: 'no-data', message: body.error ?? 'No hay datos para este activo', reason: body.reason === 'asset' ? 'asset' : 'timeframe' })
+          setState({ key, status: 'no-data', message: body.error ?? dict.marketChart.noDataForAsset, reason: body.reason === 'asset' ? 'asset' : 'timeframe' })
         } else if (!response.ok || !body.success) {
-          throw new Error(body.error ?? 'No se pudo cargar el gráfico')
+          throw new Error(body.error ?? dict.marketChart.loadFailed)
         } else {
           setState({ key, status: 'ready', candles: body.data, stale: body.stale === true })
         }
       } catch (error) {
         if (controller.signal.aborted) return
-        setState({ key, status: 'error', message: error instanceof Error ? error.message : 'No se pudo cargar el gráfico' })
+        setState({ key, status: 'error', message: error instanceof Error ? error.message : dict.marketChart.loadFailed })
       }
     }
 
     load()
     return () => controller.abort()
-  }, [symbol, timeframe, key])
+  }, [symbol, timeframe, key, dict.marketChart.noDataForAsset, dict.marketChart.loadFailed])
 
   // Candles, volume and moving averages
   useEffect(() => {
@@ -325,7 +326,7 @@ export function MarketChart({
       aria-label={`Gráfico de ${name}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-hairline-soft px-3 py-2">
-        <div role="group" aria-label="Temporalidad" className="flex items-center gap-0.5">
+        <div role="group" aria-label={dict.marketChart.timeframeAria} className="flex items-center gap-0.5">
           {TIMEFRAME_KEYS.map((option) => (
             <button
               key={option}
@@ -449,7 +450,7 @@ export function MarketChart({
 
         {loading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface-container-lowest/70" role="status">
-            <span className="text-[13px] text-ink-muted">Cargando {TIMEFRAMES[timeframe].label}…</span>
+            <span className="text-[13px] text-ink-muted">{t(dict.marketChart.loadingTimeframe, { timeframe: TIMEFRAMES[timeframe].label })}</span>
           </div>
         )}
 
@@ -462,13 +463,11 @@ export function MarketChart({
                 onClick={() => setAttempt((value) => value + 1)}
                 className="h-8 rounded-[6px] border border-hairline px-3 text-[13px] font-medium text-ink transition-colors hover:bg-surface-2"
               >
-                Reintentar
+                {dict.marketChart.retry}
               </button>
             ) : (
               <p className="max-w-sm text-[13px] text-ink-muted">
-                {state.reason === 'asset'
-                  ? 'Los precios y los indicadores técnicos de este activo siguen disponibles en el resto de la página.'
-                  : 'Prueba con otra temporalidad o elige otro activo de la lista.'}
+                {state.reason === 'asset' ? dict.marketChart.noDataAssetHint : dict.marketChart.noDataTimeframeHint}
               </p>
             )}
           </div>
@@ -476,9 +475,7 @@ export function MarketChart({
       </div>
 
       <p className="border-t border-hairline-soft px-3 py-2 text-[11px] text-ink-subtle" aria-live="polite">
-        {state?.status === 'ready' && state.stale
-          ? 'El proveedor no responde: se muestran los últimos datos guardados.'
-          : 'Datos de Yahoo Finance, con posible retraso.'}
+        {state?.status === 'ready' && state.stale ? dict.marketChart.staleData : dict.marketChart.sourceNote}
       </p>
     </section>
   )

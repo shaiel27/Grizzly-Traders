@@ -78,7 +78,8 @@ export interface CategorySummary extends MarketSummary {
 }
 
 // One entry per category that has data, best average first
-export function summarizeCategories(assets: OverviewAsset[]): CategorySummary[] {
+export function summarizeCategories(assets: OverviewAsset[], locale: Locale = 'es'): CategorySummary[] {
+  const labels = getDictionary(locale).marketCategories
   return (Object.keys(MARKET_CATEGORY_LABELS) as MarketCategory[])
     .map((category) => {
       const members = assets.filter((asset) => asset.category === category && hasChange(asset))
@@ -86,7 +87,7 @@ export function summarizeCategories(assets: OverviewAsset[]): CategorySummary[] 
       return {
         ...summarizeMarket(members),
         category,
-        label: MARKET_CATEGORY_LABELS[category],
+        label: labels[category],
         best: sorted[0] ?? null,
         worst: sorted.length > 1 ? sorted[sorted.length - 1] : null,
       }

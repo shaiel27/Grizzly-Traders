@@ -72,7 +72,8 @@ interface PivotPointsClientProps {
 
 export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
   const { locale } = useLocale()
-  const dict = useDictionary().pivotPoints
+  const fullDict = useDictionary()
+  const dict = fullDict.pivotPoints
 
   const SORT_OPTIONS: { key: SortKey; label: string }[] = [
     { key: 'default', label: dict.sortDefault },
@@ -140,6 +141,8 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
 
   const loading = quotesTimeframe !== timeframe
   const timeframeInfo = PIVOT_TIMEFRAMES.find((option) => option.key === timeframe)!
+  const timeframeLabel = locale === 'en' ? timeframeInfo.labelEn : timeframeInfo.label
+  const periodText = locale === 'en' ? timeframeInfo.periodEn : timeframeInfo.period
 
   const rows = useMemo<PivotRow[]>(() => {
     if (loading) return []
@@ -197,7 +200,7 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
             </span>
             <h1 className="text-display-lg-mobile font-bold text-ink sm:text-display-lg">{dict.pageTitle}</h1>
           </div>
-          <p className="max-w-3xl text-body text-on-surface-variant">{t(dict.description, { period: timeframeInfo.period })}</p>
+          <p className="max-w-3xl text-body text-on-surface-variant">{t(dict.description, { period: periodText })}</p>
           <p className="mt-2 flex items-center gap-2 text-micro text-ink-subtle">
             <span className="relative flex size-1.5" aria-hidden="true">
               {!error && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-semantic-success opacity-75 motion-reduce:animate-none" />}
@@ -229,7 +232,11 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
                 label={dict.periodLabel}
                 value={timeframe}
                 onChange={setTimeframe}
-                options={PIVOT_TIMEFRAMES.map((option) => ({ key: option.key, label: option.label, title: t(dict.periodTitle, { period: option.period }) }))}
+                options={PIVOT_TIMEFRAMES.map((option) => ({
+                  key: option.key,
+                  label: locale === 'en' ? option.labelEn : option.label,
+                  title: t(dict.periodTitle, { period: locale === 'en' ? option.periodEn : option.period }),
+                }))}
               />
             </div>
             <div className="flex min-w-0 max-w-full flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
@@ -238,14 +245,23 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
                 label={dict.methodLabel}
                 value={method}
                 onChange={setMethod}
-                options={PIVOT_METHODS.map((option) => ({ key: option, label: PIVOT_METHOD_INFO[option].short, title: PIVOT_METHOD_INFO[option].levels }))}
+                options={PIVOT_METHODS.map((option) => ({
+                  key: option,
+                  label: locale === 'en' ? PIVOT_METHOD_INFO[option].shortEn : PIVOT_METHOD_INFO[option].short,
+                  title: PIVOT_METHOD_INFO[option].levels,
+                }))}
               />
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 border-t border-hairline-soft pt-4">
             <div role="group" aria-label={dict.categoriesAria} className="flex flex-wrap gap-2">
-              {([{ key: 'all', label: dict.categoryAll }, ...PIVOT_CATEGORIES] as { key: CategoryFilter; label: string }[]).map((option) => (
+              {(
+                [
+                  { key: 'all', label: dict.categoryAll },
+                  ...PIVOT_CATEGORIES.map((c) => ({ key: c.key, label: fullDict.marketCategories[c.key] })),
+                ] as { key: CategoryFilter; label: string }[]
+              ).map((option) => (
                 <button
                   key={option.key}
                   type="button"
@@ -332,7 +348,7 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
 
             {missingAssets.length > 0 && (
               <p className="border-b border-hairline-soft px-6 py-2 text-micro text-ink-subtle">
-                {t(dict.missingAssets, { period: timeframeInfo.period, names: missingAssets.map((asset) => asset.label).join(', ') })}
+                {t(dict.missingAssets, { period: periodText, names: missingAssets.map((asset) => asset.label).join(', ') })}
               </p>
             )}
 
@@ -377,7 +393,7 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
                 quote={selectedRow.quote}
                 method={method}
                 timeframe={timeframe}
-                periodLabel={timeframeInfo.period}
+                periodLabel={periodText}
               />
             ) : (
               <div className="h-[560px] animate-pulse motion-reduce:animate-none rounded-2xl bg-surface-2" role="status" aria-live="polite">
@@ -390,8 +406,8 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
         <section className="mb-10" aria-label={dict.calculatorAria}>
           <PivotCalculator
             quotes={loading ? [] : quotes}
-            timeframeLabel={timeframeInfo.label}
-            periodLabel={timeframeInfo.period}
+            timeframeLabel={timeframeLabel}
+            periodLabel={periodText}
             selectedAsset={selectedRow?.asset.tv ?? null}
           />
         </section>

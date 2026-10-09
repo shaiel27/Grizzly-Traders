@@ -2,10 +2,10 @@
 
 export type PivotTimeframe = 'D' | 'W' | 'M'
 
-export const PIVOT_TIMEFRAMES: { key: PivotTimeframe; label: string; period: string }[] = [
-  { key: 'D', label: 'Diario', period: 'sesión anterior' },
-  { key: 'W', label: 'Semanal', period: 'semana anterior' },
-  { key: 'M', label: 'Mensual', period: 'mes anterior' },
+export const PIVOT_TIMEFRAMES: { key: PivotTimeframe; label: string; labelEn: string; period: string; periodEn: string }[] = [
+  { key: 'D', label: 'Diario', labelEn: 'Daily', period: 'sesión anterior', periodEn: 'previous session' },
+  { key: 'W', label: 'Semanal', labelEn: 'Weekly', period: 'semana anterior', periodEn: 'previous week' },
+  { key: 'M', label: 'Mensual', labelEn: 'Monthly', period: 'mes anterior', periodEn: 'previous month' },
 ]
 
 export function isPivotTimeframe(value: string): value is PivotTimeframe {
