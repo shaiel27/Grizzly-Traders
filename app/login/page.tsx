@@ -3,11 +3,13 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getEditor } from '@/lib/auth'
+import { getServerLocale } from '@/lib/i18n/server'
+import { getDictionary } from '@/lib/i18n/get-dictionary'
 import { LoginForm } from './LoginForm'
 
-export const metadata: Metadata = {
-  title: 'Acceso editores',
-  robots: { index: false, follow: false },
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getServerLocale()
+  return { title: getDictionary(locale).login.pageTitle, robots: { index: false, follow: false } }
 }
 
 export default async function LoginPage({
@@ -17,6 +19,8 @@ export default async function LoginPage({
 }) {
   const editor = await getEditor()
   const { recovery, error } = await searchParams
+  const locale = await getServerLocale()
+  const dict = getDictionary(locale)
 
   // A recovery session must not bounce straight to /cms: the user still needs to pick a new password.
   if (editor.status === 'ok' && recovery !== '1') redirect('/cms')
@@ -46,8 +50,8 @@ export default async function LoginPage({
 
         <div className="rounded-2xl border border-hairline bg-surface-1/90 p-6 shadow-[0_24px_64px_rgba(0,0,0,0.55)] backdrop-blur-sm sm:p-8">
           <div className="mb-6 text-center">
-            <h1 className="text-headline font-bold text-ink">Acceso editores</h1>
-            <p className="mt-1.5 text-body-sm text-ink-muted">Inicia sesión para gestionar el contenido del portal.</p>
+            <h1 className="text-headline font-bold text-ink">{dict.login.heading}</h1>
+            <p className="mt-1.5 text-body-sm text-ink-muted">{dict.login.subheading}</p>
           </div>
 
           <LoginForm forbidden={editor.status === 'forbidden'} recovery={recovery === '1'} error={error} />
@@ -60,7 +64,7 @@ export default async function LoginPage({
           <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
             arrow_back
           </span>
-          Volver al inicio
+          {dict.login.backToHome}
         </Link>
       </div>
     </main>

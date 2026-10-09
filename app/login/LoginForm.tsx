@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { useDictionary } from '@/lib/i18n/LocaleProvider'
 
 type Notice = { tone: 'error' | 'info'; text: string; canResend?: boolean }
 
@@ -16,12 +17,11 @@ export function LoginForm({
   recovery?: boolean
   error?: string
 }) {
+  const dict = useDictionary().login
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
-  const [notice, setNotice] = useState<Notice | null>(
-    error === 'enlace' ? { tone: 'error', text: 'El enlace no es válido o ya fue usado. Solicita uno nuevo.' } : null
-  )
+  const [notice, setNotice] = useState<Notice | null>(error === 'enlace' ? { tone: 'error', text: dict.errorInvalidLink } : null)
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (event: FormEvent) => {
@@ -34,15 +34,11 @@ export function LoginForm({
 
     if (error) {
       if (error.code === 'email_not_confirmed') {
-        setNotice({
-          tone: 'error',
-          text: 'Tu correo aún no está confirmado. Confírmalo desde el mensaje que envía Supabase para poder entrar.',
-          canResend: true,
-        })
+        setNotice({ tone: 'error', text: dict.errorEmailNotConfirmed, canResend: true })
       } else if (error.code === 'invalid_credentials') {
-        setNotice({ tone: 'error', text: 'Correo o contraseña incorrectos.' })
+        setNotice({ tone: 'error', text: dict.errorInvalidCredentials })
       } else {
-        setNotice({ tone: 'error', text: 'No se pudo iniciar sesión. Inténtalo de nuevo en unos minutos.' })
+        setNotice({ tone: 'error', text: dict.errorGenericSignIn })
       }
       setLoading(false)
       return
@@ -55,11 +51,7 @@ export function LoginForm({
 
   const handleResend = async () => {
     const { error } = await createClient().auth.resend({ type: 'signup', email })
-    setNotice(
-      error
-        ? { tone: 'error', text: 'No se pudo reenviar el correo de confirmación.' }
-        : { tone: 'info', text: 'Te enviamos un nuevo correo de confirmación. Revisa también la carpeta de spam.' }
-    )
+    setNotice(error ? { tone: 'error', text: dict.errorResendFailed } : { tone: 'info', text: dict.infoResendSuccess })
   }
 
   const handleSignOut = async () => {
@@ -77,11 +69,7 @@ export function LoginForm({
       redirectTo: `${origin}/auth/callback?recovery=1`,
     })
 
-    setNotice(
-      error
-        ? { tone: 'error', text: 'No se pudo enviar el enlace de recuperación. Inténtalo de nuevo.' }
-        : { tone: 'info', text: 'Te enviamos un enlace de recuperación. Revisa tu correo y spam.' }
-    )
+    setNotice(error ? { tone: 'error', text: dict.errorRecoveryFailed } : { tone: 'info', text: dict.infoRecoverySuccess })
     setLoading(false)
   }
 
@@ -93,10 +81,7 @@ export function LoginForm({
     const { error } = await createClient().auth.updateUser({ password: newPassword })
 
     if (error) {
-      setNotice({
-        tone: 'error',
-        text: 'No se pudo actualizar la contraseña. El enlace puede haber expirado; solicita uno nuevo.',
-      })
+      setNotice({ tone: 'error', text: dict.errorPasswordUpdateFailed })
       setLoading(false)
       return
     }
@@ -121,8 +106,8 @@ export function LoginForm({
         )}
 
         <Input
-          label="Nueva contraseña"
-          placeholder="Mínimo 8 caracteres"
+          label={dict.newPasswordLabel}
+          placeholder={dict.newPasswordPlaceholder}
           type="password"
           autoComplete="new-password"
           required
@@ -131,7 +116,7 @@ export function LoginForm({
           onChange={(event) => setNewPassword(event.target.value)}
         />
         <Button type="submit" variant="primary" size="lg" loading={loading} className="w-full">
-          Guardar contraseña
+          {dict.saveNewPassword}
         </Button>
       </form>
     )
@@ -141,9 +126,9 @@ export function LoginForm({
     <form onSubmit={handleSubmit} className="space-y-5">
       {forbidden && (
         <div role="alert" className="rounded-xl border border-semantic-danger/40 bg-semantic-danger/10 p-3 text-body-sm text-ink">
-          Tu cuenta no tiene permisos de editor.{' '}
+          {dict.forbiddenNotice}{' '}
           <button type="button" onClick={handleSignOut} className="underline">
-            Cerrar sesión
+            {dict.signOut}
           </button>
         </div>
       )}
@@ -162,7 +147,7 @@ export function LoginForm({
             <>
               {' '}
               <button type="button" onClick={handleResend} className="underline">
-                Reenviar correo
+                {dict.resendEmail}
               </button>
             </>
           )}
@@ -170,8 +155,8 @@ export function LoginForm({
       )}
 
       <Input
-        label="Correo"
-        placeholder="tu@correo.com"
+        label={dict.emailLabel}
+        placeholder={dict.emailPlaceholder}
         type="email"
         autoComplete="email"
         required
@@ -180,8 +165,8 @@ export function LoginForm({
       />
       <div>
         <Input
-          label="Contraseña"
-          placeholder="Tu contraseña"
+          label={dict.passwordLabel}
+          placeholder={dict.passwordPlaceholder}
           type="password"
           autoComplete="current-password"
           required
@@ -194,11 +179,11 @@ export function LoginForm({
           disabled={!email || loading}
           className="mt-2 text-body-sm text-ink-muted underline transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
         >
-          ¿Olvidaste tu contraseña?
+          {dict.forgotPassword}
         </button>
       </div>
       <Button type="submit" variant="primary" size="lg" loading={loading} className="w-full">
-        Entrar
+        {dict.submit}
       </Button>
     </form>
   )
