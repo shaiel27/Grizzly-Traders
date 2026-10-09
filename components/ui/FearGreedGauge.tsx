@@ -2,20 +2,20 @@
 
 import { useEffect, useState } from 'react'
 import { clsx } from 'clsx'
-
-const ZONES = [
-  { max: 25, label: 'Miedo extremo', color: 'var(--semantic-danger)' },
-  { max: 45, label: 'Miedo', color: 'var(--gradient-orange)' },
-  { max: 55, label: 'Neutral', color: 'var(--semantic-warning)' },
-  { max: 75, label: 'Codicia', color: 'var(--accent-blue)' },
-  { max: 100, label: 'Codicia extrema', color: 'var(--semantic-success)' },
-]
-
-function zoneFor(value: number) {
-  return ZONES.find((zone) => value <= zone.max) ?? ZONES[ZONES.length - 1]
-}
+import { t } from '@/lib/i18n/get-dictionary'
+import { useDictionary } from '@/lib/i18n/LocaleProvider'
 
 export function FearGreedGauge() {
+  const dict = useDictionary().fearGreed
+  const ZONES = [
+    { max: 25, label: dict.extremeFear, color: 'var(--semantic-danger)' },
+    { max: 45, label: dict.fear, color: 'var(--gradient-orange)' },
+    { max: 55, label: dict.neutral, color: 'var(--semantic-warning)' },
+    { max: 75, label: dict.greed, color: 'var(--accent-blue)' },
+    { max: 100, label: dict.extremeGreed, color: 'var(--semantic-success)' },
+  ]
+  const zoneFor = (value: number) => ZONES.find((zone) => value <= zone.max) ?? ZONES[ZONES.length - 1]
+
   const [value, setValue] = useState<number | null>(null)
   const [failed, setFailed] = useState(false)
 
@@ -42,14 +42,14 @@ export function FearGreedGauge() {
   const needleY = 60 - 42 * Math.sin(angle)
 
   return (
-    <section aria-label="Miedo y codicia en cripto">
-      <h3 className="mb-3 text-[13px] font-semibold text-ink">Miedo y codicia en cripto</h3>
+    <section aria-label={dict.heading}>
+      <h3 className="mb-3 text-[13px] font-semibold text-ink">{dict.heading}</h3>
       <div className="flex items-center gap-4" role={value === null ? 'status' : undefined} aria-live={value === null ? 'polite' : undefined}>
         <svg
           viewBox="0 0 120 70"
           className={clsx('h-14 w-24 shrink-0', value === null && 'animate-pulse motion-reduce:animate-none')}
           role="img"
-          aria-label={value === null ? 'Índice de miedo y codicia' : `Índice de miedo y codicia: ${value} de 100`}
+          aria-label={value === null ? dict.gaugeAriaLoading : t(dict.gaugeAriaValue, { value })}
         >
           <path d="M 10 60 A 50 50 0 0 1 110 60" fill="none" stroke="var(--hairline)" strokeWidth="8" strokeLinecap="round" />
           {value !== null && zone && (
@@ -72,7 +72,7 @@ export function FearGreedGauge() {
             <>
               <div aria-hidden="true" className="h-7 w-10 animate-pulse motion-reduce:animate-none rounded bg-surface-2" />
               <div aria-hidden="true" className="mt-1.5 h-3 w-20 animate-pulse motion-reduce:animate-none rounded bg-surface-2" />
-              <span className="sr-only">Cargando índice de miedo y codicia…</span>
+              <span className="sr-only">{dict.loadingLabel}</span>
             </>
           ) : (
             <>
@@ -84,7 +84,7 @@ export function FearGreedGauge() {
           )}
         </div>
       </div>
-      <p className="mt-2 text-[12px] text-ink-subtle">Escala de 0 a 100. Fuente: alternative.me.</p>
+      <p className="mt-2 text-[12px] text-ink-subtle">{dict.scaleNote}</p>
     </section>
   )
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { clsx } from 'clsx'
+import { useDictionary } from '@/lib/i18n/LocaleProvider'
 
 interface Mover {
   symbol: string
@@ -43,6 +44,7 @@ function MoverList<T extends Mover>({ title, items, onSelect }: { title: string;
 }
 
 export function TopMovers<T extends Mover>({ assets, onSelect, count = 5, className = 'grid gap-x-8 gap-y-6 sm:grid-cols-2' }: TopMoversProps<T>) {
+  const dict = useDictionary().topMovers
   const valid = assets.filter((asset) => Number.isFinite(asset.change))
   const sorted = [...valid].sort((a, b) => b.change - a.change)
 
@@ -50,8 +52,8 @@ export function TopMovers<T extends Mover>({ assets, onSelect, count = 5, classN
 
   return (
     <div className={className}>
-      <MoverList title="Mayores subidas" items={sorted.slice(0, count)} onSelect={onSelect} />
-      <MoverList title="Mayores bajadas" items={sorted.slice(-count).reverse()} onSelect={onSelect} />
+      <MoverList title={dict.gainersTitle} items={sorted.slice(0, count)} onSelect={onSelect} />
+      <MoverList title={dict.losersTitle} items={sorted.slice(-count).reverse()} onSelect={onSelect} />
     </div>
   )
 }
