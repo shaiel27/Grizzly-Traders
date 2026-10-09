@@ -835,5 +835,21 @@
       "noItemsYet": "No items yet.",
       "delete": "Delete"
     }
+  },
+  "topMovers": {
+    "gainersTitle": "Top gainers",
+    "losersTitle": "Top losers"
+  },
+  "fearGreed": {
+    "heading": "Crypto Fear & Greed",
+    "extremeFear": "Extreme Fear",
+    "fear": "Fear",
+    "neutral": "Neutral",
+    "greed": "Greed",
+    "extremeGreed": "Extreme Greed",
+    "gaugeAriaLoading": "Fear and greed index",
+    "gaugeAriaValue": "Fear and greed index: {value} of 100",
+    "loadingLabel": "Loading fear and greed index…",
+    "scaleNote": "Scale of 0 to 100. Source: alternative.me."
   }
 }

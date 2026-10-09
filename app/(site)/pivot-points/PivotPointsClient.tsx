@@ -425,9 +425,9 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
                     <span className="material-symbols-outlined text-[18px] text-accent-blue" aria-hidden="true">
                       {info.icon}
                     </span>
-                    {info.label}
+                    {locale === 'en' ? info.labelEn : info.label}
                   </h3>
-                  <p className="mb-3 text-body-sm text-ink-muted">{info.description}</p>
+                  <p className="mb-3 text-body-sm text-ink-muted">{locale === 'en' ? info.descriptionEn : info.description}</p>
                   <p className="font-mono text-[11px] leading-relaxed text-ink-subtle">{info.formula}</p>
                   <p className="mt-2 text-[10px] uppercase tracking-wider text-ink-subtle">{info.levels}</p>
                 </article>

@@ -835,5 +835,21 @@
       "noItemsYet": "Todavía no hay elementos.",
       "delete": "Eliminar"
     }
+  },
+  "topMovers": {
+    "gainersTitle": "Mayores subidas",
+    "losersTitle": "Mayores bajadas"
+  },
+  "fearGreed": {
+    "heading": "Miedo y codicia en cripto",
+    "extremeFear": "Miedo extremo",
+    "fear": "Miedo",
+    "neutral": "Neutral",
+    "greed": "Codicia",
+    "extremeGreed": "Codicia extrema",
+    "gaugeAriaLoading": "Índice de miedo y codicia",
+    "gaugeAriaValue": "Índice de miedo y codicia: {value} de 100",
+    "loadingLabel": "Cargando índice de miedo y codicia…",
+    "scaleNote": "Escala de 0 a 100. Fuente: alternative.me."
   }
 }
