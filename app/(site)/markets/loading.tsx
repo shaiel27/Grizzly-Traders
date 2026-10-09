@@ -1,4 +1,9 @@
-export default function MarketsLoading() {
+import { getServerLocale } from '@/lib/i18n/server'
+import { getDictionary } from '@/lib/i18n/get-dictionary'
+
+export default async function MarketsLoading() {
+  const locale = await getServerLocale()
+  const dict = getDictionary(locale).marketsLoading
   return (
     <main className="flex-1 pt-[var(--header-height)] pb-24">
       <div className="mx-auto max-w-[1400px] px-6 pt-8 md:px-8">
@@ -37,7 +42,7 @@ export default function MarketsLoading() {
               </div>
             </div>
           </div>
-          <span className="sr-only">Cargando terminal de mercados…</span>
+          <span className="sr-only">{dict.srLabel}</span>
         </div>
       </div>
     </main>

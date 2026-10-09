@@ -2,6 +2,8 @@
 
 import { clsx } from 'clsx'
 import { pageCount, pageWindow } from '@/lib/pagination'
+import { t } from '@/lib/i18n/get-dictionary'
+import { useDictionary } from '@/lib/i18n/LocaleProvider'
 
 interface PageControlsProps {
   // 0-based index of the current page
@@ -19,6 +21,7 @@ const NAV_BUTTON =
 
 // Previous / numbered pages / next. Renders nothing when everything fits on one page.
 export function PageControls({ page, total, pageSize, onPageChange, label, className }: PageControlsProps) {
+  const dict = useDictionary().common.pagination
   const totalPages = pageCount(total, pageSize)
   if (totalPages <= 1) return null
 
@@ -29,7 +32,7 @@ export function PageControls({ page, total, pageSize, onPageChange, label, class
   return (
     <nav aria-label={label} className={clsx('flex flex-wrap items-center justify-between gap-x-6 gap-y-3', className)}>
       <p className="text-[13px] tabular-nums text-ink-muted" aria-live="polite">
-        Mostrando {first} a {last} de {total}
+        {t(dict.showingRange, { first, last, total })}
       </p>
 
       <div className="flex items-center gap-1">
@@ -37,7 +40,7 @@ export function PageControls({ page, total, pageSize, onPageChange, label, class
           <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
             arrow_back
           </span>
-          Anterior
+          {dict.previous}
         </button>
 
         <ul className="flex items-center gap-0.5">
@@ -51,7 +54,7 @@ export function PageControls({ page, total, pageSize, onPageChange, label, class
                 <button
                   type="button"
                   onClick={() => onPageChange(item)}
-                  aria-label={`Página ${item + 1}`}
+                  aria-label={t(dict.page, { n: item + 1 })}
                   aria-current={item === current ? 'page' : undefined}
                   className={clsx(
                     'h-8 min-w-8 rounded-[6px] px-2 text-[13px] tabular-nums transition-colors focus-visible:outline-2 focus-visible:outline-accent-blue',
@@ -66,7 +69,7 @@ export function PageControls({ page, total, pageSize, onPageChange, label, class
         </ul>
 
         <button type="button" onClick={() => onPageChange(current + 1)} disabled={current === totalPages - 1} className={NAV_BUTTON}>
-          Siguiente
+          {dict.next}
           <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
             arrow_forward
           </span>

@@ -32,9 +32,9 @@ const GLOBE_EXTRA = [
   { symbol: 'XJO', tv: 'TVC:XJO' },
 ] as const
 
-export const metadata: Metadata = {
-  description:
-    'Noticias financieras y análisis de mercados: criptomonedas, forex, materias primas y acciones, con niveles técnicos y cotizaciones.',
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getServerLocale()
+  return { description: getDictionary(locale).home.metaDescription }
 }
 
 const CATEGORY_SLUGS = ['criptomonedas', 'forex', 'materias-primas', 'acciones']

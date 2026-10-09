@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 import { Breadcrumbs, ArticleCard } from '@/components/ui'
 import { getAuthorBySlug, getAuthorStats, getPostsByAuthor } from '@/lib/api'
 import { getServerLocale } from '@/lib/i18n/server'
-import { getDictionary } from '@/lib/i18n/get-dictionary'
+import { getDictionary, t } from '@/lib/i18n/get-dictionary'
 import type { AuthorProfile } from '@/lib/types'
 
 interface AuthorPageProps {
@@ -22,14 +22,15 @@ async function loadAuthor(slug: string): Promise<AuthorProfile | null> {
 export async function generateMetadata({ params }: AuthorPageProps): Promise<Metadata> {
   const { slug } = await params
   const author = await loadAuthor(slug)
+  const locale = await getServerLocale()
+  const dict = getDictionary(locale)
   if (!author) {
-    const locale = await getServerLocale()
-    return { title: getDictionary(locale).author.notFoundTitle, robots: { index: false } }
+    return { title: dict.author.notFoundTitle, robots: { index: false } }
   }
 
   return {
     title: author.full_name,
-    description: author.bio ?? `Artículos y análisis de ${author.full_name}.`,
+    description: author.bio ?? t(dict.author.metaDescriptionFallback, { name: author.full_name }),
     alternates: { canonical: `/autor/${slug}` },
   }
 }
