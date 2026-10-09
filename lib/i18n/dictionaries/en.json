@@ -8,7 +8,8 @@
       "nav": "Pagination",
       "previous": "Previous",
       "next": "Next",
-      "page": "Page {n}"
+      "page": "Page {n}",
+      "showingRange": "Showing {first} to {last} of {total}"
     },
     "loadingSplash": {
       "caption": "Loading markets...",
@@ -55,6 +56,7 @@
     "newsletterConsentLink": "Privacy Policy"
   },
   "home": {
+    "metaDescription": "Financial news and market analysis: crypto, forex, commodities and equities, with technical levels and quotes.",
     "heroSectionAria": "Welcome section",
     "sourceDownAlert": "We couldn't refresh the portal's data. We'll retry in a minute.",
     "heroTitleLine1": "The market intelligence",
@@ -178,7 +180,10 @@
     "searchButton": "Search",
     "searchResultsAria": "Search results",
     "searchNoResultsFor": "No results found for “{q}”",
-    "searchTryAgain": "Try more general terms or check your spelling."
+    "searchTryAgain": "Try more general terms or check your spelling.",
+    "articlesMetaTitle": "All News",
+    "articlesMetaDescription": "Explore all financial news, market analysis and trading reports.",
+    "searchMetaDescription": "Search financial news, market analysis, assets and authors."
   },
   "feedControls": {
     "filterByCategoryAria": "Filter news by category",
@@ -277,6 +282,7 @@
     "marketsCovered": "Markets covered",
     "assetsAnalyzed": "Assets analyzed",
     "website": "Website",
+    "metaDescriptionFallback": "Articles and analysis by {name}.",
     "listTitle": "Authors",
     "listDescription": "Meet the Grizzly Traders analyst team.",
     "noAuthorsYet": "No authors to show yet."
@@ -851,5 +857,27 @@
     "gaugeAriaValue": "Fear and greed index: {value} of 100",
     "loadingLabel": "Loading fear and greed index…",
     "scaleNote": "Scale of 0 to 100. Source: alternative.me."
+  },
+  "siteError": {
+    "heading": "Something went wrong",
+    "body": "We couldn't load this page. It may be a temporary issue with the data source.",
+    "retry": "Retry",
+    "backToHome": "Back to home"
+  },
+  "notFound": {
+    "heading": "Page not found",
+    "body": "Sorry, the page you're looking for doesn't exist or has been moved.",
+    "backToHome": "Back to home",
+    "viewAllNews": "View all news"
+  },
+  "marketsLoading": {
+    "srLabel": "Loading markets terminal…"
+  },
+  "loadingStates": {
+    "content": "Loading content…",
+    "filters": "Loading filters…",
+    "searchBox": "Loading search…",
+    "pivotPoints": "Loading pivot points…",
+    "article": "Loading article…"
   }
 }

@@ -33,6 +33,8 @@ function Bar({ className }: { className: string }) {
 }
 
 export function Loading({ variant = 'spinner', count = 3, className, locale = 'es' }: LoadingProps) {
+  const dict = getDictionary(locale)
+
   if (variant === 'spinner') {
     return (
       <div className={clsx('flex items-center justify-center py-12', className)} role="status" aria-live="polite">
@@ -42,7 +44,7 @@ export function Loading({ variant = 'spinner', count = 3, className, locale = 'e
             <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
           </svg>
         </div>
-        <span className="sr-only">Cargando contenido…</span>
+        <span className="sr-only">{dict.loadingStates.content}</span>
       </div>
     )
   }
@@ -58,7 +60,7 @@ export function Loading({ variant = 'spinner', count = 3, className, locale = 'e
             <div className="h-3 bg-surface-2 rounded w-1/3" />
           </div>
         ))}
-        <span className="sr-only">Cargando contenido…</span>
+        <span className="sr-only">{dict.loadingStates.content}</span>
       </div>
     )
   }
@@ -67,7 +69,7 @@ export function Loading({ variant = 'spinner', count = 3, className, locale = 'e
     return (
       <div className={clsx('grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4', className)} role="status" aria-live="polite">
         {[...Array(count)].map((_, i) => <CardSkeleton key={i} />)}
-        <span className="sr-only">Cargando contenido…</span>
+        <span className="sr-only">{dict.loadingStates.content}</span>
       </div>
     )
   }
@@ -76,14 +78,14 @@ export function Loading({ variant = 'spinner', count = 3, className, locale = 'e
     // Full-screen takeover for the home route's loading state: covers the real
     // Header/LiveTicker too (z-[60] is above the header's z-50, Header.tsx:207), not a
     // box inside the page's normal flow. Minimal on purpose — one breathing mark.
-    const dict = getDictionary(locale).common.loadingSplash
+    const splashDict = dict.common.loadingSplash
     return (
       <div className={clsx('fixed inset-0 z-[60] flex flex-col items-center justify-center gap-4 bg-canvas', className)} role="status" aria-live="polite">
         <Image src="/logo.png" alt="" width={48} height={48} className="splash-mark size-12 object-contain" aria-hidden="true" />
         <p aria-hidden="true" className="text-caption text-ink-muted">
-          {dict.caption}
+          {splashDict.caption}
         </p>
-        <span className="sr-only">{dict.srLabel}</span>
+        <span className="sr-only">{splashDict.srLabel}</span>
       </div>
     )
   }
@@ -128,7 +130,7 @@ export function Loading({ variant = 'spinner', count = 3, className, locale = 'e
             ))}
           </div>
         </div>
-        <span className="sr-only">Cargando artículo…</span>
+        <span className="sr-only">{dict.loadingStates.article}</span>
       </div>
     )
   }

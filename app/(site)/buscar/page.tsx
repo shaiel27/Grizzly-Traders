@@ -8,10 +8,10 @@ interface SearchPageProps {
   searchParams: Promise<{ q?: string; categoria?: string; tag?: string; activo?: string; page?: string }>
 }
 
-export const metadata: Metadata = {
-  title: 'Buscar',
-  robots: { index: false, follow: true },
-  description: 'Busca noticias financieras, análisis de mercados, activos y autores.',
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getServerLocale()
+  const dict = getDictionary(locale).listings
+  return { title: dict.searchTitle, robots: { index: false, follow: true }, description: dict.searchMetaDescription }
 }
 
 export default async function SearchPage({ searchParams }: SearchPageProps) {

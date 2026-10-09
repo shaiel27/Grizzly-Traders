@@ -1,4 +1,9 @@
-export default function PivotPointsLoading() {
+import { getServerLocale } from '@/lib/i18n/server'
+import { getDictionary } from '@/lib/i18n/get-dictionary'
+
+export default async function PivotPointsLoading() {
+  const locale = await getServerLocale()
+  const dict = getDictionary(locale).loadingStates
   return (
     <main className="flex-1 pt-[var(--header-height)] pb-24">
       <div className="section-container mx-auto max-w-[1400px] pt-8">
@@ -26,7 +31,7 @@ export default function PivotPointsLoading() {
               <div className="h-[560px] animate-pulse motion-reduce:animate-none rounded-2xl bg-surface-2" />
             </div>
           </div>
-          <span className="sr-only">Cargando pivot points…</span>
+          <span className="sr-only">{dict.pivotPoints}</span>
         </div>
       </div>
     </main>

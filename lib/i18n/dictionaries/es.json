@@ -8,7 +8,8 @@
       "nav": "Paginación",
       "previous": "Anterior",
       "next": "Siguiente",
-      "page": "Página {n}"
+      "page": "Página {n}",
+      "showingRange": "Mostrando {first} a {last} de {total}"
     },
     "loadingSplash": {
       "caption": "Cargando mercados...",
@@ -55,6 +56,7 @@
     "newsletterConsentLink": "Política de Privacidad"
   },
   "home": {
+    "metaDescription": "Noticias financieras y análisis de mercados: criptomonedas, forex, materias primas y acciones, con niveles técnicos y cotizaciones.",
     "heroSectionAria": "Sección de bienvenida",
     "sourceDownAlert": "No se pudieron actualizar los datos del portal. Se reintentará en un minuto.",
     "heroTitleLine1": "La inteligencia de mercado",
@@ -178,7 +180,10 @@
     "searchButton": "Buscar",
     "searchResultsAria": "Resultados de búsqueda",
     "searchNoResultsFor": "No se encontraron resultados para “{q}”",
-    "searchTryAgain": "Intenta con términos más generales o revisa la ortografía."
+    "searchTryAgain": "Intenta con términos más generales o revisa la ortografía.",
+    "articlesMetaTitle": "Todas las Noticias",
+    "articlesMetaDescription": "Explora todas las noticias financieras, análisis de mercados y reportes de trading.",
+    "searchMetaDescription": "Busca noticias financieras, análisis de mercados, activos y autores."
   },
   "feedControls": {
     "filterByCategoryAria": "Filtrar noticias por categoría",
@@ -277,6 +282,7 @@
     "marketsCovered": "Mercados cubiertos",
     "assetsAnalyzed": "Activos analizados",
     "website": "Sitio web",
+    "metaDescriptionFallback": "Artículos y análisis de {name}.",
     "listTitle": "Autores",
     "listDescription": "Conoce al equipo de analistas de Grizzly Traders.",
     "noAuthorsYet": "Aún no hay autores para mostrar."
@@ -851,5 +857,27 @@
     "gaugeAriaValue": "Índice de miedo y codicia: {value} de 100",
     "loadingLabel": "Cargando índice de miedo y codicia…",
     "scaleNote": "Escala de 0 a 100. Fuente: alternative.me."
+  },
+  "siteError": {
+    "heading": "Algo salió mal",
+    "body": "No pudimos cargar esta página. Puede ser un problema temporal con la fuente de datos.",
+    "retry": "Reintentar",
+    "backToHome": "Volver al inicio"
+  },
+  "notFound": {
+    "heading": "Página no encontrada",
+    "body": "Lo sentimos, la página que buscas no existe o ha sido movida.",
+    "backToHome": "Volver al inicio",
+    "viewAllNews": "Ver todas las noticias"
+  },
+  "marketsLoading": {
+    "srLabel": "Cargando terminal de mercados…"
+  },
+  "loadingStates": {
+    "content": "Cargando contenido…",
+    "filters": "Cargando filtros…",
+    "searchBox": "Cargando buscador…",
+    "pivotPoints": "Cargando pivot points…",
+    "article": "Cargando artículo…"
   }
 }

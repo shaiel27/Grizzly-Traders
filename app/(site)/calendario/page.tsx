@@ -4,15 +4,10 @@ import { Breadcrumbs } from '@/components/ui'
 import { getServerLocale } from '@/lib/i18n/server'
 import { getDictionary } from '@/lib/i18n/get-dictionary'
 
-// title/description stay the static ES defaults on purpose, same as every other static
-// `export const metadata` page in app/(site)/ (legal/*, buscar, articulos) and per the note in
-// app/layout.tsx: making metadata request-dependent needs an async generateMetadata(), which is
-// later-phase SEO/hreflang scope, not this pass.
-export const metadata: Metadata = {
-  title: 'Calendario económico',
-  description:
-    'Calendario económico forex en tiempo real, sincronizado con ForexFactory: publicaciones macro de EE.UU., eurozona, Reino Unido, Japón y más, con dato real, previsión y dato anterior.',
-  alternates: { canonical: '/calendario' },
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getServerLocale()
+  const dict = getDictionary(locale).calendar
+  return { title: dict.pageTitle, description: dict.metaDescription, alternates: { canonical: '/calendario' } }
 }
 
 export default async function CalendarioPage() {

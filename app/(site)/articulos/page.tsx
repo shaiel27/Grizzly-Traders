@@ -9,9 +9,10 @@ interface ArticlesPageProps {
   searchParams: Promise<{ categoria?: string; tag?: string; activo?: string; q?: string; page?: string }>
 }
 
-export const metadata: Metadata = {
-  title: 'Todas las Noticias',
-  description: 'Explora todas las noticias financieras, análisis de mercados y reportes de trading.',
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getServerLocale()
+  const dict = getDictionary(locale).listings
+  return { title: dict.articlesMetaTitle, description: dict.articlesMetaDescription }
 }
 
 export default async function ArticlesPage({ searchParams }: ArticlesPageProps) {
