@@ -1,7 +1,8 @@
 import { cache } from 'react'
 import { unstable_cache } from 'next/cache'
+import { createClient } from '@supabase/supabase-js'
 import { createPublicClient } from './supabase/public'
-import type { Category, Asset, AssetType, Tag, Source, AuthorProfile, PostWithRelations } from './types'
+import type { Category, Asset, AssetType, Tag, Source, AuthorProfile, PostTranslation, PostWithRelations } from './types'
 
 // Supabase v2 returns nested joins as { asset: {...} } instead of flattening.
 // This helper normalizes the response to match PostWithRelations type.
@@ -25,12 +26,18 @@ function normalizePost(raw: Record<string, unknown>): PostWithRelations {
     ? (rawSource.source as Source | null)
     : (rawSource as Source | null)
 
+  // PostWithRelations promete `translations: PostTranslation[]`, y la cascada de idioma depende de
+  // ello: si una consulta se olvida del join, mejor un array vacío explícito que un undefined que
+  // el cast esconde.
+  const translations = (raw.translations as PostTranslation[] | null | undefined) ?? []
+
   const { tag_filter: _tagFilter, asset_filter: _assetFilter, ...rest } = raw
 
   return {
     ...rest,
     assets,
     tags,
+    translations,
     author: author ?? null,
     category: category ?? null,
     source: source ?? null,
@@ -44,8 +51,8 @@ function normalizePost(raw: Record<string, unknown>): PostWithRelations {
 // requesting the 'en' locale would exclude every post that has no 'en' translations.posts_translations row —
 // and today the DB only has 'es' rows, so that would zero out every listing in EN. Left join + the same
 // `.eq` filter instead just narrows the embedded `translations` array (empty when there's no match for the
-// active locale), which is exactly what lib/feed.ts's localizedPost() needs to fall back to the base
-// post.title/post.slug (Fase 5.3).
+// active locale), which is exactly what lib/feed.ts's localizedPost() needs to fall back to the post's base
+// title/slug — que con el Modelo A están en `posts.original_locale`, no necesariamente en español.
 function postListSelect({ category = false, tag = false, asset = false } = {}) {
   return [
     '*',
@@ -125,17 +132,23 @@ async function getPublishedPostsRaw({
   return normalizePosts(data as unknown as Record<string, unknown>[])
 }
 
+// El slug identifica una fila de `posts_translations`, y cada idioma tiene el suyo. Filtrar además
+// por `locale` daba 404 a cualquier URL cuyo slug no fuera del idioma activo: con el Modelo A un
+// artículo con `original_locale='en'` tiene slug inglés, así que un lector en español que llegue por
+// ese enlace (o al revés) perdía el artículo entero. Se busca el slug en cualquier idioma y el
+// `locale` solo sirve para desempatar si dos filas comparten slug.
 async function getPostBySlugRaw(slug: string, locale: 'es' | 'en' = 'es') {
   const supabase = createPublicClient()
 
-  const { data: translation, error: tError } = await supabase
+  const { data: matches, error: tError } = await supabase
     .from('posts_translations')
-    .select('post_id')
+    .select('post_id, locale')
     .eq('slug', slug)
-    .eq('locale', locale)
-    .single()
+    .limit(5)
 
-  if (tError || !translation) throw tError ?? new Error('Translation not found')
+  if (tError) throw tError
+  const translation = matches?.find((row) => row.locale === locale) ?? matches?.[0]
+  if (!translation) throw new Error('Translation not found')
 
   const { data: post, error } = await supabase
     .from('posts')
@@ -279,8 +292,12 @@ async function getRelatedPostsRaw(postId: string, categoryId: number | null, ass
   return normalizePosts((data ?? []) as unknown as Record<string, unknown>[])
 }
 
+// La función SQL es SECURITY DEFINER y ya no la puede ejecutar la llave anónima (migración 0008): la llama el servidor.
 export async function incrementViewCount(postId: string) {
-  const { error } = await createPublicClient().rpc('increment_view_count', { post_id: postId })
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!serviceKey) return
+  const client = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } })
+  const { error } = await client.rpc('increment_view_count', { post_id: postId })
   if (error) console.error('Failed to increment view count:', error)
 }
 
@@ -361,6 +378,7 @@ async function getAllAuthorsRaw() {
   const { data, error } = await supabase
     .from('perfiles_autores')
     .select('*')
+    .eq('listed', true)
     .order('full_name')
 
   if (error) throw error
@@ -380,6 +398,12 @@ async function getAuthorBySlugRaw(slug: string) {
   return data as AuthorProfile
 }
 
+// El alias de la relación tiene que llamarse `translations`: con `translation:` (singular) PostgREST
+// devolvía la clave equivocada, normalizePost no la mapeaba y `post.translations` llegaba vacío, así
+// que las tarjetas de la página de autor caían siempre al título/slug base del post — es decir, al
+// idioma original, ignorando el locale del lector. Aquí NO se filtra por locale a propósito: se traen
+// todos los idiomas y decide la cascada de lib/feed.ts.
+// `locale` sigue en la firma porque forma parte de la clave de caché de la versión cacheada.
 async function getPostsByAuthorRaw(authorId: number, locale: 'es' | 'en' = 'es', limit = 20) {
   const supabase = createPublicClient()
 
@@ -387,7 +411,8 @@ async function getPostsByAuthorRaw(authorId: number, locale: 'es' | 'en' = 'es',
     .from('posts')
     .select(`
       *,
-      translation:posts_translations!posts_translations_post_id_fkey(*),
+      author:perfiles_autores(*),
+      translations:posts_translations!posts_translations_post_id_fkey(*),
       category:categorias(*),
       source:fuentes(*),
       assets:post_activos(asset_id, asset:activos(*)),
