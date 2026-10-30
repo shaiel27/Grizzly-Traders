@@ -1,0 +1,2151 @@
+{
+  "updatedAt": "2026-10-29T14:28:25.000Z",
+  "createdAt": "2026-10-13T14:58:47.745Z",
+  "id": "xvENLqv9HYCbOVcj",
+  "name": "Pipeline Noticias Financieras -> Supabase + Telegram/Discord",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "6145a067-4694-4d86-8f57-6c6a1b90386b",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        330
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "85139a3e-f00d-46ef-8575-4002a0f101d1",
+      "name": "RSS CFTC",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "onError": "continueRegularOutput",
+      "position": [
+        520,
+        0
+      ],
+      "parameters": {
+        "url": "https://www.cftc.gov/RSS/RSSGP/rssgp.xml",
+        "options": {}
+      }
+    },
+    {
+      "id": "39824837-306f-4254-b911-ad9553ca2672",
+      "name": "RSS Investing.com",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "onError": "continueRegularOutput",
+      "position": [
+        520,
+        170
+      ],
+      "parameters": {
+        "url": "https://www.investing.com/rss/news.rss",
+        "options": {}
+      }
+    },
+    {
+      "id": "3e0882dd-f86e-4a5a-aaf1-11c6067f6785",
+      "name": "Fuentes Combinadas",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "alwaysOutputData": true,
+      "position": [
+        800,
+        255
+      ],
+      "parameters": {
+        "numberInputs": 4
+      }
+    },
+    {
+      "id": "6f95c275-d8d2-4c5a-aabf-1aa416b1c5ef",
+      "name": "Normalizar Item",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1030,
+        255
+      ],
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  const j = item.json || {};\n  const raw = j.contentSnippet || j.content || j.description || j.summary || j.title || '';\n  const contentSnippet = String(raw).replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\n  const pubDate = j.isoDate || j.pubDate || j.pubdate || j.date || '';\n  const link = j.link || '';\n  // R1 -- ninguno de los dos nodos RSS (Cointelegraph, Investing.com) etiquetaba su fuente,\n  // asi que las dos llegaban como 'RSS' generico y la atribucion visible que exige la\n  // auditoria legal no podia decir CUAL fuente. Se deriva del dominio del propio link, sin\n  // anadir un nodo nuevo al canvas.\n  let fuente = j.fuente || '';\n  if (!fuente) {\n    if (/cftc\\.gov/i.test(link)) fuente = 'CFTC';\n    else if (/investing\\.com/i.test(link)) fuente = 'Investing.com';\n    else if (/federalreserve\\.gov/i.test(link)) fuente = 'Reserva Federal';\n    else if (/sec\\.gov/i.test(link)) fuente = 'SEC';\n  }\n  return { json: {\n    title: String(j.title || '').trim(),\n    link: link,\n    contentSnippet: contentSnippet,\n    pubDate: pubDate,\n    fuente: fuente\n  }};\n});"
+      }
+    },
+    {
+      "id": "7b1ac016-6510-4ac2-8efa-5101fa85d375",
+      "name": "Filtro Calidad",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1260,
+        255
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "longitud",
+              "leftValue": "={{ ($('Normalizar Item').item.json.contentSnippet || '').length }}",
+              "rightValue": 30,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            },
+            {
+              "id": "reciente",
+              "leftValue": "={{ !$('Normalizar Item').item.json.pubDate || Date.parse($('Normalizar Item').item.json.pubDate) > $now.minus({ hours: ['Reserva Federal', 'SEC', 'CFTC'].includes($('Normalizar Item').item.json.fuente) ? 168 : 24 }).toMillis() }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "3d8636bf-4ef4-44d4-8a52-dfc9ae95d1b2",
+      "name": "OpenAI - Analisis GPT",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput",
+      "position": [
+        460,
+        1560
+      ],
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-4o-mini"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Eres un Analista Financiero Senior del portal Grizzly Traders. Analizas noticias financieras y devuelves SIEMPRE un JSON valido y estricto con estas claves exactas: title (TITULAR PROPIO Y ORIGINAL en espanol: informa del mismo hecho concreto que el titular de la fuente pero con palabras distintas, nunca una traduccion literal ni una copia del titular original), slug (kebab-case, en minusculas, SIN tildes ni caracteres especiales), content_html (articulo en HTML en ESPANOL de entre 500 y 650 caracteres de texto visible (nunca mas de 700), basado en los hechos del texto completo que recibes en el mensaje: usa etiquetas <p> para parrafos, <h2> solo si hay contenido real suficiente para justificar un subtitulo, y <blockquote> UNICAMENTE para una cita textual que aparezca literalmente en el texto fuente (nunca una cita inventada). PARAFRASEA con tus propias palabras y tu propia estructura de frase: no copies oraciones completas del texto fuente, aunque puedas citar datos y cifras concretas que SI aparezcan ahi. No inventes cifras, declaraciones ni hechos que no esten en el texto fuente. NO anadas un parrafo de atribucion a la fuente al final: la atribucion y el enlace al original los gestiona el sistema con datos estructurados (source_url/source_id), no forman parte de este HTML. NUNCA incluyas una recomendacion de compra, venta, zona de entrada o señal: esto es informacion general, no asesoramiento), sentiment (exactamente uno de: bullish, bearish, neutral), category (una de: criptomonedas, forex, materias-primas, acciones), meta_description (descripcion SEO de max 160 caracteres en espanol), prompt_imagen (descripcion EN INGLES de la ESCENA FOTOGRAFICA de la portada, de 25 a 60 palabras, hecha a la medida de ESTE articulo). Identifica al PROTAGONISTA de la noticia (la materia prima, el activo, el sector, la industria, el tipo de empresa o el organismo) y el HECHO concreto (que cambia, que se gana o se pierde, que se rompe o se acumula). Describe una escena fotografica realista y especifica de ESE protagonista en su entorno real, de modo que alguien que vea la portada sin leer el titular entienda de que trata: oro -> lingotes apilados en una camara acorazada; petroleo -> plataforma maritima, tanques de refineria o un petrolero; semiconductores -> obleas de silicio en una sala blanca; trigo o maiz -> espigas o un silo en plena cosecha; banco central -> la sala de un consejo con una mesa larga vacia; farmaceutica o biotecnologia -> material de laboratorio e instrumentos de analisis; automocion -> una linea de ensamblaje; energia -> turbinas, paneles o lineas de alta tension; logistica y comercio exterior -> un puerto con gruas y contenedores; banca -> la fachada de piedra de una sede bancaria generica. Son validos y deseables los objetos, maquinas y lugares reales y reconocibles del sector, siempre genericos (sin marcas ni rotulos legibles). Expresa el matiz de la noticia (alza, caida, tension, acuerdo, bloqueo) en el ESTADO FISICO de la escena (algo que se acumula, se agrieta, se detiene, se llena, se vacia), nunca con graficos. Dos articulos distintos deben dar escenas distintas. NO especifiques color, paleta, iluminacion ni angulo de camara: de eso se encarga la plantilla de portada. PROHIBIDO en la escena: texto, letras, numeros, cifras o simbolos tipograficos de cualquier tipo (incluidos los de moneda), logotipos y marcas, banderas (las coloca la plantilla), rostros o nombres de personas reales, graficos de barras, velas de trading, lineas de tendencia, flechas, pantallas o paneles con datos, escenas belicas o de protesta. Si hay monedas o fichas, describelas lisas y sin ninguna marca. cover_flags (arreglo JSON de como maximo 2 codigos ISO 3166-1 alfa-2 en MAYUSCULAS de los paises o regiones que PROTAGONIZAN el hecho: US para Estados Unidos, EU para la zona euro o la Union Europea, GB, JP, CN, DE, FR, MX, BR, etc.). Incluye un pais solo cuando es parte del hecho (politica monetaria o fiscal, aranceles, datos macroeconomicos, regulacion, divisas, indices bursatiles nacionales, geopolitica economica). Una noticia corporativa sin dimension de pais (resultados, fusiones o recompras de una empresa) lleva []. En caso de duda, []. cover_assets (arreglo JSON de como maximo 2 simbolos, SOLO de esta lista cerrada, de los activos que PROTAGONIZAN la noticia; si ninguno lo hace, []): criptomonedas BTC ETH SOL XRP ADA DOGE BNB DOT AVAX LINK LTC UNI ATOM POL USDT USDC TRX XLM BCH ETC; materias primas XAUUSD (oro) XAGUSD (plata) PLATINUM PALLADIUM COPPER WTI BRENT NG CORN WHEAT SUGAR COFFEE; divisas EURUSD GBPUSD USDJPY USDCHF USDCAD AUDUSD NZDUSD EURGBP EURJPY GBPJPY; indices SPX NDX DJI DXY VIX US10Y DAX CAC40 FTSE NIKKEI HSI ESTX50. Nunca inventes simbolos fuera de la lista ni pongas acciones de empresas. Si la noticia original esta en ingles u otro idioma, TODO el contenido generado debe estar en ESPANOL. NO anades markdown, NO envuelvas el JSON en bloques de codigo. Responde SOLO con el JSON."
+            },
+            {
+              "content": "=Analiza esta noticia financiera a partir del texto completo extraido de la fuente original:\n\nTitulo: {{ $('Extraer contenido completo').item.json.title }}\nTexto completo del articulo fuente:\n{{ $('Extraer contenido completo').item.json.fullContent }}\nFuente: {{ $('Extraer contenido completo').item.json.fuente || 'RSS' }}\nURL original: {{ $('Extraer contenido completo').item.json.link }}\nFecha: {{ $('Extraer contenido completo').item.json.pubDate }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "MCllGOOMXeswQUEW",
+          "name": "OpenAI account 2"
+        }
+      }
+    },
+    {
+      "id": "2b14eb1a-0a65-4b5f-9400-6c1c2df7107f",
+      "name": "Parsear JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput",
+      "position": [
+        690,
+        1560
+      ],
+      "parameters": {
+        "jsCode": "let data = $json.output?.[0]?.content?.[0]?.text ?? $json.choices?.[0]?.message?.content ?? $json.message?.content ?? $json.text;\nif (typeof data === 'string') {\n  data = data.trim().replace(/^```json\\s*/i, '').replace(/```\\s*$/, '');\n  data = JSON.parse(data);\n}\nif (!data || typeof data !== 'object') {\n  data = {};\n}\nconst feed = $('Normalizar Item').item.json || {};\nconst title = data.title || 'Sin titulo';\nconst slug = (data.slug || title).toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');\nconst sentimentMap = { 'Bullish': 'bullish', 'Bearish': 'bearish', 'Neutro': 'neutral', 'bullish': 'bullish', 'bearish': 'bearish', 'neutral': 'neutral' };\nconst sentiment = sentimentMap[data.sentiment] || 'neutral';\nconst categoryMap = { 'criptomonedas': 1, 'forex': 2, 'materias-primas': 3, 'acciones': 4 };\nconst categoryId = categoryMap[data.category] || 1;\nconst originalLocale = data.original_locale === 'en' ? 'en' : 'es';\n// F3.1 -- GPT se pasa a menudo del maximo (salieron 872 y 923 sobre 750): en vez de mandar a borrador\n// un articulo valido, se quitan bloques completos del final (nunca se corta a mitad de frase). Si un\n// solo bloque ya supera el limite, se deja tal cual y el checklist lo rechazara.\nconst LIMITE = 750;\nconst textoDe = (html) => html.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\nconst recortarHtml = (html) => {\n  if (textoDe(html).length <= LIMITE) return html;\n  const bloques = html.match(/<(p|h2|h3|blockquote|ul|ol)\\b[^>]*>[\\s\\S]*?<\\/\\1>/gi);\n  if (!bloques || bloques.length < 2) return html;\n  while (bloques.length > 1 && textoDe(bloques.join('')).length > LIMITE) bloques.pop();\n  while (bloques.length > 1 && /^<h[23]\\b/i.test(bloques[bloques.length - 1])) bloques.pop();\n  return bloques.join('');\n};\n\nconst contentHtml = recortarHtml(data.content_html || '<p>Sin contenido</p>');\nconst plainText = contentHtml.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\nconst format = plainText.length < 350 ? 'brief' : 'article';\nconst wordCount = plainText.length > 0 ? plainText.split(' ').filter(Boolean).length : 0;\nconst readingTimeMinutes = Math.max(1, Math.ceil(wordCount / 200));\n// R1 -- source_id mapea el nombre de fuente al id real de la tabla fuentes (verificado hoy:\n// Cointelegraph=8, Investing.com=4). null si la fuente no esta en el registro, para no romper\n// el insert con un id inventado.\nconst sourceIdMap = { 'CFTC': 11, 'Investing.com': 4, 'Reserva Federal': 9, 'SEC': 10 };\n// Banderas y activos de la portada: solo lo que la plantilla sabe dibujar (si GPT inventa otro codigo, se descarta)\nconst BANDERAS_OK = new Set('US EU GB JP CN DE FR IT ES CA AU NZ CH MX BR AR CL CO PE VE IN ID KR TW HK SG TH MY PH VN TR RU UA PL SE NO DK NL BE PT IE AT GR ZA NG EG SA AE IL IR IQ QA KW PK BD CZ HU RO FI SY LY'.split(' '));\nconst ACTIVOS_OK = new Set('BTC ETH SOL XRP ADA DOGE BNB DOT AVAX LINK LTC UNI ATOM POL USDT USDC TRX XLM BCH ETC XAUUSD XAGUSD PLATINUM PALLADIUM COPPER WTI BRENT NG CORN WHEAT SUGAR COFFEE EURUSD GBPUSD USDJPY USDCHF USDCAD AUDUSD NZDUSD EURGBP EURJPY GBPJPY SPX NDX DJI DXY VIX US10Y DAX CAC40 FTSE NIKKEI HSI ESTX50'.split(' '));\nconst limpiarLista = (valor, permitidos, max) => {\n  const lista = Array.isArray(valor) ? valor : typeof valor === 'string' ? valor.split(',') : [];\n  const salida = [];\n  for (const item of lista) {\n    const codigo = String(item || '').trim().toUpperCase();\n    if (permitidos.has(codigo) && !salida.includes(codigo)) salida.push(codigo);\n    if (salida.length >= max) break;\n  }\n  return salida;\n};\nreturn [{ json: {\n  original_locale: originalLocale,\n  title: title,\n  slug: slug,\n  content_html: contentHtml,\n  format: format,\n  reading_time_minutes: readingTimeMinutes,\n  sentiment: sentiment,\n  category_id: categoryId,\n  meta_description: data.meta_description || title,\n  cover_flags: limpiarLista(data.cover_flags, BANDERAS_OK, 2),\n  cover_assets: limpiarLista(data.cover_assets, ACTIVOS_OK, 2),\n  prompt_imagen: data.prompt_imagen || '3D corporate financial illustration with candlestick charts and city skyline, dark background',\n  source_url: feed.link || '',\n  source_title: feed.title || '',\n  source_id: sourceIdMap[feed.fuente] || null,\n  fuente: feed.fuente || 'RSS'\n}}];"
+      }
+    },
+    {
+      "id": "6f9d8124-0cfe-4f70-8894-aade93bf6367",
+      "name": "OpenAI - Imagen GPT",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput",
+      "position": [
+        0,
+        2230
+      ],
+      "parameters": {
+        "resource": "image",
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-image-1-mini"
+        },
+        "prompt": "=Editorial photography evoking vintage newsprint and offset printing, for a financial news portal cover. The whole image is printed in a rich duotone of charcoal black and warm grey, with a visible halftone dot pattern, coarse paper fibre and grain clearly visible in raking light, and slight ink misregistration. Deep shadow, high contrast, tactile analogue imperfection, dust and fibre detail. Photorealistic, specific and recognizable real-world scene. Keep the lower-left corner of the frame uncluttered and in shadow. Subject: {{ $('Parsear JSON').item.json.prompt_imagen }}. No printed words, no headlines, no columns of type. Absolutely no text, no letters, no numbers, no typography, no logos, no brand names, no real human faces, no flags.",
+        "options": {
+          "quality": "high",
+          "size": "1536x1024"
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "MCllGOOMXeswQUEW",
+          "name": "OpenAI account 2"
+        }
+      }
+    },
+    {
+      "id": "79082dd2-ea0e-44ba-923b-7326089ab674",
+      "name": "Subir a Supabase Storage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput",
+      "position": [
+        1000,
+        2230
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://pudzvatuubywmwdmboiq.supabase.co/storage/v1/object/post-images/{{ $('Parsear JSON').item.json.slug }}-{{ String($('Reservar URL').item.json.body[0].id).slice(0, 8) }}.webp",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "image/webp"
+            },
+            {
+              "name": "x-upsert",
+              "value": "true"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "b3e0c14f-d581-4b0b-aa2b-64b82916d2b0",
+      "name": "Insertar post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "onError": "continueErrorOutput",
+      "position": [
+        1460,
+        2230
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts?id=eq.' + $('Reservar URL').item.json.body[0].id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"title\": {{ JSON.stringify($('Parsear JSON').item.json.title) }},\n  \"slug\": {{ JSON.stringify(($('Comprobar slug').item.json.body.length ? $('Parsear JSON').item.json.slug + '-' + String($('Reservar URL').item.json.body[0].id).replace(/-/g, '').slice(0, 6) : $('Parsear JSON').item.json.slug)) }},\n  \"content_html\": {{ JSON.stringify($('Parsear JSON').item.json.content_html) }},\n  \"format\": {{ JSON.stringify($('Parsear JSON').item.json.format) }},\n  \"sentiment\": {{ JSON.stringify($('Parsear JSON').item.json.sentiment) }},\n  \"cover_image_url\": \"https://pudzvatuubywmwdmboiq.supabase.co/storage/v1/object/public/post-images/{{ $('Parsear JSON').item.json.slug }}-{{ String($('Reservar URL').item.json.body[0].id).slice(0, 8) }}.webp\",\n  \"original_locale\": {{ JSON.stringify($('Parsear JSON').item.json.original_locale) }},\n  \"category_id\": {{ $('Parsear JSON').item.json.category_id }},\n  \"meta_description\": {{ JSON.stringify($('Parsear JSON').item.json.meta_description) }},\n  \"reading_time_minutes\": {{ $('Parsear JSON').item.json.reading_time_minutes }},\n  \"source_id\": {{ $('Parsear JSON').item.json.source_id }},\n  \"ai_assisted\": true\n}",
+        "options": {}
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "6d0eec41-e33b-4b73-ab95-36f87f550c86",
+      "name": "Insertar traduccion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput",
+      "position": [
+        2150,
+        2230
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts_translations?on_conflict=post_id,locale",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Armar traducciones').item.json.filas) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "27531d11-49de-4c63-aad3-45929a9d6992",
+      "name": "Log ejecucion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "onError": "continueRegularOutput",
+      "position": [
+        2610,
+        2230
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/pipeline_logs",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"timestamp\": {{ JSON.stringify($now.toISO()) }},\n  \"fuente\": {{ JSON.stringify($('Parsear JSON').item.json.fuente) }},\n  \"titulo\": {{ JSON.stringify($('Parsear JSON').item.json.title) }},\n  \"status\": \"success\",\n  \"error_message\": null\n}",
+        "options": {}
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "e09de426-f2b3-45e7-bd5b-e22fd8e826e0",
+      "name": "Telegram - Difundir",
+      "disabled": true,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2840,
+        2230
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://api.telegram.org/bot' + $vars.TELEGRAM_BOT_TOKEN + '/sendPhoto' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": {{ JSON.stringify($vars.TELEGRAM_CHAT_ID || 'TU_CHAT_ID') }},\n  \"photo\": \"https://pudzvatuubywmwdmboiq.supabase.co/storage/v1/object/public/post-images/{{ $('Parsear JSON').item.json.slug }}.webp\",\n  \"caption\": \"*{{ $('Parsear JSON').item.json.title }}*\\n\\nSentimiento: *{{ $('Parsear JSON').item.json.sentiment }}*\\nFuente: {{ $('Parsear JSON').item.json.fuente }}\\n\\n{{ $('Parsear JSON').item.json.source_url }}\\n\\n_Publicado automaticamente por Grizzly Traders_\",\n  \"parse_mode\": \"Markdown\"\n}",
+        "options": {}
+      }
+    },
+    {
+      "id": "cd62655f-26c0-4c4b-8bf0-61f44efb277d",
+      "name": "Discord - Difundir",
+      "webhookId": "21bcbe2e-d43a-4689-977b-a7af4c93b26e",
+      "disabled": true,
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        3070,
+        2230
+      ],
+      "parameters": {
+        "authentication": "webhook",
+        "operation": "create"
+      }
+    },
+    {
+      "id": "1f24bbae-4c22-4172-92c7-e6403ca05cda",
+      "name": "Obtener articulo completo",
+      "notes": "REACTIVADO 21/10/2026 -- decision informada del usuario: se acepta el riesgo de R1 (reescritura de articulo completo) para Cointelegraph/Investing.com especificamente, a cambio de contenido mas sustancial. Reuters y OTC Financial siguen desconectados (sin RSS propio, sin relacion de sindicacion legitima). Ver PLAN-CUMPLIMIENTO.md seccion 12.",
+      "type": "@mendable/n8n-nodes-firecrawl.firecrawl",
+      "typeVersion": 1,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput",
+      "position": [
+        0,
+        1560
+      ],
+      "parameters": {
+        "operation": "scrape",
+        "url": "={{ $('Normalizar Item').item.json.link }}",
+        "scrapeOptions": {
+          "options": {
+            "formats": {
+              "format": [
+                {}
+              ]
+            },
+            "headers": {},
+            "waitFor": 2000
+          }
+        },
+        "requestOptions": {}
+      },
+      "credentials": {
+        "firecrawlApi": {
+          "id": "FcA9kQm2XbT7wPzL",
+          "name": "Firecrawl API"
+        }
+      }
+    },
+    {
+      "id": "af337e0b-a738-4354-8045-a292e350c405",
+      "name": "Extraer contenido completo",
+      "notes": "REACTIVADO 21/10/2026 -- decision informada del usuario: se acepta el riesgo de R1 (reescritura de articulo completo) para Cointelegraph/Investing.com especificamente, a cambio de contenido mas sustancial. Reuters y OTC Financial siguen desconectados (sin RSS propio, sin relacion de sindicacion legitima). Ver PLAN-CUMPLIMIENTO.md seccion 12.",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput",
+      "position": [
+        230,
+        1560
+      ],
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst scraped = (input.data && (input.data.markdown || input.data.content)) || input.markdown || '';\nconst feed = $('Normalizar Item').item.json || {};\nconst MAX_CHARS = 4000;\n\n// F2.6 -- aun con onlyMainContent, Firecrawl trae ruido (publicidad, autor, fecha, titulo repetido,\n// enlaces de comentarios, tickers de precios, imagenes) que se pagaba en tokens y podia empujar el\n// final del articulo fuera del limite.\nconst vistas = new Set();\nconst lineas = String(scraped)\n  .replace(/!\\[[^\\]]*\\]\\([^)]*\\)/g, '')\n  .replace(/\\[([^\\]]*)\\]\\([^)]*\\)/g, '$1')\n  .split('\\n')\n  .map((l) => l.trim())\n  .filter((l) => {\n    if (!l) return true;\n    const b = l.toLowerCase().replace(/^#+\\s*/, '');\n    if (/^(advertisement|publicidad|anuncio)$/.test(b)) return false;\n    if (/^(view all comments|ver todos los comentarios|comments|comentarios)\\b/.test(b)) return false;\n    if (/^(author|autor|by |por |published|publicado|updated|actualizado)\\b/.test(b)) return false;\n    if (/^(escrito por|revisado por|written by|reviewed by|edited by)\\b/.test(b)) return false;\n    if (/publicado\\s*\\d|published\\s*\\w{3,9}\\.? \\d/.test(b)) return false;\n    if (/^(copiar enlace|copy link)/.test(b) || /^(share|compartir)\\b/.test(b)) return false;\n    if (/^(in this article|en este articulo|en este artículo):?$/.test(b)) return false;\n    if (/^(stock markets|últimas noticias|ultimas noticias|cryptocurrency news|economy news|economy|forex news|commodities news|company news|earnings|market news|stock market news)$/.test(b)) return false;\n    if (/^©/.test(b)) return false;\n    if (/^[a-z0-9]{2,8}\\$[\\d.,]+/i.test(l)) return false;\n    if (/^[A-Za-z0-9.&:_\\\\]{1,16}[+-]\\d+(\\.\\d+)?%$/.test(l)) return false;\n    if (/^[\\d\\s.,]+$/.test(b)) return false;\n    if (vistas.has(b)) return false;\n    vistas.add(b);\n    return true;\n  });\nconst clean = lineas.join('\\n').replace(/\\n{3,}/g, '\\n\\n').trim();\nconst fullContent = clean.length > 50 ? clean.slice(0, MAX_CHARS) : (feed.contentSnippet || '');\n\n// F1.8 -- con menos de 200 caracteres de fuente GPT rellena con generalidades inventadas (§11.5).\nif (fullContent.length < 200) {\n  throw new Error('Contenido fuente insuficiente (' + fullContent.length + ' caracteres): Firecrawl fallo y el extracto RSS es demasiado corto.');\n}\nreturn [{ json: {\n  title: feed.title || '',\n  link: feed.link || '',\n  fuente: feed.fuente || '',\n  pubDate: feed.pubDate || '',\n  fullContent: fullContent,\n  contentSnippet: feed.contentSnippet || ''\n}}];\n"
+      }
+    },
+    {
+      "id": "f536d259-a4eb-4188-839e-dc6d1eec4681",
+      "name": "Titulares recientes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput",
+      "position": [
+        0,
+        930
+      ],
+      "parameters": {
+        "url": "https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts?select=title&status=eq.published&order=published_at.desc&limit=20",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "20c32498-8ea3-4723-9e8c-8a8f90c409d8",
+      "name": "Detectar duplicado semantico",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput",
+      "position": [
+        690,
+        830
+      ],
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-4o-mini"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Eres un verificador de duplicados para un portal de noticias financieras. Te dan el titular de una noticia candidata y una lista de titulares ya publicados recientemente en el sitio. Tu unica tarea es decidir si la candidata trata del MISMO evento o noticia del mundo real que alguno de la lista, sin importar diferencias de redaccion, idioma, orden de palabras o la fuente que lo publico. Ejemplo: 'Trump amenaza con atacar Iran' y 'Trump advierte a Iran de posible ataque militar' SI tratan del mismo evento (duplicado). En cambio, dos noticias distintas sobre el mismo activo o tema general (ej. dos noticias distintas sobre Bitcoin en fechas o contextos distintos) NO son duplicado. Se estricto: solo marca duplicado si es razonablemente claro que describen el mismo hecho noticioso concreto. Devuelve SIEMPRE un JSON estricto con estas claves exactas: es_duplicado (true o false) y titulo_similar (el titular exacto de la lista que coincide, o null si es_duplicado es false). NO agregues texto fuera del JSON."
+            },
+            {
+              "content": "=Titular candidato: {{ $('Normalizar Item').item.json.title }}\n\nTitulares ya publicados recientemente:\n{{ (Array.isArray($('Titulares recientes').item.json.body) ? $('Titulares recientes').item.json.body : []).map(p => '- ' + p.title).join('\\n') }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "MCllGOOMXeswQUEW",
+          "name": "OpenAI account 2"
+        }
+      }
+    },
+    {
+      "id": "1fd308b7-03c2-4687-baa1-b4a1d478af2b",
+      "name": "Extraer veredicto duplicado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        830
+      ],
+      "parameters": {
+        "jsCode": "// F1.6 -- falla CERRADO: si no hay titulares recientes o la respuesta de GPT no se entiende,\n// el articulo se salta (se reintenta en la corrida siguiente) en vez de darse por nuevo.\nconst titulares = $('Titulares recientes').item.json;\nif (titulares.statusCode !== 200 || !Array.isArray(titulares.body)) {\n  return [{ json: { es_duplicado: true, titulo_similar: null, motivo: 'sin titulares recientes' } }];\n}\nlet raw = $json.output?.[0]?.content?.[0]?.text ?? $json.choices?.[0]?.message?.content ?? $json.message?.content ?? $json.text;\nlet data = null;\ntry {\n  if (typeof raw === 'string') data = JSON.parse(raw);\n  else if (raw && typeof raw === 'object') data = raw;\n} catch (e) {\n  data = null;\n}\nif (!data || typeof data.es_duplicado !== 'boolean') {\n  return [{ json: { es_duplicado: true, titulo_similar: null, motivo: 'veredicto ilegible' } }];\n}\nreturn [{ json: { es_duplicado: data.es_duplicado, titulo_similar: data.titulo_similar || null } }];"
+      }
+    },
+    {
+      "id": "0dfbf5fa-d0ef-45a8-bc80-897f2af6746b",
+      "name": "No es duplicado",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1150,
+        830
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "no_dup",
+              "leftValue": "={{ $json.es_duplicado }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "08159f91-2af6-483f-ab6c-bc9cc27c1c6e",
+      "name": "Optimizar imagen",
+      "type": "n8n-nodes-base.editImage",
+      "typeVersion": 1.1,
+      "onError": "continueErrorOutput",
+      "position": [
+        230,
+        2230
+      ],
+      "parameters": {
+        "operation": "resize",
+        "width": 1536,
+        "height": 1024,
+        "resizeOption": "ignoreAspectRatio",
+        "options": {
+          "destinationKey": "data",
+          "format": "webp"
+        }
+      }
+    },
+    {
+      "id": "86ff97d5-d637-4a7b-becf-e0de0944f0b4",
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1950,
+        255
+      ],
+      "parameters": {
+        "options": {}
+      }
+    },
+    {
+      "id": "a1f4c7e0-5b21-4d8e-9c33-7f1a2b3c4d50",
+      "name": "GPT · Traducir",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput",
+      "position": [
+        1150,
+        1560
+      ],
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-4o-mini"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Eres un traductor profesional de prensa financiera para el portal Grizzly Traders. Recibes un articulo ya redactado en su idioma original y lo devuelves traducido al idioma destino que se te indica. Respondes SIEMPRE con un JSON valido y estricto con estas claves exactas y ninguna mas: title, slug, content_html, meta_title, meta_description.\n\nREGLAS OBLIGATORIAS\n1. ESTRUCTURA HTML EXACTA. content_html conserva exactamente los mismos tags que el original, en el mismo orden, con los mismos atributos y el mismo anidamiento: el mismo numero de <p>, <h2>, <ul>, <li>, <blockquote>, <a>, <strong> y <em>. No agregues, elimines, fusiones, dividas ni reordenes elementos. Lo unico que cambia es el texto que hay entre los tags. Los valores de los atributos (href, src, class, target, rel) se copian literalmente, sin traducir.\n2. NO SE TRADUCEN: nombres propios de personas; tickers y simbolos de cotizacion (BTC, ETH, AAPL, EUR/USD, XAU/USD); nombres de empresas, bolsas, indices y plataformas (Binance, Nasdaq, S&P 500, Coinbase); nombres de instituciones y organismos (Federal Reserve, FOMC, SEC, BCE, ECB, OPEC, FMI, IMF); nombres de productos, protocolos y monedas. Se escriben tal como aparecen en el original. Las cifras, los porcentajes, las divisas y las fechas conservan su valor exacto; solo se adapta su formato de escritura al idioma destino cuando el idioma lo exige.\n3. SLUG. Genera un slug NUEVO en el idioma destino a partir del title traducido. Solo minusculas de la a a la z, digitos del 0 al 9 y guiones. Sin tildes, sin diereses, sin letra enie, sin signos de puntuacion, sin espacios y sin ningun otro caracter especial. Palabras separadas por un solo guion, sin guion al principio ni al final, maximo 80 caracteres y sin cortar una palabra por la mitad. No reutilices ni transcribas el slug original: redactalo desde el title traducido.\n4. CITAS. El texto dentro de <blockquote> se traduce como traduccion fiel de la cita original: respeta el sentido, el tono y lo que se afirma. No inventes, no amplies, no interpretes y no completes lo que falte; si la cita es ambigua, traducela de forma literal. Nunca dejes un <blockquote> vacio, nunca lo conviertas en parrafo y nunca lo elimines.\n5. META. meta_title es el title traducido, de 70 caracteres como maximo. meta_description es la traduccion de la meta descripcion recibida, de 160 caracteres como maximo, en el idioma destino y sin cortar una palabra por la mitad.\n6. REGISTRO. Manten el tono informativo y sobrio de la prensa financiera. No agregues opiniones, avisos, descargos de responsabilidad, notas del traductor, saludos ni frases que no esten en el original. No resumas y no alargues: la traduccion cubre todo el contenido del original, parrafo por parrafo.\n7. SALIDA. Responde SOLO con el JSON. Sin markdown, sin bloques de codigo, sin comentarios y sin texto antes ni despues."
+            },
+            {
+              "content": "=Idioma original: {{ $('Parsear JSON').item.json.original_locale === 'en' ? 'ingles (en)' : 'espanol (es)' }}\nIdioma destino: {{ $('Parsear JSON').item.json.original_locale === 'en' ? 'espanol (es)' : 'ingles (en)' }}\n\nTraduce al idioma destino el articulo siguiente y devuelve el JSON con las cinco claves.\n\ntitle: {{ $('Parsear JSON').item.json.title }}\nslug original (NO lo reutilices, genera uno nuevo en el idioma destino): {{ $('Parsear JSON').item.json.slug }}\nmeta_title: {{ $('Parsear JSON').item.json.title }}\nmeta_description: {{ $('Parsear JSON').item.json.meta_description }}\ncontent_html:\n{{ $('Parsear JSON').item.json.content_html }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "MCllGOOMXeswQUEW",
+          "name": "OpenAI account 2"
+        }
+      }
+    },
+    {
+      "id": "b2e5d8f1-6c32-4e9f-8a44-1b2c3d4e5f61",
+      "name": "Preparar traduccion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput",
+      "position": [
+        1380,
+        1560
+      ],
+      "parameters": {
+        "jsCode": "// Lee la salida de GPT - Traducir, valida la traduccion y deja preparadas las DOS\n// filas de posts_translations: la del idioma original y la del idioma opuesto.\nconst base = $('Parsear JSON').item.json;\nlet raw = $json.output?.[0]?.content?.[0]?.text ?? $json.choices?.[0]?.message?.content ?? $json.message?.content ?? $json.text;\nlet t = {};\ntry {\n  if (typeof raw === 'string') {\n    t = JSON.parse(raw.trim().replace(/^\\x60{3}json\\s*/i, \"\").replace(/\\x60{3}\\s*$/, \"\"));\n  } else if (raw && typeof raw === 'object') {\n    t = raw;\n  }\n} catch (e) {\n  t = {};\n}\n\nconst originalLocale = base.original_locale === 'en' ? 'en' : 'es';\nconst targetLocale = originalLocale === 'es' ? 'en' : 'es';\n\nconst slugify = (value) => String(value || '')\n  .toLowerCase()\n  .normalize('NFD')\n  .replace(/[\\u0300-\\u036f]/g, '')\n  .replace(/[^a-z0-9]+/g, '-')\n  .replace(/^-+|-+$/g, '')\n  .slice(0, 80)\n  .replace(/-+$/, '');\n\nconst recortar = (value, max) => {\n  const s = String(value || '').trim();\n  if (s.length <= max) return s;\n  const corte = s.slice(0, max);\n  const esp = corte.lastIndexOf(' ');\n  return (esp > max * 0.6 ? corte.slice(0, esp) : corte).trim();\n};\n\nconst titleT = String(t.title || '').trim();\nconst contentT = String(t.content_html || '').trim();\n\nif (!titleT || contentT.length < 40 || !/<[a-z]/i.test(contentT)) {\n  throw new Error('GPT - Traducir devolvio una traduccion inutilizable (title o content_html vacios o sin HTML). El post NO se inserta y el articulo se reintentara en la siguiente corrida.');\n}\n\nlet slugT = slugify(t.slug) || slugify(titleT);\nif (!slugT || slugT === base.slug) slugT = slugify(base.slug + '-' + targetLocale);\n\n// Control de integridad: mismo multiconjunto de tags en el original y en la traduccion.\nconst tagsDe = (html) => (String(html).match(/<([a-z][a-z0-9]*)(?=[\\s>\\/])/gi) || [])\n  .map((s) => s.slice(1).toLowerCase())\n  .sort()\n  .join(',');\nconst tagsCoinciden = tagsDe(base.content_html) === tagsDe(contentT);\n\nconst original = {\n  locale: originalLocale,\n  title: base.title,\n  slug: base.slug,\n  content_html: base.content_html,\n  meta_title: recortar(base.title, 70),\n  meta_description: recortar(base.meta_description, 160)\n};\n\nconst traducida = {\n  locale: targetLocale,\n  title: titleT,\n  slug: slugT,\n  content_html: contentT,\n  meta_title: recortar(t.meta_title || titleT, 70),\n  meta_description: recortar(t.meta_description || titleT, 160)\n};\n\nreturn [{ json: {\n  original_locale: originalLocale,\n  target_locale: targetLocale,\n  tags_coinciden: tagsCoinciden,\n  original: original,\n  traducida: traducida\n}, pairedItem: { item: 0 } }];"
+      }
+    },
+    {
+      "id": "c3d6e9a2-7d43-4f10-9b55-2c3d4e5f6a72",
+      "name": "Verificar slugs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput",
+      "position": [
+        1690,
+        2230
+      ],
+      "parameters": {
+        "url": "={{ 'https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts_translations?select=locale,slug&limit=10&post_id=neq.' + encodeURIComponent($('Insertar post').item.json.id) + '&slug=in.(' + encodeURIComponent($('Preparar traduccion').item.json.original.slug) + ',' + encodeURIComponent($('Preparar traduccion').item.json.traducida.slug) + ')' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "d4e7f0b3-8e54-4a21-8c66-3d4e5f6a7b83",
+      "name": "Armar traducciones",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput",
+      "position": [
+        1920,
+        2230
+      ],
+      "parameters": {
+        "jsCode": "// Resuelve las colisiones contra posts_translations_locale_slug_key UNIQUE (locale, slug)\n// y devuelve las DOS filas listas para el upsert.\nconst prep = $('Preparar traduccion').item.json;\nconst postId = $('Insertar post').item.json.id;\nif (!postId) {\n  throw new Error('Insertar post no devolvio id: no se pueden insertar las traducciones.');\n}\n\nconst existentes = Array.isArray($json.body) ? $json.body : [];\n// Sufijo corto y determinista derivado del uuid del post: estable entre reintentos.\nconst sufijo = '-' + String(postId).replace(/-/g, '').slice(0, 6);\n\nconst resolver = (fila) => {\n  const choca = existentes.some((r) => r && r.locale === fila.locale && r.slug === fila.slug);\n  if (!choca) return { slug: fila.slug, colision: false };\n  const raiz = fila.slug.slice(0, 80 - sufijo.length).replace(/-+$/, '');\n  return { slug: raiz + sufijo, colision: true };\n};\n\nconst ahora = new Date().toISOString();\nconst colisiones = [];\n\nconst filas = [prep.original, prep.traducida].map((f) => {\n  const r = resolver(f);\n  if (r.colision) colisiones.push({ locale: f.locale, slug_pedido: f.slug, slug_final: r.slug });\n  return {\n    post_id: postId,\n    locale: f.locale,\n    title: f.title,\n    slug: r.slug,\n    content_html: f.content_html,\n    meta_title: f.meta_title,\n    meta_description: f.meta_description,\n    updated_at: ahora\n  };\n});\n\nif (filas.length !== 2 || filas[0].locale === filas[1].locale) {\n  throw new Error('Se esperaban dos filas de locales distintos y no es el caso.');\n}\n\nreturn [{ json: {\n  filas: filas,\n  locales: filas.map((f) => f.locale),\n  slugs: filas.map((f) => f.locale + ':' + f.slug),\n  colisiones: colisiones,\n  tags_coinciden: prep.tags_coinciden\n}, pairedItem: { item: 0 } }];"
+      }
+    },
+    {
+      "id": "2fe6981c-50b6-4bf1-963d-946b0174ebff",
+      "name": "Checklist editorial P2",
+      "notes": "Puerta de cumplimiento P2 (auditoria legal 21/10/2026). Ver PLAN-CUMPLIMIENTO.md seccion 9.",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput",
+      "position": [
+        920,
+        1560
+      ],
+      "parameters": {
+        "jsCode": "// P2 (guia de cumplimiento) -- checklist editorial mecanico antes de insertar. Si algo falla,\n// esta linea lanza un Error: la ejecucion de n8n queda marcada como fallida, SIN insertar el\n// post, visible en el historial de ejecuciones para revision humana. No inventa un estado\n// 'pendiente_revision' nuevo en la tabla posts -- usa el mecanismo de error que n8n ya tiene.\n\nconst datos = $('Parsear JSON').item.json;\nconst errores = [];\n\nconst textoPlano = (datos.content_html || '').replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\n\nif (!datos.title || !datos.title.trim()) {\n  errores.push('Falta el titulo.');\n} else if (datos.title.trim().toLowerCase() === String(datos.source_title || '').trim().toLowerCase()) {\n  errores.push('El titulo es una copia literal del titular de la fuente.');\n}\n\nif (!textoPlano) {\n  errores.push('Falta el contenido.');\n} else if (textoPlano.length > 750) {\n  errores.push('El contenido supera los 750 caracteres (tiene ' + textoPlano.length + ').');\n}\n\nif (!datos.source_url) {\n  errores.push('Falta el enlace a la fuente original (source_url).');\n}\nif (datos.source_id == null) {\n  errores.push('Falta el source_id (atribucion estructurada a la fuente).');\n}\n\nconst senales = [\n  /comprar\\s+ahora/i, /vender\\s+ahora/i, /se[nñ]al\\s+de\\s+(compra|venta)/i,\n  /zona\\s+de\\s+entrada/i, /take[\\s-]?profit/i, /stop[\\s-]?loss/i,\n  /precio\\s+objetivo/i, /target\\s+price/i, /\\brecomendamos\\b/i,\n  /\\bdebes?\\s+(comprar|vender)\\b/i, /\\b(buy|sell)\\s+now\\b/i\n];\nconst textoCompleto = (datos.title || '') + ' ' + textoPlano;\nfor (const patron of senales) {\n  if (patron.test(textoCompleto)) {\n    errores.push('Lenguaje de senal/recomendacion de inversion detectado.');\n    break;\n  }\n}\n\nif (errores.length > 0) {\n  throw new Error('Checklist editorial P2 (auditoria legal) fallo: ' + errores.join(' | '));\n}\n\nreturn $input.all();"
+      }
+    },
+    {
+      "id": "f0c290e7-b688-47f8-b643-734c64db192e",
+      "name": "Priorizar y limitar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1720,
+        255
+      ],
+      "parameters": {
+        "jsCode": "// Antes: solo las N más recientes. Ahora: una plaza reservada para la fuente oficial más reciente\n// (Reserva Federal o SEC) y el resto por fecha. Sin esto, los comunicados oficiales, que llegan\n// menos veces, quedaban siempre debajo de los titulares de medios.\nconst N = 5;\nconst OFICIALES = ['Reserva Federal', 'SEC', 'CFTC'];\nconst items = $input.all().map((it, i) => ({ it, i, t: Date.parse($('Normalizar Item').itemMatching(i).json.pubDate) || 0 }));\nitems.sort((a, b) => b.t - a.t);\nconst elegidos = [];\nconst oficial = items.find((x) => OFICIALES.includes(x.it.json.fuente));\nif (oficial) elegidos.push(oficial);\nfor (const x of items) {\n  if (elegidos.length >= N) break;\n  if (!elegidos.includes(x)) elegidos.push(x);\n}\nreturn elegidos.map(({ it, i }) => ({ json: it.json, pairedItem: { item: i } }));"
+      }
+    },
+    {
+      "id": "f811f504-2a99-40af-bd4b-0b0a2e43ebdc",
+      "name": "Reservar URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput",
+      "position": [
+        1380,
+        930
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/rpc/pipeline_claim_post",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_source_url: $('Normalizar Item').item.json.link, p_title: $('Normalizar Item').item.json.title, p_source_id: ({ 'CFTC': 11, 'Investing.com': 4, 'Reserva Federal': 9, 'SEC': 10 })[$('Normalizar Item').item.json.fuente] ?? null, p_author_id: 5 }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "712d5052-34c9-4321-ab97-98b05a02096d",
+      "name": "Reserva obtenida",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1610,
+        930
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "reservado",
+              "leftValue": "={{ $json.statusCode === 200 && Array.isArray($json.body) && $json.body.length === 1 && typeof $json.body[0].id === 'string' }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "8d760f51-2557-4afb-9895-9c74aca0847a",
+      "name": "Comprobar slug",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput",
+      "position": [
+        1230,
+        2230
+      ],
+      "parameters": {
+        "url": "={{ 'https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts?select=id&limit=1&slug=eq.' + encodeURIComponent($('Parsear JSON').item.json.slug) + '&id=neq.' + $('Reservar URL').item.json.body[0].id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "3f33eadd-0df3-48ee-a129-7d1b96672a2e",
+      "name": "Publicar post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput",
+      "position": [
+        2380,
+        2230
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts?id=eq.' + $('Reservar URL').item.json.body[0].id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'published', published_at: $now.toISO(), pipeline_error: null }) }}",
+        "options": {}
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "8541286b-3360-4b53-a51c-4913e5a0967f",
+      "name": "Registrar fallo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        2900
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// F1.1 -- cualquier error de un articulo llega aqui y el lote sigue con el siguiente.\n// D2: el rechazo del checklist deja borrador (no se reintenta); un fallo tecnico deja\n// borrador con 'error:' y pipeline_claim_post lo reintenta una vez en otra corrida.\nconst e = $json.error;\nlet msg = typeof e === 'string' ? e : (e && (e.message || e.description)) || '';\nif (!msg) msg = JSON.stringify($json).slice(0, 300);\nconst esChecklist = msg.includes('Checklist editorial P2');\nlet feed = {};\ntry { feed = $('Normalizar Item').item.json || {}; } catch (_) {}\nlet postId = null;\ntry { postId = $('Reservar URL').item.json.body[0].id || null; } catch (_) {}\nreturn { json: {\n  post_id: typeof postId === 'string' ? postId : null,\n  source_url: feed.link || null,\n  titulo: feed.title || null,\n  fuente: feed.fuente || null,\n  pipeline_error: (esChecklist ? 'checklist: ' : 'error: ') + msg.slice(0, 500),\n  log_status: esChecklist ? 'draft_checklist' : 'failed',\n} };"
+      }
+    },
+    {
+      "id": "506bf030-10b8-403f-96fa-be881b766cec",
+      "name": "Marcar fallo en post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "onError": "continueRegularOutput",
+      "position": [
+        230,
+        2900
+      ],
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts?status=eq.draft&' + ($json.post_id ? 'id=eq.' + $json.post_id : 'source_url=eq.' + encodeURIComponent($json.source_url || 'sin-url')) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ pipeline_error: $json.pipeline_error }) }}",
+        "options": {}
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "bf5d0264-0808-4ac6-a813-c758110a0e10",
+      "name": "Log fallo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "onError": "continueRegularOutput",
+      "position": [
+        460,
+        2900
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/pipeline_logs",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ timestamp: $now.toISO(), fuente: $('Registrar fallo').item.json.fuente, titulo: $('Registrar fallo').item.json.titulo, status: $('Registrar fallo').item.json.log_status, error_message: $('Registrar fallo').item.json.pipeline_error + ' | ' + ($('Registrar fallo').item.json.source_url || '') }) }}",
+        "options": {}
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "2757fc93-6caf-4f85-a72b-645697c69b40",
+      "name": "Publicados recientes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput",
+      "position": [
+        250,
+        240
+      ],
+      "parameters": {
+        "url": "={{ 'https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts?select=source_url,status,origen,pipeline_attempts,pipeline_error&limit=2000&source_url=not.is.null&created_at=gte.' + encodeURIComponent($now.minus({ hours: 240 }).toUTC().toISO()) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "9d9413aa-a0e7-4c86-90e9-fe9323a117d5",
+      "name": "Descartar ya tratados",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1490,
+        255
+      ],
+      "parameters": {
+        "jsCode": "// F2.3 -- antes habia una peticion a Supabase por articulo (40 seguidas, 8-21 s por corrida);\n// ahora 'Publicados recientes' trae de una vez las URLs de los ultimos 10 dias (mas que la ventana de 7 dias de las fuentes oficiales). Falla cerrado: sin esa\n// lista no pasa nada (la reserva atomica en Supabase sigue siendo la red de seguridad final).\nconst r = $('Publicados recientes').first().json;\nif (r.statusCode !== 200 || !Array.isArray(r.body)) return [];\nconst tratados = new Map(r.body.map((p) => [p.source_url, p]));\nconst reintentable = (p) => p.status === 'draft' && p.origen === 'rss' && (p.pipeline_attempts ?? 0) < 2\n  && !String(p.pipeline_error || '').startsWith('checklist:');\nconst salida = [];\n$input.all().forEach((it, i) => {\n  const p = tratados.get($('Normalizar Item').itemMatching(i).json.link);\n  if (!p || reintentable(p)) salida.push({ json: it.json, pairedItem: { item: i } });\n});\nreturn salida;"
+      }
+    },
+    {
+      "id": "2843a61a-c7d6-43f2-b083-d4b0ca8e87c8",
+      "name": "Prefiltro lexico",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        230,
+        930
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// F2.4-A -- solo se paga la llamada de GPT de duplicados si el titular comparte alguna entidad\n// (nombre propio, sigla o cifra) con un titular reciente: sin ninguna en comun no puede ser la misma\n// noticia. Ante la duda (sin entidades, o sin titulares recientes) se pregunta a GPT igual.\nconst titulares = $('Titulares recientes').item.json;\nconst candidato = String($('Normalizar Item').item.json.title || '');\n\nconst VACIAS = new Set(['the', 'a', 'an', 'of', 'and', 'or', 'for', 'on', 'in', 'to', 'as', 'at', 'by', 'with', 'from',\n  'after', 'before', 'over', 'amid', 'is', 'are', 'be', 'its', 'new', 'la', 'el', 'los', 'las', 'lo', 'un', 'una', 'de',\n  'del', 'y', 'o', 'en', 'por', 'para', 'con', 'sin', 'tras', 'ante', 'sobre', 'que', 'se', 'su', 'sus', 'al', 'mas', 'nuevo', 'nueva']);\n\n// Los titulares candidatos llegan en ingles o espanol y los publicados en espanol: los activos que\n// son nombres comunes (oro, petroleo...) no comparten palabra entre idiomas, asi que se normalizan.\nconst ACTIVOS = { gold: 'oro', oro: 'oro', silver: 'plata', plata: 'plata', oil: 'petroleo', petroleo: 'petroleo',\n  crude: 'petroleo', crudo: 'petroleo', brent: 'petroleo', wti: 'petroleo', copper: 'cobre', cobre: 'cobre',\n  gas: 'gas', dollar: 'dolar', dolar: 'dolar', yen: 'yen', euro: 'euro', yuan: 'yuan' };\n\nconst entidades = (texto) => {\n  const out = new Set();\n  const sinTildes = texto.normalize('NFD').replace(/[̀-ͯ]/g, '');\n  for (const crudo of sinTildes.split(/[^A-Za-z0-9$%.&]+/)) {\n    const w = crudo.replace(/^[.]+|[.]+$/g, '');\n    if (!w) continue;\n    const baja = w.toLowerCase();\n    if (ACTIVOS[baja]) { out.add(ACTIVOS[baja]); continue; }\n    if (VACIAS.has(baja)) continue;\n    if (/\\d/.test(w) || /^[A-Z]{2,}$/.test(w) || /^[A-Z][a-z]/.test(w)) out.add(baja);\n  }\n  return out;\n};\n\nconst lista = titulares && titulares.statusCode === 200 && Array.isArray(titulares.body) ? titulares.body : null;\nconst propias = entidades(candidato);\nlet comunes = [];\nif (lista && propias.size > 0) {\n  const recientes = new Set();\n  for (const p of lista) for (const e of entidades(String(p.title || ''))) recientes.add(e);\n  comunes = [...propias].filter((e) => recientes.has(e));\n}\nconst revisar = !lista || propias.size === 0 || comunes.length > 0;\nreturn { json: { revisar_con_gpt: revisar, entidades_comunes: comunes } };\n"
+      }
+    },
+    {
+      "id": "d285881f-05d4-4a83-bdab-9bbcc94bcc8a",
+      "name": "¿Revisar con GPT?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        460,
+        930
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "revisar",
+              "leftValue": "={{ $json.revisar_con_gpt === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c4285b99-0213-40e9-9437-e78f8c5e4676",
+      "name": "RSS Reserva Federal",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "onError": "continueRegularOutput",
+      "position": [
+        520,
+        340
+      ],
+      "parameters": {
+        "url": "https://www.federalreserve.gov/feeds/press_all.xml",
+        "options": {}
+      }
+    },
+    {
+      "id": "befac85c-7f38-4402-8e9c-aa2edbf56c91",
+      "name": "RSS SEC",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "onError": "continueRegularOutput",
+      "position": [
+        520,
+        510
+      ],
+      "parameters": {
+        "url": "https://www.sec.gov/news/pressreleases.rss",
+        "options": {}
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://localhost:3100/api/cover/compose?flags=' + encodeURIComponent(($('Parsear JSON').item.json.cover_flags || []).join(',')) + '&assets=' + encodeURIComponent(($('Parsear JSON').item.json.cover_assets || []).join(',')) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "image/webp"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "cover"
+            }
+          }
+        }
+      },
+      "id": "b7c3a0de-5d2e-4c53-9b1a-6c1f0e9a1111",
+      "name": "Componer portada",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        460,
+        2230
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "coverApiCred0001",
+          "name": "Pipeline API portadas"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 4000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Si el sitio compuso la portada (banderas y logos) se usa esa; si no respondio, se publica la imagen sin insignias\nconst original = $('Optimizar imagen').item.binary?.data;\nconst compuesta = $input.item.binary?.cover;\nreturn { json: { cover_mode: compuesta ? 'compuesta' : 'respaldo_sin_insignias' }, binary: { data: compuesta ?? original } };"
+      },
+      "id": "d4e5f6a7-8b9c-4d0e-a1b2-c3d4e5f60222",
+      "name": "Elegir portada",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        690,
+        2230
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a55",
+      "name": "Prueba manual",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "content": "# Pipeline de noticias financieras\nCada 15 min: lee las fuentes, elige las 5 notas mas recientes (una puede ser oficial), descarta duplicados, las analiza con GPT, genera portada y traduccion, y publica en Supabase.\n\n**Pruebas:** `n8n execute --id=<id del flujo>` (arranca desde *Prueba manual*).",
+        "height": 190,
+        "width": 1500,
+        "color": 7
+      },
+      "id": "titulo",
+      "name": "Nota titulo",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 1 · Disparo, fuentes y seleccion\nFuentes: CFTC, Investing.com, Reserva Federal y SEC. Las oficiales tienen ventana de 7 dias y una plaza reservada. Se queda con N=5 por vuelta.",
+        "height": 760,
+        "width": 2350,
+        "color": 4
+      },
+      "id": "b1",
+      "name": "Nota b1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 2 · Antiduplicados y reserva\nPor cada nota: busca titulares recientes, pregunta a GPT solo si comparten entidades y reserva la URL en Supabase (evita duplicados entre ciclos).",
+        "height": 520,
+        "width": 1900,
+        "color": 6
+      },
+      "id": "b2",
+      "name": "Nota b2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 3 · Contenido, analisis y traduccion\nFirecrawl trae el texto completo; GPT redacta (500-650 caracteres), clasifica y sugiere escena, banderas y activos de la portada; el checklist legal revisa antes de traducir.",
+        "height": 440,
+        "width": 1760,
+        "color": 3
+      },
+      "id": "b3",
+      "name": "Nota b3",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        1350
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 4 · Portada\nGPT dibuja la escena; el sitio le pone banderas y logos de activos (`/api/cover/compose`). Si el sitio no responde, se usa la imagen sin insignias.",
+        "height": 440,
+        "width": 1010,
+        "color": 5
+      },
+      "id": "b4a",
+      "name": "Nota b4a",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        2030
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 5 · Publicacion\nSube la imagen, comprueba el slug, inserta el post y sus traducciones, lo publica y registra la ejecucion. Telegram y Discord estan apagados.",
+        "height": 440,
+        "width": 2370,
+        "color": 2
+      },
+      "id": "b4b",
+      "name": "Nota b4b",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        960,
+        2030
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Errores\nCualquier fallo del flujo llega aqui: deja el post en borrador con el error, lo registra y sigue con la siguiente nota.",
+        "height": 420,
+        "width": 810,
+        "color": 1
+      },
+      "id": "err",
+      "name": "Nota err",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        2700
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "veredicto_real",
+              "leftValue": "={{ !!$json.titulo_similar }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f0a1b2c3-d4e5-4f60-8a7b-9c0d1e2f3a66",
+      "name": "¿Duplicado confirmado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1380,
+        740
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts?on_conflict=source_url",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=ignore-duplicates,return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ title: String($('Normalizar Item').item.json.title || 'duplicado').slice(0, 200), slug: 'duplicado-' + [...String($('Normalizar Item').item.json.link)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7).toString(36), content_html: '<p></p>', status: 'draft', origen: 'rss', author_id: 5, source_url: $('Normalizar Item').item.json.link, source_id: ({ 'CFTC': 11, 'Investing.com': 4, 'Reserva Federal': 9, 'SEC': 10 })[$('Normalizar Item').item.json.fuente] ?? null, ai_assisted: true, pipeline_attempts: 2, pipeline_error: 'duplicado: ' + $json.titulo_similar }) }}",
+        "options": {}
+      },
+      "id": "a9b8c7d6-e5f4-4a3b-9c2d-1e0f9a8b7c77",
+      "name": "Guardar duplicado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1610,
+        740
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Publicados recientes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Investing.com": {
+      "main": [
+        [
+          {
+            "node": "Fuentes Combinadas",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Fuentes Combinadas": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar Item": {
+      "main": [
+        [
+          {
+            "node": "Filtro Calidad",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Analisis GPT": {
+      "main": [
+        [
+          {
+            "node": "Parsear JSON",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar fallo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Subir a Supabase Storage": {
+      "main": [
+        [
+          {
+            "node": "Comprobar slug",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar fallo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insertar post": {
+      "main": [
+        [
+          {
+            "node": "Verificar slugs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar fallo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insertar traduccion": {
+      "main": [
+        [
+          {
+            "node": "Publicar post",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar fallo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log ejecucion": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Difundir",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram - Difundir": {
+      "main": [
+        [
+          {
+            "node": "Discord - Difundir",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Titulares recientes": {
+      "main": [
+        [
+          {
+            "node": "Prefiltro lexico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detectar duplicado semantico": {
+      "main": [
+        [
+          {
+            "node": "Extraer veredicto duplicado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer veredicto duplicado": {
+      "main": [
+        [
+          {
+            "node": "No es duplicado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No es duplicado": {
+      "main": [
+        [
+          {
+            "node": "Reservar URL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "¿Duplicado confirmado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Imagen GPT": {
+      "main": [
+        [
+          {
+            "node": "Optimizar imagen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar fallo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Optimizar imagen": {
+      "main": [
+        [
+          {
+            "node": "Componer portada",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar fallo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtro Calidad": {
+      "main": [
+        [
+          {
+            "node": "Descartar ya tratados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        null,
+        [
+          {
+            "node": "Titulares recientes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear JSON": {
+      "main": [
+        [
+          {
+            "node": "Checklist editorial P2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar fallo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT · Traducir": {
+      "main": [
+        [
+          {
+            "node": "Preparar traduccion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar fallo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar traduccion": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Imagen GPT",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar fallo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar slugs": {
+      "main": [
+        [
+          {
+            "node": "Armar traducciones",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar fallo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar traducciones": {
+      "main": [
+        [
+          {
+            "node": "Insertar traduccion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar fallo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checklist editorial P2": {
+      "main": [
+        [
+          {
+            "node": "GPT · Traducir",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar fallo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtener articulo completo": {
+      "main": [
+        [
+          {
+            "node": "Extraer contenido completo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer contenido completo": {
+      "main": [
+        [
+          {
+            "node": "OpenAI - Analisis GPT",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar fallo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Priorizar y limitar": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reservar URL": {
+      "main": [
+        [
+          {
+            "node": "Reserva obtenida",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reserva obtenida": {
+      "main": [
+        [
+          {
+            "node": "Obtener articulo completo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comprobar slug": {
+      "main": [
+        [
+          {
+            "node": "Insertar post",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar fallo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publicar post": {
+      "main": [
+        [
+          {
+            "node": "Log ejecucion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar fallo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar fallo": {
+      "main": [
+        [
+          {
+            "node": "Marcar fallo en post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar fallo en post": {
+      "main": [
+        [
+          {
+            "node": "Log fallo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log fallo": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publicados recientes": {
+      "main": [
+        [
+          {
+            "node": "RSS CFTC",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS Investing.com",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS Reserva Federal",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS SEC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descartar ya tratados": {
+      "main": [
+        [
+          {
+            "node": "Priorizar y limitar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prefiltro lexico": {
+      "main": [
+        [
+          {
+            "node": "¿Revisar con GPT?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Revisar con GPT?": {
+      "main": [
+        [
+          {
+            "node": "Detectar duplicado semantico",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reservar URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Reserva Federal": {
+      "main": [
+        [
+          {
+            "node": "Fuentes Combinadas",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "RSS SEC": {
+      "main": [
+        [
+          {
+            "node": "Fuentes Combinadas",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Componer portada": {
+      "main": [
+        [
+          {
+            "node": "Elegir portada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Elegir portada": {
+      "main": [
+        [
+          {
+            "node": "Subir a Supabase Storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS CFTC": {
+      "main": [
+        [
+          {
+            "node": "Fuentes Combinadas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prueba manual": {
+      "main": [
+        [
+          {
+            "node": "Publicados recientes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Duplicado confirmado?": {
+      "main": [
+        [
+          {
+            "node": "Guardar duplicado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar duplicado": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true,
+    "executionTimeout": 840
+  },
+  "staticData": {
+    "node:Schedule Trigger": {
+      "recurrenceRules": [
+        null
+      ],
+      "recurrenceRuleSignatures": [
+        null
+      ]
+    }
+  },
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "instanceId": "df32f97375e762b11c3efe67762634809f562393bf0a68f6f07d3def9ea83fe3"
+  },
+  "nodeGroups": [
+    {
+      "id": "38723968-0e71-481d-b2c9-8b2ee20c4724",
+      "name": "Fuentes",
+      "description": "Une en una sola lista los articulos de las 3 fuentes: RSS Cointelegraph, RSS Investing.com y OTC Financial.",
+      "nodeIds": [
+        "3e0882dd-f86e-4a5a-aaf1-11c6067f6785"
+      ]
+    },
+    {
+      "id": "59cf1c2a-7624-48a4-9e0f-24454621fe68",
+      "name": "Filtrado",
+      "description": "Descarta articulos ya publicados (por URL o titulo similar), cortos, en ingles o con mas de 24 horas.",
+      "nodeIds": [
+        "6f95c275-d8d2-4c5a-aabf-1aa416b1c5ef",
+        "7b1ac016-6510-4ac2-8efa-5101fa85d375"
+      ]
+    }
+  ],
+  "pinData": {},
+  "versionCounter": 52,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": []
+}
