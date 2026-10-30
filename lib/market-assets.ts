@@ -2,7 +2,7 @@
 // la única fuente de verdad — ver ese archivo para agregar/editar un activo.
 import { ASSETS } from './assets-catalog'
 
-export type MarketCategory = 'crypto' | 'forex' | 'commodity' | 'stock' | 'index'
+export type MarketCategory = 'crypto' | 'forex' | 'commodity' | 'stock' | 'index' | 'future'
 
 export interface MarketAssetDef {
   symbol: string
@@ -22,6 +22,7 @@ export const MARKET_CATEGORY_LABELS: Record<MarketCategory, string> = {
   commodity: 'Materias primas',
   stock: 'Acciones',
   index: 'Índices',
+  future: 'Futuros',
 }
 
 export const MARKET_ASSETS: MarketAssetDef[] = ASSETS.map((a) => ({

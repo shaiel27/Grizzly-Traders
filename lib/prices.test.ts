@@ -66,7 +66,8 @@ describe('fetchAllPrices', () => {
 
     const prices = await fetchAllPrices()
 
-    expect(prices.map((price) => price.symbol).sort()).toEqual(['BTC', 'ETH', 'SOL', 'XAUUSD'])
+    // The Yahoo stub also answers the always-on index quotes (SPX/DXY), so they show up too
+    expect(prices.map((price) => price.symbol).sort()).toEqual(['BTC', 'DXY', 'ETH', 'SOL', 'SPX', 'XAUUSD'])
     expect(prices[0]).toMatchObject({ source: 'yahoo', price: 100, change24h: 20, changePercent24h: 25 })
   })
 
@@ -85,17 +86,28 @@ describe('fetchAllPrices', () => {
     expect(eurusd?.changePercent24h).toBeCloseTo((0.02 / 1.1) * 100)
   })
 
-  it('scales the SPY and UUP proxies into SPX and DXY levels', async () => {
+  it('serves SPX and DXY as real Yahoo index quotes, not Finnhub ETF proxies', async () => {
     vi.stubEnv('FINNHUB_API_KEY', 'test-key')
-    stubFetch({ 'coingecko.com': {}, 'frankfurter.dev': { rates: {} }, 'finnhub.io': { c: 500, d: 5, dp: 1 } })
+    stubFetch({
+      'coingecko.com': {},
+      'frankfurter.dev': { rates: {} },
+      'finnhub.io': { c: 500, d: 5, dp: 1 },
+      'query1.finance.yahoo.com': { chart: { result: [{ meta: { regularMarketPrice: 5_200, chartPreviousClose: 5_150 } }] } },
+    })
     const { fetchAllPrices } = await loadPrices()
 
     const bySymbol = Object.fromEntries((await fetchAllPrices()).map((price) => [price.symbol, price]))
+    const urls = vi.mocked(fetch).mock.calls.map(([url]) => String(url))
 
     expect(bySymbol.AAPL.price).toBe(500)
-    expect(bySymbol.SPX.price).toBeCloseTo(500 * 10.09)
-    expect(bySymbol.DXY.price).toBeCloseTo(500 * 3.71)
-    expect(bySymbol.SPX.changePercent24h).toBe(1)
+    // Real index level straight from Yahoo — no SPY/UUP scaled by a fixed factor
+    expect(bySymbol.SPX).toMatchObject({ price: 5_200, source: 'yahoo' })
+    expect(bySymbol.SPX.changePercent24h).toBeCloseTo((50 / 5_150) * 100)
+    expect(bySymbol.DXY).toMatchObject({ price: 5_200, source: 'yahoo' })
+    // Catalog symbols (lib/assets-catalog.ts): SPX -> ^GSPC, DXY -> DX-Y.NYB
+    expect(urls.some((url) => url.includes('%5EGSPC'))).toBe(true)
+    expect(urls.some((url) => url.includes('DX-Y.NYB'))).toBe(true)
+    expect(urls.some((url) => url.includes('SPY') || url.includes('UUP'))).toBe(false)
   })
 
   it('does not call Finnhub without an API key', async () => {

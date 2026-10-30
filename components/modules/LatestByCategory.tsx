@@ -17,19 +17,19 @@ export function LatestByCategory({ categorySlug, posts, locale = 'es' }: LatestB
   const meta = categoryMeta({ id: 0, name: '', slug: categorySlug, created_at: '', updated_at: '' }, locale)
 
   return (
-    <section className="mb-10" aria-label={t(dict.latestByCategory.sectionAria, { name: meta.name })}>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <span className={`flex size-8 items-center justify-center rounded-lg border ${meta.chip}`}>
-            <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
+    <section className="mb-10 border-t border-hairline-soft pt-6 first-of-type:border-t-0 first-of-type:pt-0" aria-label={t(dict.latestByCategory.sectionAria, { name: meta.name })}>
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2.5">
+          <span className={`flex size-7 items-center justify-center rounded-md border ${meta.chip}`}>
+            <span className="material-symbols-outlined text-[15px]" aria-hidden="true">
               {meta.icon}
             </span>
           </span>
-          <h2 className="text-headline text-ink">{meta.name}</h2>
+          <h3 className="font-serif text-[19px] font-bold tracking-tight text-ink">{meta.name}</h3>
         </div>
         <Link
           href={`/articulos?categoria=${categorySlug}`}
-          className="inline-flex items-center gap-1.5 text-body-sm font-medium text-accent-blue hover:text-accent-blue-hover transition-colors"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-sm text-body-sm font-medium text-accent-blue transition-colors hover:text-accent-blue-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-blue"
         >
           {dict.latestByCategory.viewAll}
           <span className="material-symbols-outlined text-[16px]" aria-hidden="true">

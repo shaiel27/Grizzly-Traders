@@ -51,6 +51,8 @@ export function PivotAssetPanel({ asset, quote, method, timeframe, periodLabel, 
   const dict = useDictionary().pivotAssetPanel
   const zoneDict = useDictionary().pivotZone
   const [view, setView] = useState<View>('ladder')
+  // El catalogo trae el nombre en los dos idiomas: el titulo sigue al idioma activo
+  const assetName = locale === 'en' ? asset.nameEn : asset.name
 
   const BIAS = {
     bullish: { label: dict.biasBullish, hint: dict.biasBullishHint, className: 'text-semantic-success' },
@@ -77,11 +79,11 @@ export function PivotAssetPanel({ asset, quote, method, timeframe, periodLabel, 
   return (
     <section
       className={clsx('rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-5', className)}
-      aria-label={t(dict.levelsOfAria, { name: asset.name })}
+      aria-label={t(dict.levelsOfAria, { name: assetName })}
     >
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="truncate text-subhead font-bold text-ink">{asset.name}</h2>
+          <h2 className="truncate text-subhead font-bold text-ink">{assetName}</h2>
           <p className="text-micro text-ink-muted">
             {asset.label} · {methodLabel} · {periodLabel}
           </p>
@@ -126,9 +128,11 @@ export function PivotAssetPanel({ asset, quote, method, timeframe, periodLabel, 
           key={`${asset.tv}|${timeframe}`}
           bare
           symbol={asset.tv}
-          name={asset.name}
+          name={assetName}
           height={400}
           levels={chartLevels}
+          // Sin niveles de pivote el widget de TradingView no sirve aquí: estado vacío de siempre
+          allowWidget={false}
           initialTimeframe={INITIAL_TIMEFRAME[timeframe]}
         />
       )}

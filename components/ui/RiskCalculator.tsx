@@ -82,7 +82,7 @@ export function RiskCalculator() {
 
   return (
     <section className="rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-6 md:p-8" aria-labelledby={`${baseId}-title`}>
-      <h2 id={`${baseId}-title`} className="mb-1 text-subhead font-bold text-ink">
+      <h2 id={`${baseId}-title`} className="mb-1 font-serif text-subhead font-bold text-ink">
         {dict.riskCalculator.title}
       </h2>
       <p className="mb-6 text-body-sm text-ink-muted">

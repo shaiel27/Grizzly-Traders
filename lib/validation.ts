@@ -55,6 +55,33 @@ export const patchPostSchema = z
 
 export const postIdSchema = z.string().uuid()
 
+// ---- CMS asistido: contrato con el webhook editorial de n8n ----
+
+// Lo unico que escribe el editor en modo asistido. El minimo de 200 caracteres del cuerpo lo fija
+// el contrato: por debajo de eso el analisis no tiene material con el que redactar un articulo.
+export const asistirSchema = z.object({
+  titular: z.string().trim().min(1).max(200),
+  cuerpo: z.string().trim().min(200, 'El cuerpo necesita al menos 200 caracteres').max(100_000),
+})
+
+export const etapaAsistenteSchema = z.enum(['analisis', 'imagen', 'storage', 'insercion', 'traduccion'])
+
+// Respuesta del webhook. Lo que llega de n8n es dato ajeno, asi que se valida igual que la entrada
+// del navegador. `ok` y `post_id` son lo unico indispensable: con el id se abre el borrador en el
+// editor. El resto se acepta ausente para que un campo mal rellenado en el workflow no tire una
+// generacion que si dejo el borrador escrito en la base.
+export const asistirWebhookSchema = z.object({
+  ok: z.boolean(),
+  post_id: z.string().uuid().nullish(),
+  slug: z.string().trim().max(200).nullish(),
+  status: z.string().trim().max(40).nullish(),
+  original_locale: z.enum(['es', 'en']).nullish(),
+  cover_image_url: z.string().trim().max(2000).nullish(),
+  traducciones: z.array(z.enum(['es', 'en'])).max(2).nullish(),
+  error: z.string().trim().max(500).nullish(),
+  etapa: etapaAsistenteSchema.nullish(),
+})
+
 const slugField = z
   .string()
   .trim()

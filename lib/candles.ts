@@ -111,11 +111,13 @@ export function parseYahooCandles(payload: YahooChartResponse): Candle[] {
   return candles
 }
 
-// Groups ascending candles into buckets of `seconds` (UTC-aligned); volume is summed when present
-export function aggregateCandles(candles: Candle[], seconds: number): Candle[] {
+// Groups ascending candles into buckets of `seconds`; volume is summed when present.
+// `offsetSeconds` shifts the bucket grid so session series keep their stamp (US stocks :30):
+// buckets land at floor((time − offset) / seconds) * seconds + offset. Offset 0 = UTC-aligned.
+export function aggregateCandles(candles: Candle[], seconds: number, offsetSeconds = 0): Candle[] {
   const out: Candle[] = []
   for (const candle of candles) {
-    const bucket = Math.floor(candle.time / seconds) * seconds
+    const bucket = Math.floor((candle.time - offsetSeconds) / seconds) * seconds + offsetSeconds
     const last = out[out.length - 1]
 
     if (last && last.time === bucket) {
@@ -141,13 +143,84 @@ export function normalizeCandles(candles: Candle[]): Candle[] {
   return out
 }
 
-// Folds a trailing bar that sits closer to its predecessor than the given gap into it (see TimeframeSpec.minGapSeconds)
-export function mergePartialTail(candles: Candle[], minGapSeconds: number): Candle[] {
+// Folds a trailing bar that sits closer to its predecessor than the given gap into it (see TimeframeSpec.minGapSeconds).
+// Yahoo stamps the current in-progress week/month either at its start (session assets) or mid-period (forex and other
+// 24h classes, where the previous bar sits at the closed period's end): only a duplicate of the SAME period may fold —
+// folding across a period boundary would swallow the in-progress week or month into the closed one.
+export function mergePartialTail(candles: Candle[], minGapSeconds: number, period?: 'week' | 'month'): Candle[] {
   if (candles.length < 2) return candles
   const last = candles[candles.length - 1]
   const previous = candles[candles.length - 2]
   if (last.time - previous.time >= minGapSeconds) return candles
 
+  if (period === 'month' && !sameUtcMonth(last.time, previous.time)) return candles
+  if (period === 'week' && isoWeekStart(last.time) !== isoWeekStart(previous.time)) return candles
+
   const merged: Candle = { ...previous, high: Math.max(previous.high, last.high), low: Math.min(previous.low, last.low), close: last.close }
   return [...candles.slice(0, -2), merged]
+}
+
+function sameUtcMonth(a: number, b: number): boolean {
+  const left = new Date(a * 1000)
+  const right = new Date(b * 1000)
+  return left.getUTCFullYear() === right.getUTCFullYear() && left.getUTCMonth() === right.getUTCMonth()
+}
+
+// Start of the Monday-based UTC week containing `time` (epoch seconds)
+function isoWeekStart(time: number): number {
+  const daysSinceMonday = (new Date(time * 1000).getUTCDay() + 6) % 7
+  return Math.floor((time - daysSinceMonday * 86_400) / 86_400) * 86_400
+}
+
+// Yahoo appends a bar stamped "now" to intraday data: for indices its open/high/low arrive as 0 and get rebuilt
+// as a doji, leaving a stub stamped mid-bucket with no range of its own. Fold it onto the bucket the series itself
+// is stamped to (US stocks sit on the session's :30, not on the UTC hour) or drop it when that bucket already
+// carries a real bar, so the chart never shows a stray half-width candle.
+export function collapsePhantomTail(candles: Candle[], bucketSeconds: number): Candle[] {
+  if (!candles.length || bucketSeconds <= 0) return candles
+  const last = candles[candles.length - 1]
+  if (last.open !== last.high || last.high !== last.low || last.low !== last.close) return candles
+  if (last.volume !== undefined) return candles
+
+  const head = candles.slice(0, -1)
+  const offset = head.length ? head[head.length - 1].time % bucketSeconds : 0
+  const bucket = Math.floor((last.time - offset) / bucketSeconds) * bucketSeconds + offset
+  if (bucket === last.time) return candles
+  const tail = head[head.length - 1]
+  if (tail && tail.time === bucket) return head
+  return [...head, { ...last, time: bucket }]
+}
+
+const INTERVAL_SECONDS: Record<string, number> = {
+  '1m': 60,
+  '2m': 120,
+  '5m': 300,
+  '15m': 900,
+  '30m': 1_800,
+  '60m': 3_600,
+  '90m': 5_400,
+  '1h': 3_600,
+  '1d': 86_400,
+  '5d': 432_000,
+  '1wk': 604_800,
+  // 31 days: a month bar stamped on the 1st still belongs to its month on day 31
+  '1mo': 2_678_400,
+}
+
+export function intervalSeconds(interval: string): number {
+  return INTERVAL_SECONDS[interval] ?? 3_600
+}
+
+// Sobre la última vela pega el precio en vivo del scanner: el cierre se reescribe y la mecha
+// se extiende si el tick supera el máximo o se hunde bajo el mínimo. Nunca muta la entrada y
+// las velas anteriores conservan su referencia, para que los indicadores derivados no rehagan nada.
+// Con `bucketSeconds`, solo se muta si la vela todavía pertenece al bucket abierto: un tick nunca
+// reescribe historia de un período ya cerrado (after-hours, fin de semana, datos stale).
+export function applyLiveTick(candles: Candle[], liveClose: number, bucketSeconds?: number, nowSeconds = Math.floor(Date.now() / 1000)): Candle[] {
+  const out = [...candles]
+  if (!out.length || !Number.isFinite(liveClose) || liveClose <= 0) return out
+  const last = out[out.length - 1]
+  if (bucketSeconds && nowSeconds - last.time >= bucketSeconds) return out
+  out[out.length - 1] = { ...last, close: liveClose, high: Math.max(last.high, liveClose), low: Math.min(last.low, liveClose) }
+  return out
 }

@@ -24,14 +24,14 @@ export default async function ToolsPage() {
       <div className="mx-auto max-w-[1200px] px-6 pt-8 md:px-8">
         <Breadcrumbs items={[{ label: dict.tools.breadcrumbHome, href: '/' }, { label: dict.tools.breadcrumbTools }]} />
 
-        <h1 className="mb-2 text-display-lg-mobile font-bold text-ink sm:text-display-lg">{dict.tools.h1}</h1>
+        <h1 className="mb-2 font-serif text-display-lg-mobile font-bold text-ink sm:text-display-lg">{dict.tools.h1}</h1>
         <p className="mb-8 max-w-2xl text-body text-on-surface-variant">{dict.tools.body}</p>
 
         <div className="space-y-8">
           <RiskCalculator />
 
           <section className="rounded-2xl border border-outline-variant/40 bg-surface-container-lowest p-6 md:p-8" aria-labelledby="pivot-tool-title">
-            <h2 id="pivot-tool-title" className="mb-1 text-subhead font-bold text-ink">
+            <h2 id="pivot-tool-title" className="mb-1 font-serif text-subhead font-bold text-ink">
               {dict.tools.pivotSectionTitle}
             </h2>
             <p className="mb-4 max-w-2xl text-body-sm text-ink-muted">{dict.tools.pivotSectionBody}</p>

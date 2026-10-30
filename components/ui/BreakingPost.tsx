@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { categoryMeta, excerpt, sentimentMeta, timeAgo } from '@/lib/feed'
+import { categoryMeta, excerpt, localizedPostContent, sentimentMeta, timeAgo } from '@/lib/feed'
 import { useDictionary, useLocale } from '@/lib/i18n/LocaleProvider'
+import { SITE_NAME } from '@/lib/site'
 import type { PostWithRelations } from '@/lib/types'
 import { MediaPreview } from './MediaPreview'
 import { Button } from './Button'
@@ -13,8 +14,13 @@ export function BreakingPost({ post }: { post: PostWithRelations }) {
   const meta = categoryMeta(post.category, locale)
   const sent = sentimentMeta(post.sentiment, locale)
   const symbol = post.assets?.[0]?.symbol
-  const slug = post.slug
-  const authorName = post.author?.full_name ?? 'Grizzly Traders'
+  // Este componente ni siquiera pasaba por localizedPost: title/slug venian del campo BASE del
+  // post, que con el Modelo A esta siempre en original_locale — el bug mas severo de los tres,
+  // porque afectaba tambien al TITULAR (no solo al resumen, como en ArticleCard). Mismo patron,
+  // mismo motivo: coincidia por casualidad mientras no habia traducciones 'en' de verdad.
+  const { title, slug, contentHtml } = localizedPostContent(post, locale)
+  // Mismo motivo que en ArticleCard: el respaldo es la marca, nunca una persona.
+  const authorName = post.author?.full_name ?? SITE_NAME
   const authorInitial = authorName.charAt(0).toUpperCase()
   const assetSymbols = post.assets?.map((asset) => asset.symbol).join(', ')
 
@@ -27,7 +33,7 @@ export function BreakingPost({ post }: { post: PostWithRelations }) {
   const share = async () => {
     try {
       if (navigator.share) {
-        await navigator.share({ title: post.title, url: `${window.location.origin}/articulos/${slug}` })
+        await navigator.share({ title, url: `${window.location.origin}/articulos/${slug}` })
       }
     } catch {
       /* noop */
@@ -60,10 +66,15 @@ export function BreakingPost({ post }: { post: PostWithRelations }) {
           </div>
 
           <div>
-            <h2 className="font-serif text-[28px] font-bold leading-[1.15] tracking-[-0.015em] text-ink md:text-[32px]">
-              {post.title}
+            <h2 className="font-serif text-[28px] font-bold leading-[1.15] tracking-[-0.015em] text-ink text-balance md:text-[32px]">
+              <Link
+                href={`/articulos/${slug}`}
+                className="rounded-sm transition-colors duration-150 hover:text-accent-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-blue"
+              >
+                {title}
+              </Link>
             </h2>
-<p className="mt-3 text-body-sm leading-relaxed text-ink-muted">{excerpt(post.content_html, 200)}</p>
+            <p className="mt-3 max-w-[62ch] text-body-sm leading-relaxed text-ink-muted line-clamp-4">{excerpt(contentHtml, 200)}</p>
           </div>
 
           <div className="grid grid-cols-1 gap-2 md:grid-cols-3">

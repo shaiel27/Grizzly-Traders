@@ -198,7 +198,7 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
             <span className="material-symbols-outlined text-[28px] text-accent-blue" aria-hidden="true">
               candlestick_chart
             </span>
-            <h1 className="text-display-lg-mobile font-bold text-ink sm:text-display-lg">{dict.pageTitle}</h1>
+            <h1 className="font-serif text-display-lg-mobile font-bold text-ink sm:text-display-lg">{dict.pageTitle}</h1>
           </div>
           <p className="max-w-3xl text-body text-on-surface-variant">{t(dict.description, { period: periodText })}</p>
           <p className="mt-2 flex items-center gap-2 text-micro text-ink-subtle">
@@ -320,7 +320,7 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
         <div className="mb-10 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
           <section className="overflow-hidden rounded-2xl border border-outline-variant/40 bg-surface-container-lowest" aria-label={dict.levelsHeading}>
             <div className="flex items-center justify-between border-b border-outline-variant/40 bg-surface-container-low px-6 py-4">
-              <h2 className="text-subhead font-bold text-ink">{dict.levelsHeading}</h2>
+              <h2 className="font-serif text-subhead font-bold text-ink">{dict.levelsHeading}</h2>
               <p className="text-micro text-ink-muted">
                 {loading ? dict.loadingShort : t(dict.visibleCount, { visible: visibleRows.length, total: rows.length })}
               </p>
@@ -413,7 +413,7 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
         </section>
 
         <section aria-labelledby="pivot-methods-heading">
-          <h2 id="pivot-methods-heading" className="mb-4 text-subhead font-bold text-ink">
+          <h2 id="pivot-methods-heading" className="mb-4 font-serif text-subhead font-bold text-ink">
             {dict.methodsHeading}
           </h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">

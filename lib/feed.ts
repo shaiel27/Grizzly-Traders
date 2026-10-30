@@ -1,4 +1,4 @@
-import type { Category, PostTranslation, PostWithRelations } from './types'
+import type { AuthorProfile, Category, PostTranslation, PostWithRelations } from './types'
 import { getDictionary, t, type Locale } from './i18n/get-dictionary'
 
 // Icon/chip/media are purely visual and locale-independent; only the display `name` comes from the
@@ -73,16 +73,65 @@ export function sentimentMeta(sentiment: PostWithRelations['sentiment'], locale:
   }
 }
 
+// Modelo A: `posts` guarda el original EN SU IDIOMA y `posts.original_locale` dice cuál es, así que
+// los campos base (title/slug/content_html) NO son necesariamente españoles. La DB define la columna
+// como `not null default 'es'`; este normalizador replica ese default para las filas/mocks que
+// lleguen sin la columna, y es el ÚNICO sitio del frontend donde 'es' sigue siendo un supuesto.
+function originalLocaleOf(post: { original_locale?: string | null }): Locale {
+  return post.original_locale === 'en' || post.original_locale === 'es' ? post.original_locale : 'es'
+}
+
+interface ResolvedTranslation {
+  row: PostTranslation | undefined
+  // Idioma en el que el lector va a ver REALMENTE el texto.
+  resolvedLocale: Locale
+  // true cuando falta la fila del idioma pedido y hubo que caer a otro idioma. Cuando no hay
+  // ninguna fila, los campos base están en `original_locale`, así que pedir ese mismo idioma
+  // NO es un fallback: el lector recibe exactamente el idioma que pidió.
+  isFallback: boolean
+}
+
+// Cascada única (Modelo A): locale activo -> `original_locale` del post -> cualquier fila que haya
+// -> campos base del post (que están en `original_locale`).
+//
+// El escalón intermedio era 'es' a pelo; con el Modelo A eso significaba servir inglés sin aviso a
+// quien pedía español en cuanto un post tuviera `original_locale='en'`.
+function resolveTranslation(
+  post: { original_locale?: string | null; translations?: PostTranslation[] },
+  locale: Locale
+): ResolvedTranslation {
+  const original = originalLocaleOf(post)
+  const requested = post.translations?.find((tr) => tr.locale === locale)
+  if (requested) return { row: requested, resolvedLocale: locale, isFallback: false }
+
+  const originalRow = post.translations?.find((tr) => tr.locale === original)
+  if (originalRow) return { row: originalRow, resolvedLocale: original, isFallback: true }
+
+  const anyRow = post.translations?.[0]
+  if (anyRow) return { row: anyRow, resolvedLocale: anyRow.locale, isFallback: anyRow.locale !== locale }
+
+  return { row: undefined, resolvedLocale: original, isFallback: original !== locale }
+}
+
+// Rol y bio del autor en el idioma activo. Los perfiles guardan el texto base en español y la
+// traducción en bio_en/role_en; sin traducción se muestra el base (misma cascada que los artículos).
+export function localizedAuthor(
+  author: Pick<AuthorProfile, 'bio' | 'role' | 'bio_en' | 'role_en'>,
+  locale: Locale
+): { bio: string | null; role: string | null } {
+  if (locale === 'en') return { bio: author.bio_en || author.bio, role: author.role_en || author.role }
+  return { bio: author.bio, role: author.role }
+}
+
 // Articles are looked up by their translation slug, so links must be built from it (not from posts.slug).
-// Fallback cascade (Fase 5.3): active locale's translation -> 'es' translation -> the post's own
-// base title/slug. The DB only has 'es' rows today, so EN visitors mostly land on the last two steps —
-// expected, not a bug: n8n isn't generating 'en' posts_translations rows in this plan.
-export function localizedPost(post: { title: string; slug: string; translations?: PostTranslation[] }, locale: Locale = 'es') {
-  const translation =
-    post.translations?.find((tr) => tr.locale === locale) ?? post.translations?.find((tr) => tr.locale === 'es') ?? post.translations?.[0]
+export function localizedPost(
+  post: { title: string; slug: string; original_locale?: string | null; translations?: PostTranslation[] },
+  locale: Locale = 'es'
+) {
+  const { row } = resolveTranslation(post, locale)
   return {
-    title: translation?.title || post.title,
-    slug: translation?.slug || post.slug,
+    title: row?.title || post.title,
+    slug: row?.slug || post.slug,
   }
 }
 
@@ -92,10 +141,13 @@ export interface LocalizedPostContent {
   contentHtml: string
   metaTitle: string | null
   metaDescription: string | null
-  resolvedLocale: 'es' | 'en'
-  // True when the active locale has no translation row of its own and the content fell back
-  // (to 'es', or to the post's base fields) — the caller should show an honest notice rather
-  // than silently rendering untranslated content under translated chrome.
+  resolvedLocale: Locale
+  // Idioma original del artículo, para que quien muestre el aviso pueda decir en qué idioma está
+  // leyendo realmente (y no dar por hecho «español»).
+  originalLocale: Locale
+  // True cuando falta la fila del idioma pedido y el contenido cayó a otro idioma — en CUALQUIER
+  // dirección, también es->en y en->es. El llamante debe avisar en vez de servir texto sin traducir
+  // bajo un chrome traducido.
   isFallback: boolean
 }
 
@@ -108,23 +160,21 @@ export function localizedPostContent(
     content_html: string
     meta_title: string | null
     meta_description: string | null
+    original_locale?: string | null
     translations?: PostTranslation[]
   },
   locale: Locale = 'es'
 ): LocalizedPostContent {
-  const translation =
-    post.translations?.find((tr) => tr.locale === locale) ??
-    post.translations?.find((tr) => tr.locale === 'es') ??
-    post.translations?.[0]
-  const resolvedLocale = translation?.locale ?? 'es'
+  const { row, resolvedLocale, isFallback } = resolveTranslation(post, locale)
   return {
-    title: translation?.title || post.title,
-    slug: translation?.slug || post.slug,
-    contentHtml: translation?.content_html || post.content_html,
-    metaTitle: translation?.meta_title ?? null,
-    metaDescription: translation?.meta_description ?? null,
+    title: row?.title || post.title,
+    slug: row?.slug || post.slug,
+    contentHtml: row?.content_html || post.content_html,
+    metaTitle: row?.meta_title ?? null,
+    metaDescription: row?.meta_description ?? null,
     resolvedLocale,
-    isFallback: locale !== resolvedLocale,
+    originalLocale: originalLocaleOf(post),
+    isFallback,
   }
 }
 

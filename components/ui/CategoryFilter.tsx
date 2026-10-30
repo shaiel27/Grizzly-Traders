@@ -66,7 +66,7 @@ export function CategoryFilter({ categories, tags = [], assets = [] }: CategoryF
   return (
     <div className="section-container py-4">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-subhead font-bold text-ink">{dict.feedControls.filtersTitle}</h2>
+        <h2 className="font-serif text-subhead font-bold text-ink">{dict.feedControls.filtersTitle}</h2>
         {hasFilters && (
           <button
             onClick={clearAll}

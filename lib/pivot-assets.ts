@@ -3,7 +3,7 @@
 // un tercio del catálogo real de la terminal (64); ahora expone el set completo.
 import { ASSETS, type AssetDefinition } from './assets-catalog'
 
-export type PivotCategory = 'crypto' | 'forex' | 'commodity' | 'index' | 'stock'
+export type PivotCategory = 'crypto' | 'forex' | 'commodity' | 'index' | 'future' | 'stock'
 
 export interface PivotAsset {
   // TradingView ticker; the scanner echoes it back, so it identifies the asset everywhere
@@ -20,6 +20,7 @@ export const PIVOT_CATEGORIES: { key: PivotCategory; label: string }[] = [
   { key: 'forex', label: 'Forex' },
   { key: 'commodity', label: 'Materias primas' },
   { key: 'index', label: 'Índices' },
+  { key: 'future', label: 'Futuros' },
   { key: 'stock', label: 'Acciones' },
 ]
 

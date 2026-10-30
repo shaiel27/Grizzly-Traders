@@ -70,8 +70,11 @@ describe('localizedPost fallback (lib/feed.ts, Fase 5.3)', () => {
     expect(result).toEqual({ title: 'English Title', slug: 'english-title' })
   })
 
-  it('falls back to the es translation when the active locale has no row', () => {
-    const result = localizedPost({ ...basePost, translations: [esTranslation] }, 'en')
+  // Modelo A: el segundo escalón ya no es «español» sino `post.original_locale` (default 'es' en la
+  // DB, que es lo que aplica aquí porque basePost no trae la columna). El contrato completo de la
+  // cascada vive en lib/feed.test.ts.
+  it('falls back to the row in the post original locale when the active locale has no row', () => {
+    const result = localizedPost({ ...basePost, original_locale: 'es', translations: [esTranslation] }, 'en')
     expect(result).toEqual({ title: 'Título en Español', slug: 'titulo-en-espanol' })
   })
 
@@ -150,9 +153,16 @@ describe('localizedPostContent fallback (lib/feed.ts, Fase 3 — article detail 
     })
   })
 
-  it('never flags isFallback under the es locale, since es is always the base language', () => {
-    const result = localizedPostContent({ ...basePost, translations: [esTranslation] }, 'es')
+  // Ya no es «es nunca es un fallback»: lo que no es fallback es pedir el idioma que el post
+  // tiene de verdad. Un original en inglés leído en español SÍ tiene que avisar.
+  it('never flags isFallback when the requested locale is the one the post is written in', () => {
+    const result = localizedPostContent({ ...basePost, original_locale: 'es', translations: [esTranslation] }, 'es')
     expect(result.isFallback).toBe(false)
+  })
+
+  it('flags isFallback for an es reader when the post original is en and has no es row', () => {
+    const result = localizedPostContent({ ...basePost, original_locale: 'en', translations: [enTranslation] }, 'es')
+    expect(result).toMatchObject({ title: 'English Title', resolvedLocale: 'en', isFallback: true })
   })
 })
 

@@ -2,15 +2,19 @@
 
 import { useEffect, useId, useState, type KeyboardEvent } from 'react'
 import { clsx } from 'clsx'
+import { ASSET_BY_PLAIN, ASSET_BY_TV } from '@/lib/assets-catalog'
 import { formatNumber, formatPrice } from '@/lib/format'
 import { t, type Dictionary } from '@/lib/i18n/get-dictionary'
-import { useDictionary } from '@/lib/i18n/LocaleProvider'
+import { useDictionary, useLocale } from '@/lib/i18n/LocaleProvider'
 import { adxReading, compareWithAverages, macdReading, rsiReading, signalFor, type Reading, type Tone } from '@/lib/market-analysis'
 import type { MarketItem as MarketAsset } from '@/lib/markets'
 
 interface AssetDetailPanelProps {
   asset: MarketAsset | null
   className?: string
+  // Abre otro activo en la misma terminal (por su ticker de TradingView): lo usa el enlace de un
+  // futuro a su índice al contado. Sin esto el enlace no se muestra.
+  onSelectSymbol?: (tvSymbol: string) => void
 }
 
 type Tab = 'summary' | 'performance' | 'averages' | 'company'
@@ -35,9 +39,9 @@ function CompanyTab({ symbol, dict }: { symbol: string; dict: Dictionary }) {
   useEffect(() => {
     const controller = new AbortController()
     fetch(`/api/company-profile?symbol=${encodeURIComponent(symbol)}`, { signal: controller.signal })
-      .then((response) => response.json())
+      .then((response) => (response.ok ? response.json() : null))
       .then((body) => {
-        if (body.success) setProfile(body.data)
+        if (body?.success) setProfile(body.data)
         else setFailed(true)
       })
       .catch(() => {
@@ -128,7 +132,7 @@ function SummaryTab({ asset, dict }: { asset: MarketAsset; dict: Dictionary }) {
       <div>
         <p className="text-[12px] text-ink-muted">{dict.assetDetail.overallSignal}</p>
         <p className={clsx('mt-0.5 text-[22px] font-semibold tracking-tight', TONE_TEXT[overall.tone])}>{readingLabel(dict, overall)}</p>
-        <RatingScale value={asset.recommendAll} dict={dict} />
+        {Number.isFinite(asset.recommendAll) && <RatingScale value={asset.recommendAll} dict={dict} />}
         <dl className="mt-4">
           <Row label={dict.assetDetail.movingAveragesTab} value={readingLabel(dict, averages)} tone={averages.tone} />
           <Row label={dict.assetDetail.oscillatorsLabel} value={readingLabel(dict, oscillators)} tone={oscillators.tone} />
@@ -171,7 +175,7 @@ function PerformanceTab({ asset, dict }: { asset: MarketAsset; dict: Dictionary 
                 <span className="absolute inset-y-0 left-1/2 w-px bg-hairline" />
                 {value != null && (
                   <span
-                    className={clsx('absolute inset-y-0 rounded-[2px]', up ? 'bg-semantic-success' : 'bg-semantic-danger')}
+                    className={clsx('absolute inset-y-0 rounded-2xs', up ? 'bg-semantic-success' : 'bg-semantic-danger')}
                     style={up ? { left: '50%', width: `${width}%` } : { right: '50%', width: `${width}%` }}
                   />
                 )}
@@ -189,14 +193,16 @@ function PerformanceTab({ asset, dict }: { asset: MarketAsset; dict: Dictionary 
 }
 
 function AveragesTab({ asset, dict }: { asset: MarketAsset; dict: Dictionary }) {
-  const comparisons = compareWithAverages(asset.close, [
-    { label: dict.assetDetail.ema10, value: asset.ema10 },
-    { label: dict.assetDetail.ema20, value: asset.ema20 },
-    { label: dict.assetDetail.ema50, value: asset.ema50 },
-    { label: dict.assetDetail.sma50, value: asset.sma50 },
-    { label: dict.assetDetail.sma200, value: asset.sma200 },
-    { label: dict.assetDetail.vwap, value: asset.vwap },
-  ])
+  const comparisons = Number.isFinite(asset.close)
+    ? compareWithAverages(asset.close, [
+        { label: dict.assetDetail.ema10, value: asset.ema10 },
+        { label: dict.assetDetail.ema20, value: asset.ema20 },
+        { label: dict.assetDetail.ema50, value: asset.ema50 },
+        { label: dict.assetDetail.sma50, value: asset.sma50 },
+        { label: dict.assetDetail.sma200, value: asset.sma200 },
+        { label: dict.assetDetail.vwap, value: asset.vwap },
+      ])
+    : []
   const above = comparisons.filter((item) => item.distancePct >= 0).length
 
   if (comparisons.length === 0) return <p className="text-[13px] text-ink-muted">{dict.assetDetail.noAveragesData}</p>
@@ -239,7 +245,35 @@ function AveragesTab({ asset, dict }: { asset: MarketAsset; dict: Dictionary }) 
   )
 }
 
-export function AssetDetailPanel({ asset, className }: AssetDetailPanelProps) {
+// Futuros (PLAN-FUTUROS.md, D7): los artículos se etiquetan con el índice ("el S&P cayó"), no con el
+// contrato, así que las noticias y el enlace al contado salen del `underlying` del catálogo; sin
+// underlying (Russell, A50, SPI 200, Nifty) las noticias se buscan por el propio plain del contrato.
+function FutureLinks({ symbol, onSelectSymbol }: { symbol: string; onSelectSymbol?: (tvSymbol: string) => void }) {
+  const dict = useDictionary()
+  const { locale } = useLocale()
+  const future = ASSET_BY_TV.get(symbol)
+  if (future?.cls !== 'future') return null
+
+  const spot = future.underlying ? ASSET_BY_PLAIN.get(future.underlying) : undefined
+  const newsAsset = spot ?? future
+  const newsName = locale === 'en' ? (newsAsset.nameEn ?? newsAsset.name) : newsAsset.name
+  const linkClass = 'text-[13px] text-accent-blue hover:text-accent-blue-hover focus-visible:outline-2 focus-visible:outline-accent-blue'
+
+  return (
+    <div className="flex flex-wrap gap-x-6 gap-y-2 border-t border-hairline px-5 py-3">
+      {spot && onSelectSymbol && (
+        <button type="button" onClick={() => onSelectSymbol(spot.tv)} className={linkClass}>
+          {dict.assetDetail.viewSpot}
+        </button>
+      )}
+      <a href={`/articulos?activo=${encodeURIComponent(newsAsset.plain)}`} className={linkClass}>
+        {t(dict.assetDetail.underlyingNews, { name: newsName })}
+      </a>
+    </div>
+  )
+}
+
+export function AssetDetailPanel({ asset, className, onSelectSymbol }: AssetDetailPanelProps) {
   const dict = useDictionary()
   const [tab, setTab] = useState<Tab>('summary')
   const id = useId()
@@ -256,13 +290,19 @@ export function AssetDetailPanel({ asset, className }: AssetDetailPanelProps) {
   const tabs = asset.category === 'stock' ? [...TABS, COMPANY_TAB] : TABS
   const activeTab = tabs.some((item) => item.key === tab) ? tab : 'summary'
 
-  // Arrow keys move between tabs, as in any tab list
+  // Arrow keys move between tabs, as in any tab list. El foco acompaña a la selección: con el
+  // roving tabindex la pestaña vieja pasa a tabIndex -1 y dejarlo ahí perdía el foco del teclado
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     const index = tabs.findIndex((item) => item.key === activeTab)
-    if (event.key === 'ArrowRight') setTab(tabs[(index + 1) % tabs.length].key)
-    else if (event.key === 'ArrowLeft') setTab(tabs[(index - 1 + tabs.length) % tabs.length].key)
+    let next: number
+    if (event.key === 'ArrowRight') next = (index + 1) % tabs.length
+    else if (event.key === 'ArrowLeft') next = (index - 1 + tabs.length) % tabs.length
+    else if (event.key === 'Home') next = 0
+    else if (event.key === 'End') next = tabs.length - 1
     else return
     event.preventDefault()
+    setTab(tabs[next].key)
+    document.getElementById(`${id}-${tabs[next].key}-tab`)?.focus()
   }
 
   return (
@@ -294,6 +334,7 @@ export function AssetDetailPanel({ asset, className }: AssetDetailPanelProps) {
         {activeTab === 'averages' && <AveragesTab asset={asset} dict={dict} />}
         {activeTab === 'company' && <CompanyTab symbol={asset.symbol.split(':').pop() || asset.symbol} dict={dict} />}
       </div>
+      <FutureLinks symbol={asset.symbol} onSelectSymbol={onSelectSymbol} />
     </section>
   )
 }

@@ -237,7 +237,7 @@ export function PivotCalculator({ quotes, timeframeLabel, periodLabel, selectedA
     <div className="overflow-hidden rounded-2xl border border-outline-variant/40 bg-surface-container-lowest">
       <div className="flex items-center justify-between gap-3 border-b border-outline-variant/40 bg-surface-container-low px-6 py-4">
         <div>
-          <h2 className="flex items-center gap-2 text-headline text-ink">
+          <h2 className="flex items-center gap-2 font-serif text-headline text-ink">
             <span className="material-symbols-outlined text-[20px] text-accent-blue" aria-hidden="true">
               calculate
             </span>

@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { clsx } from 'clsx'
+import { isWeekendNoise } from '@/lib/calendar-events'
+import { FearGreedGauge } from '@/components/ui/FearGreedGauge'
 import { getDictionary, type Locale } from '@/lib/i18n/get-dictionary'
 
 export interface NoticiaPreview {
@@ -40,6 +42,7 @@ interface HomeFeaturesProps {
 }
 
 interface EventoCalendario {
+  event_date: string
   event_timestamp: string | null
   currency: string
   impact: string
@@ -143,25 +146,52 @@ function PivoteEscalera({ datos, locale }: { datos: PivotePreview | null; locale
   )
 }
 
-// --- Vista previa: Calendario económico — proximo evento de alto impacto con cuenta atras ---
+// --- Vista previa: Calendario económico — proximo evento mas importante con cuenta atras ---
 // Se pide aparte (no en page.tsx con el resto): si /api/forex-calendar falla esta tarjeta sola
 // se queda sin vista previa, el resto de la home no se entera. Misma fuente que ForexCalendar.tsx
 // (tabla `economic_events` en Supabase, sincronizada por el automatismo n8n/ForexFactory) — ya
 // no depende de Finnhub (rate-limited) como antes.
-function CalendarioPreview() {
-  const [evento, setEvento] = useState<EventoCalendario | null>(null)
+// Solo alto impacto dejaba la tarjeta vacia buena parte de la semana (el feed trae ~5 eventos
+// altos por semana y suelen concentrarse en los primeros dias): se elige el mas importante que
+// quede por delante y se muestra su nivel, para no presentar uno menor como si fuera clave.
+const RANGO_IMPACTO: Record<string, number> = { high: 0, medium: 1, low: 2 }
+
+const IMPACTO_CLASE: Record<string, string> = {
+  high: 'text-semantic-danger',
+  medium: 'text-gradient-orange',
+  low: 'text-ink-subtle',
+}
+
+function CalendarioPreview({ locale }: { locale: Locale }) {
+  const dict = getDictionary(locale)
+  // undefined = cargando o fallo de red (no se muestra nada); null = cargado y sin eventos pendientes
+  const [evento, setEvento] = useState<EventoCalendario | null | undefined>(undefined)
   const [faltan, setFaltan] = useState('')
 
   useEffect(() => {
     let cancelado = false
     fetch('/api/forex-calendar')
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`forex-calendar ${r.status}`)
+        return r.json()
+      })
       .then((body: { data?: EventoCalendario[] }) => {
         if (cancelado) return
         const ahora = Date.now()
+        // Sin feriados ni avisos de fin de semana (p. ej. el cambio de horario): lib/calendar-events.ts
         const proximo = (body.data ?? [])
-          .filter((e) => e.impact === 'high' && e.event_timestamp && new Date(e.event_timestamp).getTime() > ahora)
-          .sort((a, b) => (a.event_timestamp as string).localeCompare(b.event_timestamp as string))[0]
+          .filter(
+            (e) =>
+              e.event_timestamp &&
+              new Date(e.event_timestamp).getTime() > ahora &&
+              e.impact !== 'holiday' &&
+              !isWeekendNoise({ event_date: e.event_date, event_timestamp: e.event_timestamp, impact: e.impact, is_all_day: false })
+          )
+          .sort(
+            (a, b) =>
+              (RANGO_IMPACTO[a.impact] ?? 3) - (RANGO_IMPACTO[b.impact] ?? 3) ||
+              (a.event_timestamp as string).localeCompare(b.event_timestamp as string)
+          )[0]
         setEvento(proximo ?? null)
       })
       .catch(() => {})
@@ -179,22 +209,38 @@ function CalendarioPreview() {
         setFaltan('00:00:00')
         return
       }
-      const h = Math.floor(ms / 3_600_000)
+      const d = Math.floor(ms / 86_400_000)
+      const h = Math.floor((ms % 86_400_000) / 3_600_000)
       const m = Math.floor((ms % 3_600_000) / 60_000)
       const s = Math.floor((ms % 60_000) / 1_000)
-      setFaltan(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`)
+      const reloj = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+      setFaltan(d > 0 ? `${d}d ${reloj}` : reloj)
     }
     actualizar()
     const id = setInterval(actualizar, 1000)
     return () => clearInterval(id)
   }, [evento])
 
-  if (!evento) return null
+  if (evento === undefined) return null
+
+  if (evento === null) {
+    return <p className="flex h-full items-center text-body-sm text-ink-subtle">{dict.features.calendar.noUpcoming}</p>
+  }
+
+  const impactoLabel =
+    evento.impact === 'high'
+      ? dict.calendar.impactHigh
+      : evento.impact === 'medium'
+        ? dict.calendar.impactMedium
+        : dict.calendar.impactLow
 
   return (
     <div className="flex flex-col justify-center gap-1.5">
+      <p className={clsx('text-[10px] font-medium uppercase tracking-wider', IMPACTO_CLASE[evento.impact] ?? 'text-ink-subtle')}>
+        {impactoLabel}
+      </p>
       <p className="flex items-center gap-1.5 text-body-sm font-medium text-ink">
-        <span className="shrink-0 rounded-[4px] bg-surface-2 px-1 py-0.5 font-mono text-[9px] text-ink-subtle" aria-hidden="true">
+        <span className="shrink-0 rounded-xs bg-surface-2 px-1 py-0.5 font-mono text-[9px] text-ink-subtle" aria-hidden="true">
           {evento.currency}
         </span>
         <span className="truncate">{evento.title}</span>
@@ -218,11 +264,18 @@ interface Canal {
 // varias columnas en vez del kit-de-tarjetas-SaaS generico (icono + titulo + cuerpo, todas con
 // el mismo borde redondeado) de la version anterior.
 function ColumnaTerminal({ canal, i, visible }: { canal: Canal; i: number; visible: boolean }) {
+  // La tarjeta entera era un <Link> y dentro vivian los enlaces de los previews (el titular
+  // rotatorio de NoticiasRotator enlaza a SU articulo). Eso es un <a> dentro de otro <a>: HTML
+  // invalido que rompia la hidratacion en la home — React descartaba el arbol y lo regeneraba en
+  // cliente ("Hydration failed… Invalid HTML tag nesting"), con el coste y el parpadeo que eso
+  // implica. Patron de enlace extendido: el contenedor es un div, el enlace al canal vive en el
+  // titulo y se estira sobre toda la tarjeta con after:inset-0, y los enlaces de dentro del
+  // preview se elevan por encima de esa capa. Asi se conservan las DOS afordancias que habia
+  // (clic en el titular -> ese articulo; clic en cualquier otro sitio -> el canal) sin anidar.
   return (
-    <Link
-      href={canal.href}
+    <div
       className={clsx(
-        'group flex h-full flex-col gap-4 px-5 py-6 transition-colors duration-200 hover:bg-white/[0.025]',
+        'group relative flex h-full flex-col gap-4 px-5 py-6 transition-colors duration-200 hover:bg-white/[0.025]',
         visible ? 'hero-fade-up' : 'opacity-0'
       )}
       style={visible ? { animationDelay: `${i * 70}ms` } : undefined}
@@ -237,13 +290,19 @@ function ColumnaTerminal({ canal, i, visible }: { canal: Canal; i: number; visib
         <span className="splash-mark size-1.5 rounded-full bg-semantic-success" aria-hidden="true" />
       </div>
 
-      <div className="min-h-[108px] flex-1">{canal.preview}</div>
+      {/* z-10 sobre la capa estirada del titulo: sin esto el after del enlace al canal se comeria
+          los clics de los enlaces del preview, que es justo lo que el anidamiento permitia. */}
+      <div className="relative z-10 min-h-[108px] flex-1 [&_a]:relative [&_a]:z-10">{canal.preview}</div>
 
       <div>
-        <h3 className="text-body-sm font-semibold text-ink">{canal.title}</h3>
+        <h3 className="text-body-sm font-semibold text-ink">
+          <Link href={canal.href} className="after:absolute after:inset-0 after:content-['']">
+            {canal.title}
+          </Link>
+        </h3>
         <p className="mt-1 text-micro text-ink-subtle">{canal.body}</p>
       </div>
-    </Link>
+    </div>
   )
 }
 
@@ -276,7 +335,7 @@ export function HomeFeatures({ locale, noticiasPreview, cotizacionesPreview, piv
     { codigo: 'NEWS', href: '/articulos', title: features.news.title, body: features.news.body, preview: <NoticiasRotator items={noticiasPreview} /> },
     { codigo: 'MKTS', href: '/markets', title: features.markets.title, body: features.markets.body, preview: <MercadosFilas items={cotizacionesPreview} locale={locale} /> },
     { codigo: 'PVT', href: '/pivot-points', title: features.pivots.title, body: features.pivots.body, preview: <PivoteEscalera datos={pivotePreview} locale={locale} /> },
-    { codigo: 'CAL', href: '/calendario', title: features.calendar.title, body: features.calendar.body, preview: <CalendarioPreview /> },
+    { codigo: 'CAL', href: '/calendario', title: features.calendar.title, body: features.calendar.body, preview: <CalendarioPreview locale={locale} /> },
   ]
 
   return (
@@ -314,6 +373,16 @@ export function HomeFeatures({ locale, noticiasPreview, cotizacionesPreview, piv
               </li>
             ))}
           </ul>
+
+          {/* Miedo y codicia: cripto (alternative.me) y bolsa (cálculo propio). Se carga en el
+              cliente y, si una fuente falla, ese medidor simplemente no se muestra. */}
+          <div className="border-t border-white/10 px-5 py-5">
+            <h3 className="mb-4 font-mono text-[11px] uppercase tracking-wider text-ink-subtle">{dict.fearGreed.homeHeading}</h3>
+            <div className="grid gap-8 sm:grid-cols-2">
+              <FearGreedGauge kind="crypto" compact />
+              <FearGreedGauge kind="stocks" compact />
+            </div>
+          </div>
         </div>
       </div>
     </div>

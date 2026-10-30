@@ -17,7 +17,7 @@ interface PageControlsProps {
 }
 
 const NAV_BUTTON =
-  'flex h-8 items-center gap-1 rounded-[6px] px-2.5 text-[13px] text-ink-muted transition-colors hover:bg-surface-1 hover:text-ink disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-accent-blue'
+  'flex h-8 items-center gap-1 rounded-ctl px-2.5 text-[13px] text-ink-muted transition-colors hover:bg-surface-1 hover:text-ink disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-accent-blue'
 
 // Previous / numbered pages / next. Renders nothing when everything fits on one page.
 export function PageControls({ page, total, pageSize, onPageChange, label, className }: PageControlsProps) {
@@ -57,7 +57,7 @@ export function PageControls({ page, total, pageSize, onPageChange, label, class
                   aria-label={t(dict.page, { n: item + 1 })}
                   aria-current={item === current ? 'page' : undefined}
                   className={clsx(
-                    'h-8 min-w-8 rounded-[6px] px-2 text-[13px] tabular-nums transition-colors focus-visible:outline-2 focus-visible:outline-accent-blue',
+                    'h-8 min-w-8 rounded-ctl px-2 text-[13px] tabular-nums transition-colors focus-visible:outline-2 focus-visible:outline-accent-blue',
                     item === current ? 'bg-surface-2 text-ink' : 'text-ink-muted hover:bg-surface-1 hover:text-ink'
                   )}
                 >

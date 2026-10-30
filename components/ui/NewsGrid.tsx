@@ -35,7 +35,7 @@ export function NewsGrid({ posts }: { posts: PostWithRelations[] }) {
           onClick={() => setSort('recent')}
           aria-pressed={sort === 'recent'}
           className={clsx(
-            'inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-caption font-medium transition-colors',
+            'inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-caption font-medium transition-[background-color,border-color,color,transform] duration-150 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-blue active:scale-[0.97] motion-reduce:transition-none',
             sort === 'recent'
               ? 'border-accent-blue bg-accent-blue text-canvas'
               : 'border-hairline bg-white/[0.04] text-ink-muted hover:text-ink'
@@ -51,7 +51,7 @@ export function NewsGrid({ posts }: { posts: PostWithRelations[] }) {
           onClick={() => setSort('views')}
           aria-pressed={sort === 'views'}
           className={clsx(
-            'inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-caption font-medium transition-colors',
+            'inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-caption font-medium transition-[background-color,border-color,color,transform] duration-150 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-blue active:scale-[0.97] motion-reduce:transition-none',
             sort === 'views'
               ? 'border-accent-blue bg-accent-blue text-canvas'
               : 'border-hairline bg-white/[0.04] text-ink-muted hover:text-ink'
@@ -64,7 +64,7 @@ export function NewsGrid({ posts }: { posts: PostWithRelations[] }) {
         </button>
       </div>
 
-      <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {visible.map((post) => (
           <li key={post.id}>
             <ArticleCard post={post} locale={locale} />
@@ -77,7 +77,7 @@ export function NewsGrid({ posts }: { posts: PostWithRelations[] }) {
           <button
             type="button"
             onClick={() => setExpanded(true)}
-            className="inline-flex items-center gap-2 rounded-full border border-hairline px-5 py-2.5 text-sm font-medium text-ink transition-colors hover:border-hairline hover:bg-white/[0.04]"
+            className="inline-flex items-center gap-2 rounded-full border border-hairline px-5 py-2.5 text-sm font-medium text-ink transition-[background-color,transform] duration-150 ease-out hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-blue active:scale-[0.97] motion-reduce:transition-none"
           >
             {t(dict.newsGrid.viewMore, { n: posts.length - INITIAL_COUNT })}
             <span className="material-symbols-outlined text-[16px]" aria-hidden="true">

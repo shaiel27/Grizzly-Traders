@@ -12,7 +12,7 @@
 | i18n | UI + contenido con fallback (sin cambiar URLs; cookie `gt_locale`) |
 | `Header.tsx` | **Editable** en este plan |
 | Sobrecarga visual | **Moderada** (eliminar duplicados y ruido; conservar chips de categoría y estilo terminal) |
-| Jurisdicción legal | **USA** (CCPA/CPRA + estándar US). Responsable: **Grizzly Traders** (sin email → placeholder `{{CONTACTO_LEGAL}}` hasta definirlo) |
+| Jurisdicción legal | **USA — estado de Florida** (CCPA/CPRA para residentes de California + estándar US). Responsable: **Grizzly Traders** · Contacto: **grizzlytraders@gmail.com** (confirmado por el usuario 2026-10-12) |
 | n8n | **No tocar** |
 
 ## Orden de ejecución
@@ -369,15 +369,15 @@ DevTools → Rendering → reduced-motion: sin ping/spin/pulse animados. Animati
 ## FASE 6 — Políticas legales (USA)
 
 > Borradores técnicos para revisión legal externa. **No son asesoramiento.**
-> Responsable: **Grizzly Traders** · Contacto: `{{CONTACTO_LEGAL}}` (pendiente de definir; no inventar email).
-> Jurisdicción: Estados Unidos (CCPA/CPRA + estándar US). Si se detectan residentes de California: derechos CCPA aplicables; declaramos **no venta ni sharing comercial de datos personales**.
+> Responsable: **Grizzly Traders** · Contacto: **grizzlytraders@gmail.com** (confirmado 2026-10-12; placeholders resueltos).
+> Jurisdicción: Estados Unidos — **estado de Florida** (CCPA/CPRA + estándar US). Si se detectan residentes de California: derechos CCPA aplicables; declaramos **no venta ni sharing comercial de datos personales**.
 
 ### 6.1 Páginas nuevas — `app/(site)/legal/`
 
 | Ruta | Contenido mínimo |
 |---|---|
-| `/legal/privacidad` | Responsable (Grizzly Traders, `{{CONTACTO_LEGAL}}`); datos recolectados (email de newsletter, cuenta del CMS, cookies técnicas de sesión, IP en logs de Supabase); finalidades; retención; encargados (Supabase, n8n Cloud, OpenAI vía n8n, proveedores de datos de mercado); derechos CCPA (acceso, eliminación, opt-out — sin venta de datos); menores (no dirigido a menores de 13); fecha de vigimiento; cómo ejercer derechos vía `{{CONTACTO_LEGAL}}` |
-| `/legal/terminos` | Uso aceptable; **descargo de contenido financiero** (no es asesoramiento de inversión, sin garantías, riesgo propio); propiedad intelectual (artículos, marca, logo); newsletter; limitación de responsabilidad; indemnización; terminación; ley aplicable y foro (State of ___, USA — pendiente de definir estado); cambios |
+| `/legal/privacidad` | Responsable (Grizzly Traders, Florida EE.UU., `grizzlytraders@gmail.com`); datos recolectados (email de newsletter, cuenta del CMS, cookies técnicas de sesión, IP en logs de Supabase); finalidades; retención; encargados (Supabase, n8n Cloud, OpenAI vía n8n, proveedores de datos de mercado); derechos CCPA (acceso, eliminación, opt-out — sin venta de datos); menores (no dirigido a menores de 13); fecha de vigimiento; cómo ejercer derechos vía `grizzlytraders@gmail.com` |
+| `/legal/terminos` | Uso aceptable; **descargo de contenido financiero** (no es asesoramiento de inversión, sin garantías, riesgo propio); propiedad intelectual (artículos, marca, logo); newsletter; limitación de responsabilidad; indemnización; terminación; ley aplicable y foro (State of **Florida**, USA); cambios |
 | `/legal/cookies` | Cookies técnicas (sesión Supabase auth `sb-*`, preferencia `gt_locale`); sin cookies de terceros ni analytics hoy (declararlo); control desde el navegador; última actualización |
 
 ### 6.2 Integración
@@ -402,7 +402,7 @@ Las 3 rutas 200, enlazadas desde Footer, en sitemap, sin errores de build; revis
 3. **Traducciones `en` de contenido:** decidir si n8n o CMS generan `posts_translations` EN (fuera de alcance actual).
 4. **Stagger de grid (O1)** y crossfade skeleton (O2).
 5. Tipografía: completar migración de raw px en `components/` admin y páginas no MVP.
-6. Entidad legal completa (estado, email) → rellenar placeholders y revisión legal formal.
+6. Entidad legal completa → ~~rellenar placeholders~~ **resuelto 2026-10-12** (estado **Florida EE.UU.**, email `grizzlytraders@gmail.com` en las 3 páginas) → queda solo la revisión legal formal.
 7. Plan n8n (workflow de noticias) — documento aparte, **no incluido aquí**.
 
 ---
@@ -417,6 +417,6 @@ Las 3 rutas 200, enlazadas desde Footer, en sitemap, sin errores de build; revis
 - [ ] Home sin stats triplicados; BreakingPost sin doble "Destacado" ni tile "Lectura".
 - [ ] `transition-all` eliminado en componentes públicos; tokens `--ease-*` presentes; reduced-motion global excluye ticker.
 - [ ] Switcher ES/EN opera con cookie; fallback de contenido verificado; `html lang` correcto.
-- [ ] 3 páginas legales en Footer + sitemap; placeholders `{{CONTACTO_LEGAL}}` documentados.
+- [ ] 3 páginas legales en Footer + sitemap; ~~placeholders `{{CONTACTO_LEGAL}}` documentados~~ → **resueltos 2026-10-12** (`grizzlytraders@gmail.com` + estado Florida).
 - [ ] `npx tsc --noEmit && pnpm lint && pnpm test` en verde.
 - [ ] **n8n sin cambios.**

@@ -81,12 +81,17 @@ function girar(orientacion: THREE.Quaternion, deltaYaw: number, deltaPitch: numb
  */
 export function useArrastreGlobo(reducedMotionRef: { current: boolean }, onToque?: (clientX: number, clientY: number) => void) {
   const estadoRef = useRef<EstadoArrastreGlobo>(crearEstadoArrastreGlobo())
-  const punteroAnterior = useRef<{ x: number; y: number } | null>(null)
+  // Puntero anterior reutilizado (F5): onPointerMove puede llegar a 120Hz y el literal
+  // { x, y } que se reasignaba alocaba un objeto por evento. El null ya no hace falta como
+  // senal de "no hay arrastre": eso lo decide estado.arrastrando (se pone en true justo
+  // despues de rellenar esto en onPointerDown), y el objeto se escribe en sitio.
+  const punteroAnterior = useRef({ x: 0, y: 0 })
   const inicioToque = useRef<{ x: number; y: number; t: number } | null>(null)
 
   const onPointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId)
-    punteroAnterior.current = { x: e.clientX, y: e.clientY }
+    punteroAnterior.current.x = e.clientX
+    punteroAnterior.current.y = e.clientY
     inicioToque.current = { x: e.clientX, y: e.clientY, t: performance.now() }
     const estado = estadoRef.current
     estado.arrastrando = true
@@ -97,13 +102,15 @@ export function useArrastreGlobo(reducedMotionRef: { current: boolean }, onToque
 
   const onPointerMove = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     const estado = estadoRef.current
-    if (!estado.arrastrando || !punteroAnterior.current) return
+    if (!estado.arrastrando) return
 
     const alto = e.currentTarget.clientHeight || 300
     const k = (Math.PI / alto) * 1.4
-    const dx = e.clientX - punteroAnterior.current.x
-    const dy = e.clientY - punteroAnterior.current.y
-    punteroAnterior.current = { x: e.clientX, y: e.clientY }
+    const anterior = punteroAnterior.current
+    const dx = e.clientX - anterior.x
+    const dy = e.clientY - anterior.y
+    anterior.x = e.clientX
+    anterior.y = e.clientY
 
     estado.velY = dx * k
     estado.velX = dy * k
@@ -124,7 +131,8 @@ export function useArrastreGlobo(reducedMotionRef: { current: boolean }, onToque
           onToque(e.clientX, e.clientY)
         }
       }
-      punteroAnterior.current = null
+      // Sin poner punteroAnterior a null (se reutiliza): el guard de arriba ya es
+      // estado.arrastrando, y en el proximo pointerdown se sobreescribe igual.
     },
     [onToque]
   )

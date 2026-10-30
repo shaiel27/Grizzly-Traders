@@ -17,12 +17,16 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+      `script-src 'self' 'unsafe-inline' https://s3.tradingview.com${isDev ? " 'unsafe-eval'" : ""}`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://pudzvatuubywmwdmboiq.supabase.co https://coin-images.coingecko.com",
       "font-src 'self'",
       "connect-src 'self' https://pudzvatuubywmwdmboiq.supabase.co https://*.supabase.co wss://*.supabase.co",
       "worker-src 'self' blob:",
+      // Widget Advanced Chart de TradingView (components/ui/TradingViewWidget.tsx): el script oficial
+      // viene de s3.tradingview.com (script-src) y crea un iframe de www.tradingview-widget.com.
+      // Sin comodines.
+      "frame-src https://www.tradingview-widget.com",
       "frame-ancestors 'none'",
       "base-uri 'self'; form-action 'self'",
     ].join("; "),

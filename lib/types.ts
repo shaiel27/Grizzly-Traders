@@ -31,6 +31,11 @@ export type AuthorProfile = {
   avatar_url: string | null
   bio: string | null
   role: string | null
+  // Traducción al inglés (null = sin traducir: se muestra el texto base en español)
+  bio_en?: string | null
+  role_en?: string | null
+  // false = no aparece en el listado /autor (p. ej. el perfil de la marca)
+  listed?: boolean
   twitter_url: string | null
   linkedin_url: string | null
   website_url: string | null
@@ -55,10 +60,18 @@ export type Tag = {
   created_at: string
 }
 
+// Modelo A: `posts` guarda el original EN SU IDIOMA y `posts.original_locale` dice cuál es.
+// Nada en el frontend puede volver a dar por hecho que el original está en español.
+export type PostLocale = 'es' | 'en'
+
+// De dónde salió el artículo: `rss` = pipeline automatizado (firma la marca), `cms` = editorial
+// humano (firma la persona). Columna de trazabilidad, independiente del autor.
+export type PostOrigin = 'rss' | 'cms'
+
 export type PostTranslation = {
   id: number
   post_id: string
-  locale: 'es' | 'en'
+  locale: PostLocale
   title: string
   slug: string
   content_html: string
@@ -81,8 +94,14 @@ export type Post = {
   cover_image_url: string | null
   source_url: string | null
   source_id: number | null
+  // true = redactado con asistencia de IA por el pipeline: la página debe avisarlo (guía de cumplimiento, P2 #7)
+  ai_assisted?: boolean | null
   status: 'draft' | 'published' | 'scheduled'
   format: 'article' | 'brief'
+  // Idioma de los campos base (title/slug/content_html) de ESTA fila. `text not null default 'es'`
+  // en la DB con CHECK ('es','en'); la cascada de lib/feed.ts lo usa como segundo escalón.
+  original_locale: PostLocale
+  origen: PostOrigin
   embedding: unknown | null
   search_vector: unknown | null
   view_count: number

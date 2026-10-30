@@ -1,19 +1,22 @@
 import Link from 'next/link'
-import { categoryMeta, excerpt, localizedPost, sentimentMeta, timeAgo } from '@/lib/feed'
+import { categoryMeta, excerpt, localizedPostContent, sentimentMeta, timeAgo } from '@/lib/feed'
 import { getDictionary, t, type Locale } from '@/lib/i18n/get-dictionary'
+import { SITE_NAME } from '@/lib/site'
 import type { PostWithRelations } from '@/lib/types'
 import { MediaPreview } from './MediaPreview'
 
 type ArticleCardVariant = 'cover' | 'compact'
 
-// Mismo lenguaje de hover que Card.tsx (lift + sombra), antes esta tarjeta solo cambiaba de
-// color — dos sistemas de tarjetas con dos sensaciones de hover distintas en el mismo sitio.
+// Toda la tarjeta es el área de clic (el título estira su enlace sobre ella con ::after) y el
+// foco del título se dibuja sobre la tarjeta entera. El hover solo cambia borde, fondo y color
+// del título, sin levantar la tarjeta: en una rejilla de 15 tarjetas el salto y la sombra pesada
+// competían entre sí. h-full alinea los pies de una misma fila aunque el brief no tenga resumen.
 const CARD_CLASS =
-  'group flex flex-col rounded-lg border border-hairline-soft bg-surface-1 transition-all duration-200 hover:border-hairline hover:bg-surface-2/50 hover:-translate-y-0.5 hover:shadow-[0_12px_32px_rgba(0,0,0,0.6)]'
+  'group relative flex h-full flex-col rounded-lg border border-hairline-soft bg-surface-1 transition-[border-color,background-color] duration-200 ease-out has-[h3_a:focus-visible]:outline-2 has-[h3_a:focus-visible]:outline-offset-2 has-[h3_a:focus-visible]:outline-accent-blue [@media(hover:hover)]:hover:border-hairline [@media(hover:hover)]:hover:bg-surface-2/60'
 const TITLE_CLASS =
-  'font-serif text-body-lg font-semibold leading-[1.25] text-ink transition-colors line-clamp-3 hover:text-accent-blue'
+  "font-serif font-semibold text-ink transition-colors duration-150 line-clamp-3 after:absolute after:inset-0 after:rounded-lg after:content-[''] focus-visible:outline-none [@media(hover:hover)]:group-hover:text-accent-blue"
 const ARROW_CLASS =
-  'material-symbols-outlined text-[18px] text-ink-subtle transition-[transform,color] duration-150 group-hover:translate-x-0.5 group-hover:text-accent-blue'
+  'material-symbols-outlined text-[18px] text-ink-subtle transition-[transform,color] duration-150 ease-out [@media(hover:hover)]:group-hover:translate-x-0.5 [@media(hover:hover)]:group-hover:text-accent-blue'
 
 const SENTIMENT_TEXT: Record<string, string> = {
   bullish: 'text-semantic-success',
@@ -33,7 +36,7 @@ function PostMeta({
   const dict = getDictionary(locale)
   const sent = showSentiment ? sentimentMeta(post.sentiment, locale) : null
   return (
-    <div className="flex items-center gap-2 text-micro text-ink-muted">
+    <div className="flex min-w-0 items-center gap-2 text-micro text-ink-muted">
       <span className="inline-flex shrink-0 items-center gap-1">
         <span className="material-symbols-outlined text-[13px]" aria-hidden="true">
           schedule
@@ -54,13 +57,30 @@ function PostMeta({
           <span className={SENTIMENT_TEXT[post.sentiment]}>{sent.label}</span>
         </>
       )}
-      <span className="ml-auto inline-flex shrink-0 items-center gap-1" title={dict.articleCard.viewsTitle}>
+      <span className="ml-auto inline-flex shrink-0 items-center gap-1 tabular-nums" title={dict.articleCard.viewsTitle}>
         <span className="material-symbols-outlined text-[13px]" aria-hidden="true">
           visibility
         </span>
+        <span className="sr-only">{dict.articleCard.viewsTitle}:</span>
         {post.view_count.toLocaleString(locale === 'en' ? 'en-US' : 'es-ES')}
       </span>
     </div>
+  )
+}
+
+function ReadingInfo({ post, isBrief, locale }: { post: PostWithRelations; isBrief: boolean; locale: Locale }) {
+  const dict = getDictionary(locale)
+  if (isBrief) {
+    return <span className="rounded-full border border-hairline px-2 py-0.5 text-micro font-medium text-ink-muted">{dict.articleCard.briefLabel}</span>
+  }
+  if (!post.reading_time_minutes) return null
+  return (
+    <span className="inline-flex items-center gap-1 text-micro text-ink-muted">
+      <span className="material-symbols-outlined text-[13px]" aria-hidden="true">
+        menu_book
+      </span>
+      {t(dict.articleCard.readingTime, { n: post.reading_time_minutes })}
+    </span>
   )
 }
 
@@ -73,9 +93,14 @@ export function ArticleCard({
   variant?: ArticleCardVariant
   locale?: Locale
 }) {
-  const dict = getDictionary(locale)
   const sent = sentimentMeta(post.sentiment, locale)
-  const { title, slug } = localizedPost(post, locale)
+  // localizedPostContent (no localizedPost): el titulo YA resolvia el idioma activo, pero el
+  // resumen de abajo seguia leyendo post.content_html a pelo — el campo BASE, que con el Modelo A
+  // esta siempre en original_locale, nunca en la traduccion. Mismo patron que el bug del nombre
+  // de autor (F0): coincidia por casualidad mientras no habia traducciones de verdad, y dejo de
+  // coincidir en cuanto el pipeline empezo a producir filas 'en' genuinas.
+  const { title, slug, contentHtml } = localizedPostContent(post, locale)
+  // Brief y artículo enlazan igual a su página: el brief solo omite el párrafo de resumen
   const href = `/articulos/${slug}`
   const symbol = post.assets?.[0]?.symbol
   const isBrief = post.format === 'brief'
@@ -83,50 +108,48 @@ export function ArticleCard({
   if (variant === 'compact') {
     return (
       <article className={`${CARD_CLASS} p-4`}>
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex items-center justify-between gap-3">
           <PostMeta post={post} locale={locale} />
           <span
-            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-micro font-semibold uppercase tracking-wider ${sent.chip}`}
+            className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-micro font-semibold uppercase tracking-wider ${sent.chip}`}
           >
             {sent.label}
           </span>
         </div>
 
-        {isBrief ? (
-          <h3 className={`${TITLE_CLASS} mb-2`}>{title}</h3>
-        ) : (
-          <h3 className="mb-2">
-            <Link href={href} className={TITLE_CLASS}>
-              {title}
-            </Link>
-          </h3>
-        )}
+        <h3 className="mb-2 text-body-lg leading-[1.3]">
+          <Link href={href} className={TITLE_CLASS}>
+            {title}
+          </Link>
+        </h3>
 
-        {!isBrief && <p className="mb-3 text-body-sm leading-relaxed text-ink-muted line-clamp-2">{excerpt(post.content_html)}</p>}
+        {!isBrief && <p className="mb-3 text-body-sm leading-relaxed text-ink-muted line-clamp-2">{excerpt(contentHtml)}</p>}
 
-        <div className="mt-auto flex items-center justify-between border-t border-hairline-soft pt-3">
+        <div className="mt-auto flex items-center gap-2 border-t border-hairline-soft pt-3">
           {symbol && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-accent-blue/30 bg-accent-blue/10 px-2 py-0.5 text-micro font-semibold text-accent-blue">
+            <span className="inline-flex items-center rounded-full border border-accent-blue/30 bg-accent-blue/10 px-2 py-0.5 text-micro font-semibold text-accent-blue">
               {symbol}
             </span>
           )}
-          {!isBrief && (
-            <Link href={href} aria-label={t(dict.articleCard.readMore, { title })} className={`${ARROW_CLASS} ml-auto`}>
-              east
-            </Link>
-          )}
+          <ReadingInfo post={post} isBrief={isBrief} locale={locale} />
+          <span className={`${ARROW_CLASS} ml-auto`} aria-hidden="true">
+            east
+          </span>
         </div>
       </article>
     )
   }
 
   const meta = categoryMeta(post.category, locale)
-  const authorName = post.author?.full_name ?? 'Grizzly Traders'
+  // Respaldo a la MARCA, no a una persona: desde la separacion de identidades el autor por
+  // defecto del portal es Grizzly Traders, y un literal con el nombre del fundador firmaba con
+  // su nombre articulos que no son suyos cuando el join de autor no venia en la consulta.
+  const authorName = post.author?.full_name ?? SITE_NAME
   const initials = authorName.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
 
   return (
     <article className={`${CARD_CLASS} p-3`}>
-      <div className="relative mb-3 aspect-[16/10] overflow-hidden rounded-md border border-hairline-soft">
+      <div className="relative mb-3 aspect-[16/10] overflow-hidden rounded-md border border-hairline-soft bg-surface-2">
         <MediaPreview src={post.cover_image_url} icon={meta.icon} mediaGradient={meta.media} symbol={symbol} />
         <span
           className={`absolute left-2 top-2 inline-flex items-center gap-1 rounded-full border bg-surface-container-lowest/90 px-2 py-0.5 text-micro font-semibold uppercase tracking-wider backdrop-blur-sm ${meta.chip}`}
@@ -138,46 +161,35 @@ export function ArticleCard({
         </span>
       </div>
 
-      <div className="flex flex-1 flex-col gap-2">
+      <div className="flex flex-1 flex-col gap-2 px-1">
         <PostMeta post={post} showSentiment locale={locale} />
 
-        {isBrief ? (
-          <h3 className={TITLE_CLASS}>{title}</h3>
-        ) : (
-          <h3>
-            <Link href={href} className={TITLE_CLASS}>{title}</Link>
-          </h3>
-        )}
+        <h3 className="text-body-lg leading-[1.25]">
+          <Link href={href} className={TITLE_CLASS}>
+            {title}
+          </Link>
+        </h3>
 
-        {!isBrief && <p className="text-body-sm leading-relaxed text-ink-muted line-clamp-2">{excerpt(post.content_html)}</p>}
+        {!isBrief && <p className="text-body-sm leading-relaxed text-ink-muted line-clamp-2">{excerpt(contentHtml)}</p>}
       </div>
 
-      {!isBrief && (
-        <div className="mt-3 flex items-center justify-between border-t border-hairline-soft pt-3">
-          <Link
-            href={`/autor/${post.author?.slug ?? 'grizzly-traders'}`}
-            className="flex items-center gap-1.5 transition-opacity hover:opacity-80"
-          >
-            <span className="flex size-6 items-center justify-center rounded-full bg-accent-blue/10 text-micro font-bold text-accent-blue">
-              {initials}
-            </span>
-            <span className="text-micro text-ink-muted transition-colors hover:text-accent-blue">{authorName}</span>
-          </Link>
-          <span className="flex items-center gap-3">
-            {post.reading_time_minutes && (
-              <span className="inline-flex items-center gap-1 text-micro text-ink-muted">
-                <span className="material-symbols-outlined text-[13px]" aria-hidden="true">
-                  menu_book
-                </span>
-                {t(dict.articleCard.readingTime, { n: post.reading_time_minutes })}
-              </span>
-            )}
-            <Link href={href} aria-label={t(dict.articleCard.readMore, { title })} className={ARROW_CLASS}>
-              east
-            </Link>
+      <div className="mt-3 flex items-center justify-between gap-3 border-t border-hairline-soft px-1 pt-3">
+        <Link
+          href={`/autor/${post.author?.slug ?? 'grizzly-traders'}`}
+          className="relative z-10 flex min-w-0 items-center gap-1.5 rounded-sm text-ink-muted transition-colors hover:text-accent-blue focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-blue"
+        >
+          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent-blue/10 text-micro font-bold text-accent-blue" aria-hidden="true">
+            {initials}
           </span>
-        </div>
-      )}
+          <span className="truncate text-micro">{authorName}</span>
+        </Link>
+        <span className="flex shrink-0 items-center gap-3">
+          <ReadingInfo post={post} isBrief={isBrief} locale={locale} />
+          <span className={ARROW_CLASS} aria-hidden="true">
+            east
+          </span>
+        </span>
+      </div>
     </article>
   )
 }

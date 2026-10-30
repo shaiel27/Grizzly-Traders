@@ -87,7 +87,7 @@ function DivergingBar({ value, scale, layout }: { value: number; scale: number; 
   return (
     <span className="relative block h-2" aria-hidden="true">
       <span className={clsx('absolute inset-y-0 w-px bg-hairline', layout === 'both' ? 'left-1/2' : layout === 'positive' ? 'left-0' : 'right-0')} />
-      <span className={clsx('absolute inset-y-0 rounded-[2px]', value >= 0 ? 'bg-semantic-success' : 'bg-semantic-danger')} style={style} />
+      <span className={clsx('absolute inset-y-0 rounded-2xs', value >= 0 ? 'bg-semantic-success' : 'bg-semantic-danger')} style={style} />
     </span>
   )
 }
@@ -168,7 +168,10 @@ export function MarketOverview({ assets, onSelect, onSelectCategory }: MarketOve
 
         <div className="space-y-12">
           <TopMovers assets={assets} onSelect={onSelect} className="grid gap-x-10 gap-y-9 sm:grid-cols-2" />
-          <FearGreedGauge />
+          <div className="grid gap-9 sm:grid-cols-2">
+            <FearGreedGauge kind="crypto" />
+            <FearGreedGauge kind="stocks" />
+          </div>
         </div>
       </div>
     </div>

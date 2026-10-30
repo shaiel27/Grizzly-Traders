@@ -3,6 +3,7 @@ import Image from 'next/image'
 import { notFound } from 'next/navigation'
 import { Breadcrumbs, ArticleCard } from '@/components/ui'
 import { getAuthorBySlug, getAuthorStats, getPostsByAuthor } from '@/lib/api'
+import { localizedAuthor } from '@/lib/feed'
 import { getServerLocale } from '@/lib/i18n/server'
 import { getDictionary, t } from '@/lib/i18n/get-dictionary'
 import type { AuthorProfile } from '@/lib/types'
@@ -30,7 +31,7 @@ export async function generateMetadata({ params }: AuthorPageProps): Promise<Met
 
   return {
     title: author.full_name,
-    description: author.bio ?? t(dict.author.metaDescriptionFallback, { name: author.full_name }),
+    description: localizedAuthor(author, locale).bio ?? t(dict.author.metaDescriptionFallback, { name: author.full_name }),
     alternates: { canonical: `/autor/${slug}` },
   }
 }
@@ -47,6 +48,7 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
 
   const locale = await getServerLocale()
   const dict = getDictionary(locale)
+  const { bio, role } = localizedAuthor(author, locale)
 
   const [posts, stats] = await Promise.all([
     getPostsByAuthor(author.id, locale).catch(() => []),
@@ -66,13 +68,18 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
     { label: dict.author.assetsAnalyzed, value: stats?.assets },
   ].filter((item): item is { label: string; value: number } => typeof item.value === 'number')
 
+  // Un autor recién creado (Moises Orraiz arranca con 0 artículos hasta que publique por el CMS)
+  // no tiene nada que resumir: una fila de tres ceros parece una página rota. Con 0 artículos la
+  // ficha se queda en nombre/rol/bio y quien explica la situación es el estado vacío de abajo.
+  const hasPublished = (stats?.posts ?? posts.length) > 0
+
   const socials = [
     ...SOCIAL_LINK_DEFS.filter((link) => author[link.key]),
     ...(author.website_url ? [{ key: 'website_url' as const, label: dict.author.website, icon: 'language' }] : []),
   ]
 
   return (
-    <main id="main-content" tabIndex={-1} className="flex-1 pt-[var(--header-height)] pb-24">
+    <main id="main-content" tabIndex={-1} className="flex-1 pt-[var(--header-height-sin-ticker)] pb-24">
       <div className="mx-auto max-w-[1200px] px-6 md:px-8">
         <Breadcrumbs
           items={[
@@ -102,10 +109,10 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
 
             <div className="flex-1">
               <h1 className="mb-2 font-serif text-display-md font-bold text-ink">{author.full_name}</h1>
-              {author.role && <p className="mb-4 text-body font-bold text-accent-blue">{author.role}</p>}
-              {author.bio && <p className="mb-6 max-w-2xl text-body text-ink-muted">{author.bio}</p>}
+              {role && <p className="mb-4 text-body font-bold text-accent-blue">{role}</p>}
+              {bio && <p className="mb-6 max-w-2xl whitespace-pre-line text-body text-ink-muted">{bio}</p>}
 
-              {statItems.length > 0 && (
+              {hasPublished && statItems.length > 0 && (
                 <dl className="flex flex-wrap items-center gap-8">
                   {statItems.map((item) => (
                     <div key={item.label} className="flex flex-col">
@@ -141,7 +148,7 @@ export default async function AuthorPage({ params }: AuthorPageProps) {
         </section>
 
         <section aria-labelledby="author-articles-heading">
-          <h2 id="author-articles-heading" className="mb-6 text-headline text-ink">
+          <h2 id="author-articles-heading" className="mb-6 font-serif text-headline text-ink">
             {dict.author.latestArticles}
           </h2>
           {posts.length > 0 ? (

@@ -2,12 +2,12 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getPublishedPosts } from '@/lib/api'
 import { localizedPost, sentimentMeta, timeAgo } from '@/lib/feed'
-import { MARCADORES } from '@/lib/globe/marcadores'
+import { MARCADORES, simboloNoticias } from '@/lib/globe/marcadores'
 
 // Simbolos validos = los que de verdad usan los pines del globo (lib/globe/marcadores.ts), no
 // cualquier string — evita que esta ruta publica se use para filtrar noticias por un activo
 // arbitrario que no tiene nada que ver con el globo.
-const SIMBOLOS_VALIDOS = Array.from(new Set(MARCADORES.map((m) => m.simbolo))) as [string, ...string[]]
+const SIMBOLOS_VALIDOS = Array.from(new Set(MARCADORES.map(simboloNoticias))) as [string, ...string[]]
 
 const schema = z.object({
   symbol: z.enum(SIMBOLOS_VALIDOS),

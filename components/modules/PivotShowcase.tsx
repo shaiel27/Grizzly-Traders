@@ -54,7 +54,7 @@ export function PivotShowcase({ activos, locale }: PivotShowcaseProps) {
             <span className="material-symbols-outlined text-[24px] text-accent-blue" aria-hidden="true">
               functions
             </span>
-            <h2 className="text-headline text-ink">{dict.home.pivotTitle}</h2>
+            <h2 className="font-serif text-headline text-ink">{dict.home.pivotTitle}</h2>
           </div>
           <p className="text-body text-on-surface-variant max-w-md">{dict.home.pivotDesc}</p>
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatCompact, formatLevel, formatNumber, formatPrice } from './format'
+import { formatChangeAbs, formatCompact, formatDataAge, formatLevel, formatNumber, formatPrice } from './format'
 
 describe('formatCompact', () => {
   it('abbreviates large counts without a currency symbol', () => {
@@ -77,5 +77,60 @@ describe('formatNumber', () => {
   it('formats smaller values with fixed decimals and grouping', () => {
     expect(formatNumber(1234.5)).toBe('1,234.50')
     expect(formatNumber(5, 0)).toBe('5')
+  })
+})
+
+describe('formatChangeAbs', () => {
+  it('follows the precision of the price instead of a fixed 2 decimals', () => {
+    expect(formatChangeAbs(1.234, 230.45, 'AAPL')).toBe('1.23')
+    expect(formatChangeAbs(0.5, 65_000, 'BTC')).toBe('0.50')
+    expect(formatChangeAbs(0.0012, 0.0987, 'DOGE')).toBe('0.0012')
+    expect(formatChangeAbs(1234.5, 65_000, 'BTC')).toBe('1,234.50')
+  })
+
+  it('keeps the quotation of forex pairs', () => {
+    expect(formatChangeAbs(0.00123, 1.08512, 'FX:EURUSD')).toBe('0.00123')
+    expect(formatChangeAbs(0.45, 151.4, 'FX:USDJPY')).toBe('0.450')
+  })
+
+  it('returns the magnitude and a dash for missing values', () => {
+    expect(formatChangeAbs(-1.234, 230.45, 'AAPL')).toBe('1.23')
+    expect(formatChangeAbs(null, 230.45, 'AAPL')).toBe('—')
+    expect(formatChangeAbs(undefined, 230.45, 'AAPL')).toBe('—')
+    expect(formatChangeAbs(NaN, 230.45, 'AAPL')).toBe('—')
+  })
+})
+
+describe('formatDataAge', () => {
+  it('says "now" while the datum is a few seconds old', () => {
+    expect(formatDataAge(0, 'es')).toBe('ahora')
+    expect(formatDataAge(4_999, 'es')).toBe('ahora')
+    expect(formatDataAge(0, 'en')).toBe('now')
+  })
+
+  it('counts seconds under a minute, then minutes, then hours', () => {
+    expect(formatDataAge(5_000, 'es')).toBe('hace 5 s')
+    expect(formatDataAge(30_000, 'es')).toBe('hace 30 s')
+    expect(formatDataAge(59_999, 'es')).toBe('hace 59 s')
+    expect(formatDataAge(90_000, 'es')).toBe('hace 1 min')
+    expect(formatDataAge(59 * 60_000, 'es')).toBe('hace 59 min')
+    expect(formatDataAge(3_600_000, 'es')).toBe('hace 1 h')
+    expect(formatDataAge(2 * 3_600_000, 'es')).toBe('hace 2 h')
+  })
+
+  it('translates the same thresholds to english', () => {
+    expect(formatDataAge(30_000, 'en')).toBe('30 s ago')
+    expect(formatDataAge(90_000, 'en')).toBe('1 min ago')
+    expect(formatDataAge(2 * 3_600_000, 'en')).toBe('2 h ago')
+  })
+
+  it('clamps negative and unusable ages to "now"', () => {
+    expect(formatDataAge(-1_000, 'es')).toBe('ahora')
+    expect(formatDataAge(NaN, 'es')).toBe('ahora')
+    expect(formatDataAge(undefined as unknown as number, 'es')).toBe('ahora')
+  })
+
+  it('defaults to spanish', () => {
+    expect(formatDataAge(30_000)).toBe('hace 30 s')
   })
 })

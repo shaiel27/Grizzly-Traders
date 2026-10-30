@@ -13,11 +13,17 @@ function prefiereMovimientoReducido(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
+// --header-scroll-offset es un calc(var(--header-h-real) + 24px) que getComputedStyle devuelve SIN
+// resolver ("calc(...)"): parseFloat daba NaN y el destino nunca descontaba el header, así que el
+// ancla quedaba tapada por él. Se reconstruye con las dos variables numéricas (px) que sí resuelven.
+const MARGEN_BAJO_HEADER_PX = 24
+
 function alturaHeaderReal(): number {
   if (typeof window === 'undefined') return 0
-  const valor = getComputedStyle(document.documentElement).getPropertyValue('--header-scroll-offset').trim()
-  const px = parseFloat(valor)
-  return Number.isFinite(px) ? px : 0
+  const estilos = getComputedStyle(document.documentElement)
+  const medida = parseFloat(estilos.getPropertyValue('--header-h-real'))
+  const base = Number.isFinite(medida) ? medida : parseFloat(estilos.getPropertyValue('--header-height'))
+  return (Number.isFinite(base) ? base : 0) + MARGEN_BAJO_HEADER_PX
 }
 
 function calcularDestino(elemento: HTMLElement): number {
@@ -28,6 +34,43 @@ function calcularDestino(elemento: HTMLElement): number {
 // nativa de leer un cubic-bezier del CSS y aplicarlo a un scroll manual.
 function easeInOut(t: number): number {
   return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2
+}
+
+// Al terminar la intro del hero, Hero/useIntroInicio.ts descuenta la "pista" con un scrollTo propio
+// y mueve la posición final DESPUÉS de que termina esta animación: el destino quedaba ~150 px más
+// arriba de lo previsto (bajo el header) y "Ver más" no aterrizaba donde empieza el contenido. Un
+// segundo cálculo repetido hasta que la página se asienta corrige lo que falte. Si el usuario toca la rueda,
+// la pantalla o el teclado en ese lapso, no se corrige nada.
+const PASO_ASENTAMIENTO_MS = 100
+const PASOS_MAX = 14
+const PASOS_ESTABLES = 3
+const TOLERANCIA_PX = 3
+
+function corregirAlAsentarse(elemento: HTMLElement): void {
+  let interrumpido = false
+  const parar = () => {
+    interrumpido = true
+  }
+  const eventos = ['wheel', 'touchstart', 'keydown'] as const
+  eventos.forEach((evento) => window.addEventListener(evento, parar, { once: true, passive: true }))
+
+  let pasos = 0
+  let estables = 0
+  const id = window.setInterval(() => {
+    pasos += 1
+    const diferencia = calcularDestino(elemento) - window.scrollY
+    if (!interrumpido && Math.abs(diferencia) > TOLERANCIA_PX) {
+      window.scrollTo(0, window.scrollY + diferencia)
+      estables = 0
+    } else {
+      estables += 1
+    }
+    // La página "se asienta" cuando el destino deja de moverse unos pasos seguidos
+    if (interrumpido || estables >= PASOS_ESTABLES || pasos >= PASOS_MAX) {
+      window.clearInterval(id)
+      eventos.forEach((evento) => window.removeEventListener(evento, parar))
+    }
+  }, PASO_ASENTAMIENTO_MS)
 }
 
 export interface OpcionesScrollSuave {
@@ -71,6 +114,7 @@ export function scrollSuaveA(elemento: HTMLElement, opciones: OpcionesScrollSuav
 
     if (t >= 1) {
       limpiar()
+      corregirAlAsentarse(elemento)
       opciones.onTerminar?.()
       return
     }

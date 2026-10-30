@@ -10,7 +10,7 @@
 // original). `TVC:DJI` es el caso real: no devuelve fila, `DJ:DJI` sí — por eso el Dow Jones usa
 // ese ticker acá, no el que todavía figura en TradingView como "oficial" para mostrar en un chart.
 
-export type AssetClass = 'crypto' | 'forex' | 'commodity' | 'stock' | 'index'
+export type AssetClass = 'crypto' | 'forex' | 'commodity' | 'stock' | 'index' | 'future'
 
 export interface AssetDefinition {
   // Símbolo corto: columna `activos.symbol` en Supabase, chips de artículo, company-profile.
@@ -36,11 +36,21 @@ export interface AssetDefinition {
   // antes de este catálogo, se preserva tal cual). Sin esto, las acciones usan el nombre propio
   // que ya devuelve el scanner de TradingView.
   label?: string
+  // Etiqueta corta en inglés cuando `label` está en español ('PLATINO' -> 'PLATINUM'); el ticker la usa
+  // con el idioma en inglés. Ausente = `label` sirve en los dos idiomas.
+  labelEn?: string
   // Fase 5 del plan de cobertura en inglés (PLAN-API-ACTIVOS.md): nombre de `name` en inglés con
   // precisión financiera estándar (ej. 'Oro' -> 'Gold', 'Petróleo WTI' -> 'WTI Crude Oil'). Para
   // crypto/stocks donde el nombre ya es igual o casi igual en los dos idiomas se repite tal cual
   // en vez de omitirse, así todo consumidor puede asumir que siempre está presente.
   nameEn?: string
+  // Solo futuros (PLAN-FUTUROS.md, D7): `plain` del índice al contado del que deriva el contrato
+  // (ES -> 'SPX', FDAX -> 'DAX'). El panel del futuro lo usa para las noticias (los artículos de
+  // n8n se etiquetan con el índice, "el S&P cayó", no con el contrato) y para el enlace "Ver
+  // índice al contado". Ausente = el catálogo no tiene ese índice al contado (Russell 2000, A50,
+  // SPI 200, Nifty 50). Si está, siempre apunta a un `plain` de este mismo catálogo (lo cubre
+  // assets-catalog.test.ts).
+  underlying?: string
 }
 
 export const ASSETS: readonly AssetDefinition[] = [
@@ -76,16 +86,16 @@ export const ASSETS: readonly AssetDefinition[] = [
   // --- Materias primas (12) ---
   { plain: 'XAUUSD', name: 'Oro', nameEn: 'Gold', cls: 'commodity', tv: 'OANDA:XAUUSD', yahoo: 'GC=F', decimals: 2, popular: true, currency: true, label: 'XAU/USD' },
   { plain: 'XAGUSD', name: 'Plata', nameEn: 'Silver', cls: 'commodity', tv: 'TVC:SILVER', yahoo: 'SI=F', decimals: 2, currency: true, label: 'XAG/USD' },
-  { plain: 'PLATINUM', name: 'Platino', nameEn: 'Platinum', cls: 'commodity', tv: 'TVC:PLATINUM', yahoo: 'PL=F', decimals: 2, currency: true, label: 'PLATINO' },
-  { plain: 'PALLADIUM', name: 'Paladio', nameEn: 'Palladium', cls: 'commodity', tv: 'TVC:PALLADIUM', yahoo: 'PA=F', decimals: 2, currency: true, label: 'PALADIO' },
+  { plain: 'PLATINUM', name: 'Platino', nameEn: 'Platinum', cls: 'commodity', tv: 'TVC:PLATINUM', yahoo: 'PL=F', decimals: 2, currency: true, label: 'PLATINO', labelEn: 'PLATINUM' },
+  { plain: 'PALLADIUM', name: 'Paladio', nameEn: 'Palladium', cls: 'commodity', tv: 'TVC:PALLADIUM', yahoo: 'PA=F', decimals: 2, currency: true, label: 'PALADIO', labelEn: 'PALLADIUM' },
   { plain: 'BRENT', name: 'Petróleo Brent', nameEn: 'Brent Crude Oil', cls: 'commodity', tv: 'ICEEUR:BRN1!', yahoo: 'BZ=F', decimals: 2, currency: true, label: 'BRENT' },
   { plain: 'WTI', name: 'Petróleo WTI', nameEn: 'WTI Crude Oil', cls: 'commodity', tv: 'NYMEX:CL1!', yahoo: 'CL=F', decimals: 2, currency: true, label: 'WTI' },
-  { plain: 'NG', name: 'Gas natural', nameEn: 'Natural Gas', cls: 'commodity', tv: 'NYMEX:NG1!', yahoo: 'NG=F', decimals: 2, currency: true, label: 'GAS NAT.' },
-  { plain: 'COPPER', name: 'Cobre', nameEn: 'Copper', cls: 'commodity', tv: 'COMEX:HG1!', yahoo: 'HG=F', decimals: 2, currency: true, label: 'COBRE' },
-  { plain: 'CORN', name: 'Maíz', nameEn: 'Corn', cls: 'commodity', tv: 'CBOT:ZC1!', yahoo: 'ZC=F', decimals: 2, currency: true, label: 'MAÍZ' },
-  { plain: 'WHEAT', name: 'Trigo', nameEn: 'Wheat', cls: 'commodity', tv: 'CBOT:ZW1!', yahoo: 'ZW=F', decimals: 2, currency: true, label: 'TRIGO' },
-  { plain: 'SUGAR', name: 'Azúcar', nameEn: 'Sugar', cls: 'commodity', tv: 'ICEUS:SB1!', yahoo: 'SB=F', decimals: 2, currency: true, label: 'AZÚCAR' },
-  { plain: 'COFFEE', name: 'Café', nameEn: 'Coffee', cls: 'commodity', tv: 'ICEUS:KC1!', yahoo: 'KC=F', decimals: 2, currency: true, label: 'CAFÉ' },
+  { plain: 'NG', name: 'Gas natural', nameEn: 'Natural Gas', cls: 'commodity', tv: 'NYMEX:NG1!', yahoo: 'NG=F', decimals: 2, currency: true, label: 'GAS NAT.', labelEn: 'NAT GAS' },
+  { plain: 'COPPER', name: 'Cobre', nameEn: 'Copper', cls: 'commodity', tv: 'COMEX:HG1!', yahoo: 'HG=F', decimals: 2, currency: true, label: 'COBRE', labelEn: 'COPPER' },
+  { plain: 'CORN', name: 'Maíz', nameEn: 'Corn', cls: 'commodity', tv: 'CBOT:ZC1!', yahoo: 'ZC=F', decimals: 2, currency: true, label: 'MAÍZ', labelEn: 'CORN' },
+  { plain: 'WHEAT', name: 'Trigo', nameEn: 'Wheat', cls: 'commodity', tv: 'CBOT:ZW1!', yahoo: 'ZW=F', decimals: 2, currency: true, label: 'TRIGO', labelEn: 'WHEAT' },
+  { plain: 'SUGAR', name: 'Azúcar', nameEn: 'Sugar', cls: 'commodity', tv: 'ICEUS:SB1!', yahoo: 'SB=F', decimals: 2, currency: true, label: 'AZÚCAR', labelEn: 'SUGAR' },
+  { plain: 'COFFEE', name: 'Café', nameEn: 'Coffee', cls: 'commodity', tv: 'ICEUS:KC1!', yahoo: 'KC=F', decimals: 2, currency: true, label: 'CAFÉ', labelEn: 'COFFEE' },
 
   // --- Acciones (14, sin label: el scanner ya devuelve nombre/ticker legibles por si solo) ---
   { plain: 'AAPL', name: 'Apple', nameEn: 'Apple', cls: 'stock', tv: 'NASDAQ:AAPL', decimals: 2, popular: true, currency: true },
@@ -119,6 +129,35 @@ export const ASSETS: readonly AssetDefinition[] = [
   { plain: 'US10Y', name: 'Bono de EE. UU. a 10 años', nameEn: 'US 10-Year Treasury Note', cls: 'index', tv: 'TVC:US10Y', yahoo: '^TNX', decimals: 2, currency: false, label: 'US10Y' },
   // Sin cobertura de Yahoo conocida (ya documentado antes de este catálogo) — sin velas, el resto funciona.
   { plain: 'US02Y', name: 'Bono de EE. UU. a 2 años', nameEn: 'US 2-Year Treasury Note', cls: 'index', tv: 'TVC:US02Y', decimals: 2, currency: false, label: 'US02Y' },
+
+  // --- Futuros (20, PLAN-FUTUROS.md §1) ---
+  // Todos son el contrato continuo `1!` de TradingView: el precio sigue siempre al contrato más
+  // próximo a vencer y salta al siguiente en cada vencimiento trimestral (la terminal lo rotula
+  // "Contrato continuo"). Los 20 tickers de `tv` se verificaron en vivo contra el scanner el
+  // 2026-10-22 (todos devuelven fila con `type: "futures"`), y los `yahoo` solo están en los 11
+  // que respondieron con velas ese mismo día — FDAX=F, FESX=F y VX=F dan 404. Cotizan en puntos
+  // del índice, no en dólares (`currency: false`); la moneda del contrato la da el scanner.
+  { plain: 'ES', name: 'Futuro E-mini S&P 500', nameEn: 'E-mini S&P 500 Futures', cls: 'future', tv: 'CME_MINI:ES1!', yahoo: 'ES=F', decimals: 2, currency: false, label: 'ES · S&P 500', underlying: 'SPX' },
+  { plain: 'NQ', name: 'Futuro E-mini Nasdaq-100', nameEn: 'E-mini Nasdaq-100 Futures', cls: 'future', tv: 'CME_MINI:NQ1!', yahoo: 'NQ=F', decimals: 2, currency: false, label: 'NQ · NASDAQ 100', underlying: 'NDX' },
+  { plain: 'YM', name: 'Futuro E-mini Dow Jones', nameEn: 'E-mini Dow Jones Futures', cls: 'future', tv: 'CBOT_MINI:YM1!', yahoo: 'YM=F', decimals: 2, currency: false, label: 'YM · DOW JONES', underlying: 'DJI' },
+  { plain: 'RTY', name: 'Futuro E-mini Russell 2000', nameEn: 'E-mini Russell 2000 Futures', cls: 'future', tv: 'CME_MINI:RTY1!', yahoo: 'RTY=F', decimals: 2, currency: false, label: 'RTY · RUSSELL 2000' },
+  { plain: 'FDAX', name: 'Futuro DAX', nameEn: 'DAX Futures', cls: 'future', tv: 'EUREX:FDAX1!', decimals: 2, currency: false, label: 'FDAX · DAX', underlying: 'DAX' },
+  { plain: 'FESX', name: 'Futuro Euro Stoxx 50', nameEn: 'Euro Stoxx 50 Futures', cls: 'future', tv: 'EUREX:FESX1!', decimals: 2, currency: false, label: 'FESX · EURO STOXX 50', underlying: 'ESTX50' },
+  { plain: 'FTSEF', name: 'Futuro FTSE 100', nameEn: 'FTSE 100 Futures', cls: 'future', tv: 'ICEEUR:Z1!', decimals: 2, currency: false, label: 'FTSE · FTSE 100', underlying: 'FTSE' },
+  { plain: 'FCE', name: 'Futuro CAC 40', nameEn: 'CAC 40 Futures', cls: 'future', tv: 'EURONEXT:FCE1!', decimals: 2, currency: false, label: 'FCE · CAC 40', underlying: 'CAC40' },
+  { plain: 'NKD', name: 'Futuro Nikkei 225 (USD)', nameEn: 'Nikkei 225 Futures (USD)', cls: 'future', tv: 'CME:NKD1!', yahoo: 'NKD=F', decimals: 2, currency: false, label: 'NKD · NIKKEI (USD)', underlying: 'NIKKEI' },
+  { plain: 'HSIF', name: 'Futuro Hang Seng', nameEn: 'Hang Seng Futures', cls: 'future', tv: 'HKEX:HSI1!', decimals: 2, currency: false, label: 'HSI · HANG SENG', underlying: 'HSI' },
+  { plain: 'CN50', name: 'Futuro FTSE China A50', nameEn: 'FTSE China A50 Futures', cls: 'future', tv: 'SGX:CN1!', decimals: 2, currency: false, label: 'CN50 · CHINA A50' },
+  { plain: 'VX', name: 'Futuro VIX', nameEn: 'VIX Futures', cls: 'future', tv: 'CBOE:VX1!', decimals: 2, currency: false, label: 'VX · VIX', underlying: 'VIX' },
+  { plain: 'MES', name: 'Futuro Micro E-mini S&P 500', nameEn: 'Micro E-mini S&P 500 Futures', cls: 'future', tv: 'CME_MINI:MES1!', yahoo: 'MES=F', decimals: 2, currency: false, label: 'MES · MICRO S&P 500', underlying: 'SPX' },
+  { plain: 'MNQ', name: 'Futuro Micro E-mini Nasdaq-100', nameEn: 'Micro E-mini Nasdaq-100 Futures', cls: 'future', tv: 'CME_MINI:MNQ1!', yahoo: 'MNQ=F', decimals: 2, currency: false, label: 'MNQ · MICRO NASDAQ', underlying: 'NDX' },
+  { plain: 'MYM', name: 'Futuro Micro E-mini Dow Jones', nameEn: 'Micro E-mini Dow Jones Futures', cls: 'future', tv: 'CBOT_MINI:MYM1!', yahoo: 'MYM=F', decimals: 2, currency: false, label: 'MYM · MICRO DOW', underlying: 'DJI' },
+  { plain: 'M2K', name: 'Futuro Micro E-mini Russell 2000', nameEn: 'Micro E-mini Russell 2000 Futures', cls: 'future', tv: 'CME_MINI:M2K1!', yahoo: 'M2K=F', decimals: 2, currency: false, label: 'M2K · MICRO RUSSELL' },
+  { plain: 'NIY', name: 'Futuro Nikkei 225 (JPY)', nameEn: 'Nikkei 225 Futures (JPY)', cls: 'future', tv: 'CME:NIY1!', yahoo: 'NIY=F', decimals: 2, currency: false, label: 'NIY · NIKKEI (JPY)', underlying: 'NIKKEI' },
+  { plain: 'SPI200F', name: 'Futuro ASX SPI 200', nameEn: 'ASX SPI 200 Futures', cls: 'future', tv: 'ASX24:AP1!', decimals: 2, currency: false, label: 'SPI · ASX SPI 200' },
+  { plain: 'NIFTYF', name: 'Futuro Nifty 50', nameEn: 'Nifty 50 Futures', cls: 'future', tv: 'NSE:NIFTY1!', decimals: 2, currency: false, label: 'NIFTY · NIFTY 50' },
+  // 3 decimales: el ZN cotiza en fracciones de 1/64 de punto (ej. 112.016), con 2 se perdería el tick.
+  { plain: 'ZN', name: 'Futuro Nota del Tesoro a 10 años', nameEn: '10-Year Treasury Note Futures', cls: 'future', tv: 'CBOT:ZN1!', yahoo: 'ZN=F', decimals: 3, currency: false, label: 'ZN · T-NOTE 10Y', underlying: 'US10Y' },
 ] as const
 
 export const ASSET_CLASS_TIPO_ID: Record<AssetClass, number> = {
@@ -127,6 +166,8 @@ export const ASSET_CLASS_TIPO_ID: Record<AssetClass, number> = {
   commodity: 3,
   stock: 4,
   index: 5,
+  // Fila `Future`/`future` de `tipos_activo`, creada por la migración tipos_activo_future (PLAN-FUTUROS.md, Lote 0).
+  future: 6,
 }
 
 export const ASSET_BY_PLAIN = new Map(ASSETS.map((a) => [a.plain, a]))
@@ -135,8 +176,9 @@ export const ASSET_BY_TV = new Map(ASSETS.map((a) => [a.tv, a]))
 // Orden intercalado por clase (round-robin), no agrupado — mismo criterio que ya usaba
 // TICKER_ASSETS a mano ("cada tramo de la barra mezcla clases de activo"), ahora generado en vez
 // de mantenido a mano. El orden de clases de abajo es el mismo que ya se sentía bien en el ticker
-// original: cripto/forex/índice/materia prima/acción repitiendo.
-const ORDEN_CLASES: AssetClass[] = ['crypto', 'forex', 'index', 'commodity', 'stock']
+// original: cripto/forex/índice/materia prima/acción repitiendo. Los futuros van al final del
+// ciclo y no junto a los índices, para que ES no quede pegado al S&P al contado en la barra.
+const ORDEN_CLASES: AssetClass[] = ['crypto', 'forex', 'index', 'commodity', 'stock', 'future']
 
 export function intercalarPorClase(assets: readonly AssetDefinition[]): AssetDefinition[] {
   const porClase = new Map<AssetClass, AssetDefinition[]>(ORDEN_CLASES.map((c) => [c, []]))

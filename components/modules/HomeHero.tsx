@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { clsx } from 'clsx'
 import { Button } from '@/components/ui'
-import { HeroGlobe } from '@/components/globe/HeroGlobe'
+import { HeroGlobe, type EstadoCargaGlobo } from '@/components/globe/HeroGlobe'
 import type { DatosGlobo } from '@/components/globe/GloboHolografico'
 import { HomeFeatures, type NoticiaPreview, type CotizacionPreview, type PivotePreview } from './HomeFeatures'
 import { useIntroInicio } from './useIntroInicio'
@@ -22,6 +22,27 @@ import type { ResultadoSentimiento } from '@/lib/globe/sentimiento'
 // en globals.css (position:absolute, sin importar estas clases) mientras dura, y estas clases
 // solo definen el tamaño/posicion de reposo antes y despues de la intro.
 const CLASES_CAJA_GLOBO = 'aspect-square w-[88vw] max-w-[420px] lg:w-full lg:max-w-[min(78vh,720px)]'
+
+// Encogimiento del globo con el scroll. Los tres valores viven juntos porque se leen juntos:
+// el globo pierde ENCOGIMIENTO_MAX de escala a lo largo de ZONA_ENCOGIMIENTO pantallas de
+// scroll, con el progreso amortiguado a K_ENCOGIMIENTO.
+const ENCOGIMIENTO_MAX = 0.32
+const ZONA_ENCOGIMIENTO = 0.85
+// Misma constante de amortiguacion que useIntroInicio.ts: las dos fases del mismo gesto
+// (encogerse durante la intro y seguir encogiendose despues) deben sentirse del mismo material.
+const K_ENCOGIMIENTO = 9
+
+// Deliberadamente la MISMA curva que useIntroInicio.ts, duplicada en vez de compartida porque
+// exportar un easing de un hook de intro para que lo use su propio consumidor acoplaba dos cosas
+// que solo comparten este valor. Si una cambia, la otra tiene que cambiar con ella: son el
+// principio y el final de un unico movimiento continuo.
+// easeOutQuint = --ease-out de globals.css. Aqui vivia un easeInOutCubic, copiado de la intro
+// para "unificar la curva del gesto" — pero la curva de la intro era justamente la equivocada:
+// su fase ease-in inicial hacia que el globo pareciera trabado y despues saltara. Unificar
+// estaba bien; el error fue unificar sobre la curva mala.
+function suaveSalida(t: number): number {
+  return 1 - Math.pow(1 - t, 2)
+}
 
 interface HomeHeroProps {
   locale: Locale
@@ -54,6 +75,10 @@ export function HomeHero({
   // tarda/falla) para que ambos arranquen su secuencia de entrada juntos, en vez de que el
   // texto aparezca mientras el canvas todavia esta cargando.
   const [listo, setListo] = useState(false)
+  // Estado de carga del globo (F0-02): independiente de `listo` de arriba — ese controla
+  // cuando entra el texto del hero (onReady o timeout de 2s), este que haya de verdad un
+  // globo para arrastrar. Arranca en 'cargando', igual que HeroGlobe.
+  const [estadoGlobo, setEstadoGlobo] = useState<EstadoCargaGlobo>('cargando')
 
   // Estado de sesiones del mercado (plan 009 §2): se recalcula cada 30s, no en cada frame — es
   // la hora, no algo que necesite 60fps. Arranca vacio (nada de Date.now() en el render, la
@@ -94,35 +119,105 @@ export function HomeHero({
     let alturaRef = window.visualViewport?.height ?? window.innerHeight ?? 800
     let anchoAnterior = window.innerWidth
 
-    let pidiendoFrame = false
-    const actualizar = () => {
-      pidiendoFrame = false
+    const html = document.documentElement
+
+    // Progreso amortiguado, no el scrollY crudo. La intro (useIntroInicio.ts) ya suaviza SU
+    // progreso con este mismo lerp y por el motivo documentado alli: una rueda de raton a saltos
+    // de 100px tiene que verse continua. El encogimiento no lo hacia, asi que el MISMO gesto
+    // (seguir bajando) se sentia sedoso durante la intro y escalonado en el instante en que la
+    // intro terminaba y este efecto tomaba el relevo. Misma K que la intro (9) a proposito: el
+    // traspaso no debe notarse como un cambio de material.
+    let objetivo = 0
+    let actual = 0
+    let raf = 0
+    let ultimoFrame = 0
+    let ultimaEscala = Number.NaN
+
+    const leer = () => {
       // Durante la intro el tamaño/posicion del globo los lleva useIntroInicio (transform en
-      // cajaRef); este encogimiento por scroll empieza recien cuando la intro termina, si no
-      // ambas animaciones pelean por el mismo transform visual.
-      const progreso =
-        document.documentElement.dataset.intro === 'activo' ? 0 : Math.min(1, Math.max(0, window.scrollY / (alturaRef * 0.85)))
-      const escala = 1 - progreso * 0.32
-      if (globoEscalaRef.current) globoEscalaRef.current.style.transform = `scale(${escala})`
+      // cajaRef, que es el PADRE de globoEscalaRef: las dos escalas se multiplicarian).
+      if (html.dataset.intro === 'activo') return 0
+      return Math.min(1, Math.max(0, window.scrollY / (alturaRef * ZONA_ENCOGIMIENTO)))
     }
-    const onScroll = () => {
-      if (pidiendoFrame) return
-      pidiendoFrame = true
-      requestAnimationFrame(actualizar)
+
+    const escribir = () => {
+      // Misma curva que la intro (easeOutQuint), que es la que hace que el encogimiento responda
+      // al scroll desde el primer pixel y asiente al final en vez de pegar un tiron por el medio.
+      const q = suaveSalida(actual)
+      const escala = 1 - q * ENCOGIMIENTO_MAX
+      // Write-gating (patron F5): durante toda la intro esto vale 1 invariablemente, y sin la
+      // guarda se escribia el mismo transform en cada tick de scroll. Redondeado a 4 decimales
+      // para no reescribir por diferencias sub-pixel que el compositor no puede mostrar.
+      const redondeada = Math.round(escala * 1e4) / 1e4
+      if (redondeada === ultimaEscala) return
+      ultimaEscala = redondeada
+      if (globoEscalaRef.current) globoEscalaRef.current.style.transform = `scale(${redondeada})`
     }
+
+    const frame = (ahora: number) => {
+      raf = 0
+      const dt = ultimoFrame ? Math.min(0.1, (ahora - ultimoFrame) / 1000) : 1 / 60
+      ultimoFrame = ahora
+      actual += (objetivo - actual) * (1 - Math.exp(-dt * K_ENCOGIMIENTO))
+      if (Math.abs(objetivo - actual) < 0.0005) actual = objetivo
+      escribir()
+      if (actual !== objetivo) raf = requestAnimationFrame(frame)
+      else ultimoFrame = 0
+    }
+
+    // Flanco de salida de la intro: el traspaso NO se anima.
+    let introPrevia = html.dataset.intro === 'activo'
+
+    const pedir = () => {
+      const introAhora = html.dataset.intro === 'activo'
+      const esTraspaso = introPrevia && !introAhora
+      introPrevia = introAhora
+      objetivo = leer()
+
+      if (esTraspaso) {
+        // Durante la intro `actual` esta forzado a 0, asi que al terminar el objetivo salta de
+        // golpe a lo que diga el scroll ya consumido. Amortiguar ESO era un segundo cambio de
+        // tamaño justo despues del zoom —exactamente lo que se veia como "cambia de tamaño al
+        // terminar"—: el usuario ya hizo ese scroll, no hay nada que comunicarle. Se asienta en
+        // el mismo frame y la amortiguacion se reserva para el scroll que venga despues.
+        actual = objetivo
+        ultimoFrame = 0
+        escribir()
+        return
+      }
+
+      if (!raf) raf = requestAnimationFrame(frame)
+    }
+
     const onResize = () => {
       if (window.innerWidth === anchoAnterior) return
       anchoAnterior = window.innerWidth
       alturaRef = window.visualViewport?.height ?? window.innerHeight ?? 800
-      actualizar()
+      pedir()
     }
 
-    actualizar()
-    window.addEventListener('scroll', onScroll, { passive: true })
+    // Arranque sin animar: si el navegador restauro el scroll a mitad de pagina, el globo debe
+    // aparecer ya en su escala, no viajar hasta ella (mismo criterio que useIntroInicio.ts).
+    objetivo = actual = leer()
+    escribir()
+
+    window.addEventListener('scroll', pedir, { passive: true })
     window.addEventListener('resize', onResize)
+    // `data-intro` se REMUEVE de <html> al terminar la intro, y eso no es un evento de scroll:
+    // sin observarlo, el encogimiento se quedaba con el 0 de la era intro hasta que el usuario
+    // volviera a mover la rueda. Mismo idiom que GloboHolografico.tsx para el pausado del giro.
+    // El callback de MutationObserver es un microtask, asi que corre DESPUES de que completar()
+    // haya hecho las dos cosas (quitar el atributo y descontar la pista con scrollTo): aqui
+    // scrollY ya es el valor corregido. Si corriera entre ambas leeria scrollY ~= recorrido,
+    // pediria encogimiento completo y el globo daria un tiron antes de volver.
+    const observador = new MutationObserver(pedir)
+    observador.observe(html, { attributes: true, attributeFilter: ['data-intro'] })
+
     return () => {
-      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('scroll', pedir)
       window.removeEventListener('resize', onResize)
+      observador.disconnect()
+      if (raf) cancelAnimationFrame(raf)
     }
   }, [])
 
@@ -132,7 +227,9 @@ export function HomeHero({
   // B1). preventDefault() evita que el navegador agregue el hash a la URL de entrada (B11); sin
   // JS, el enlace nativo sigue funcionando igual.
   const irAFeatures = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    const destino = document.getElementById('lo-que-hay-dentro')
+    // "Ver más" lleva a donde empiezan los artículos (Últimas noticias); si esa sección no existe
+    // (por ejemplo, página sin noticias), cae al panel de la terminal.
+    const destino = document.getElementById('ultimas-noticias') ?? document.getElementById('lo-que-hay-dentro')
     if (!destino) return
     e.preventDefault()
     scrollSuaveA(destino, {
@@ -146,7 +243,13 @@ export function HomeHero({
 
   const datosGlobo: DatosGlobo = {
     precioBtc: price !== null ? price.toLocaleString(numberLocale, { maximumFractionDigits: 0 }) : '—',
-    deltaBtc: price !== null ? Math.abs(changePercent).toFixed(1) : '—',
+    // El Math.abs que vivia aqui perdia el signo de verdad: la etiqueta del aro HUD compone
+    // `${deltaPositivo ? '+' : ''}${deltaBtc}%`, asi que un delta NEGATIVO se imprimia "2.4%" sin
+    // el menos y la direccion quedaba solo en el color — WCAG 1.4.1 (el color no puede ser el
+    // unico canal). Ahora deltaBtc trae su propio signo: toFixed ya pone el '-' y nunca pone '+',
+    // que es justo lo que el prefijo de la plantilla aporta. deltaPositivo se queda porque el aro
+    // lo usa tambien para elegir el color y el sentido de barrido del gauge.
+    deltaBtc: price !== null ? changePercent.toFixed(1) : '—',
     deltaPositivo: changePercent >= 0,
     posts: postCount,
     assets: assetCount,
@@ -241,25 +344,29 @@ export function HomeHero({
                     {dict.heroLead}
                   </p>
                   {/* Pastilla en vez de linea de texto suelta: ahora se lee como una pista de uso,
-                      no como otro renglon de copy. */}
-                  <p
-                    className={clsx(
-                      'mt-4 inline-flex items-center gap-1.5 rounded-full border border-hairline bg-white/[0.03] px-3 py-1.5 font-mono text-micro text-ink-muted',
-                      listo ? 'hero-fade-up' : 'opacity-0'
-                    )}
-                    style={listo ? { animationDelay: '340ms' } : undefined}
-                  >
-                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                      <path
-                        d="M8 1.5 L8 11.5 M8 1.5 L5 4.5 M8 1.5 L11 4.5 M3 9 C3 12.5 5.2 14.5 8 14.5 C10.8 14.5 13 12.5 13 9"
-                        stroke="currentColor"
-                        strokeWidth="1.3"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                    {dict.heroDragHint}
-                  </p>
+                      no como otro renglon de copy. F0-02: solo se pinta con el globo en 'listo'
+                      — sin globo no hay nada que arrastrar. Monta en el mismo commit en que
+                      arranca la secuencia de entrada (onReady del globo pinta listo y estado a
+                      la vez), asi su retardo de 340ms respeta el escalonado existente y no
+                      desplaza a nadie visible: los CTA de abajo siguen en opacity-0 hasta los
+                      460ms. */}
+                  {listo && estadoGlobo === 'listo' && (
+                    <p
+                      className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-hairline bg-white/[0.03] px-3 py-1.5 font-mono text-micro text-ink-muted hero-fade-up"
+                      style={{ animationDelay: '340ms' }}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                        <path
+                          d="M8 1.5 L8 11.5 M8 1.5 L5 4.5 M8 1.5 L11 4.5 M3 9 C3 12.5 5.2 14.5 8 14.5 C10.8 14.5 13 12.5 13 9"
+                          stroke="currentColor"
+                          strokeWidth="1.3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      {dict.heroDragHint}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -272,7 +379,7 @@ export function HomeHero({
                     <Link href="/articulos">{dict.heroCtaPrimary}</Link>
                   </Button>
                   <Button variant="secondary" size="lg" className="whitespace-nowrap" asChild>
-                    <a href="#lo-que-hay-dentro" onClick={irAFeatures}>
+                    <a href="#ultimas-noticias" onClick={irAFeatures}>
                       {dict.heroCtaMore}
                     </a>
                   </Button>
@@ -299,7 +406,7 @@ export function HomeHero({
                     className="splash-mark pointer-events-none absolute -inset-[8%] -z-10 rounded-full blur-[60px]"
                     style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--accent-cyan) 30%, transparent) 0%, transparent 72%)' }}
                   />
-                  <HeroGlobe datos={datosGlobo} ariaLabel={dict.globeAria} locale={locale} estadosSesion={estadosSesion} onReady={() => setListo(true)} />
+                  <HeroGlobe datos={datosGlobo} ariaLabel={dict.globeAria} locale={locale} estadosSesion={estadosSesion} onReady={() => setListo(true)} onEstadoCarga={setEstadoGlobo} />
                 </div>
               </div>
               {/* Debajo de la intro, con el resto del texto secundario (data-intro-resto): la leyenda

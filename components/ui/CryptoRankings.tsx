@@ -42,7 +42,7 @@ export function CryptoRankings() {
 
   return (
     <section aria-labelledby="rankings-heading">
-      <h2 id="rankings-heading" className="text-[22px] font-semibold tracking-tight text-ink">
+      <h2 id="rankings-heading" className="font-serif text-[22px] font-bold tracking-tight text-ink">
         {dict.cryptoRankings.title}
       </h2>
       <p className="mb-8 mt-1 max-w-2xl text-[14px] text-ink-muted">{dict.cryptoRankings.description}</p>

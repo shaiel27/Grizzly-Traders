@@ -12,6 +12,7 @@ export async function GET() {
       .from('posts')
       .select(`
         id, title, slug, status, sentiment, view_count, published_at, created_at, is_featured,
+        pipeline_error, pipeline_attempts,
         category:categorias(name, slug),
         author:perfiles_autores(full_name),
         assets:post_activos(asset:activos(symbol, name)),
@@ -42,6 +43,8 @@ export async function GET() {
         ? p.tags.map((t: Record<string, unknown>) => (t as { tag: Record<string, unknown> }).tag).filter(Boolean)
         : [],
       translations: Array.isArray(p.translations) ? p.translations : [],
+      pipeline_error: p.pipeline_error ?? null,
+      pipeline_attempts: p.pipeline_attempts ?? null,
     }))
 
     return NextResponse.json({ success: true, data: posts })

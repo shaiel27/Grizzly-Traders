@@ -9,7 +9,7 @@ import { getPostBySlug, getPostViewCount, getRelatedPosts, incrementViewCount } 
 import { htmlToText, sanitizeArticleHtml } from '@/lib/sanitize'
 import { SITE_NAME, SITE_URL } from '@/lib/site'
 import { jsonLdString } from '@/lib/json-ld'
-import { categoryMeta, localizedPostContent } from '@/lib/feed'
+import { categoryMeta, localizedAuthor, localizedPostContent } from '@/lib/feed'
 import { getServerLocale } from '@/lib/i18n/server'
 import { getDictionary, t } from '@/lib/i18n/get-dictionary'
 import Image from 'next/image'
@@ -32,8 +32,10 @@ function normalizeTwitterCard(value: string | null | undefined): TwitterCard {
 export async function generateMetadata({ params }: ArticlePageProps): Promise<Metadata> {
   const { slug } = await params
   try {
-    const post = await getPostBySlug(slug)
+    // El locale va a la consulta: el slug puede ser el de cualquier idioma y solo sirve para
+    // desempatar, pero sin él la búsqueda no sabría qué fila preferir.
     const locale = await getServerLocale()
+    const post = await getPostBySlug(slug, locale)
     const translation = localizedPostContent(post, locale)
     const title = translation.title
     const description = translation.metaDescription || htmlToText(translation.contentHtml).slice(0, 160)
@@ -69,10 +71,11 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
 
 export default async function ArticlePage({ params }: ArticlePageProps) {
   const { slug } = await params
+  const locale = await getServerLocale()
 
   let post
   try {
-    post = await getPostBySlug(slug)
+    post = await getPostBySlug(slug, locale)
   } catch {
     notFound()
   }
@@ -88,11 +91,20 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   const liveViewCount = await getPostViewCount(post.id)
   const viewCount = liveViewCount ?? post.view_count
 
-  const locale = await getServerLocale()
   const dict = getDictionary(locale)
   const translation = localizedPostContent(post, locale)
   const title = translation.title
   const content = sanitizeArticleHtml(translation.contentHtml)
+  // Solo enlaces http(s): source_url viene del pipeline, pero nunca se renderiza un esquema arbitrario
+  const sourceLink = (() => {
+    if (!post.source_url) return null
+    try {
+      const url = new URL(post.source_url)
+      return url.protocol === 'https:' || url.protocol === 'http:' ? { href: url.href, host: url.hostname.replace(/^www\./, '') } : null
+    } catch {
+      return null
+    }
+  })()
   const dateFnsLocale = locale === 'en' ? enUS : es
   const publishedDate = post.published_at ? new Date(post.published_at) : new Date(post.created_at)
   const timeAgo = formatDistanceToNow(publishedDate, { addSuffix: true, locale: dateFnsLocale })
@@ -126,7 +138,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
         dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd) }}
       />
 
-      <main id="main-content" tabIndex={-1} className="flex-1 pt-[var(--header-height)] pb-24">
+      <main id="main-content" tabIndex={-1} className="flex-1 pt-[var(--header-height-sin-ticker)] pb-24">
         <article className="section-container max-w-4xl pt-8">
           <Breadcrumbs
             items={[
@@ -139,7 +151,13 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
             ]}
           />
 
-          {translation.isFallback && locale === 'en' && (
+          {/* Modelo A: el aviso depende de que FALTE la fila del idioma pedido, no de que el idioma
+              activo sea inglés. Si el original está en inglés y el lector pide español, también se
+              le está sirviendo un idioma que no pidió y tiene derecho a saberlo.
+              NOTA: `article.translationPendingNotice` solo describe el caso en->es (y hoy está en
+              inglés en los dos diccionarios). Hace falta una copia parametrizada por dirección;
+              el diccionario es de otro agente. */}
+          {translation.isFallback && (
             <p className="mb-6 rounded-lg border border-hairline-soft bg-surface-2/60 px-4 py-3 text-body-sm text-ink-muted">
               {dict.article.translationPendingNotice}
             </p>
@@ -161,7 +179,14 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
               )}
             </div>
 
-            <h1 className="mb-4 font-serif text-[34px] font-bold leading-[1.12] tracking-[-0.02em] text-ink sm:text-[46px]">{title}</h1>
+            {/* El titular y el cuerpo pueden venir en un idioma distinto al del chrome cuando falta
+                la traducción: `lang` evita que un lector de pantalla los lea con la voz equivocada. */}
+            <h1
+              lang={translation.resolvedLocale}
+              className="mb-4 font-serif text-[34px] font-bold leading-[1.12] tracking-[-0.02em] text-ink sm:text-[46px]"
+            >
+              {title}
+            </h1>
 
             <div className="flex flex-wrap items-center gap-4 text-body-sm text-ink-muted mb-6">
               {post.author && (
@@ -176,8 +201,8 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
                     </div>
                   )}
                   <span className="font-medium text-ink hover:text-accent-blue transition-colors">{post.author.full_name}</span>
-                  {post.author.role && (
-                    <span className="text-micro text-accent-blue">· {post.author.role}</span>
+                  {localizedAuthor(post.author, locale).role && (
+                    <span className="text-micro text-accent-blue">· {localizedAuthor(post.author, locale).role}</span>
                   )}
                 </Link>
               )}
@@ -209,9 +234,31 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
           {/* Content */}
           <div
-            className="article-body prose prose-lg max-w-[68ch] font-serif prose-headings:font-sans prose-headings:font-bold prose-headings:tracking-tight prose-p:leading-[1.8] prose-a:font-medium prose-a:no-underline hover:prose-a:underline prose-blockquote:font-normal prose-blockquote:not-italic prose-img:rounded-xl prose-img:border prose-img:border-hairline prose-figcaption:font-sans prose-table:font-sans prose-table:text-sm"
+            lang={translation.resolvedLocale}
+            className="article-body prose prose-lg max-w-[68ch] font-serif prose-headings:font-serif prose-headings:font-bold prose-headings:tracking-tight prose-p:leading-[1.8] prose-a:font-medium prose-a:no-underline hover:prose-a:underline prose-blockquote:font-normal prose-blockquote:not-italic prose-img:rounded-xl prose-img:border prose-img:border-hairline prose-figcaption:font-sans prose-table:font-sans prose-table:text-sm"
             dangerouslySetInnerHTML={{ __html: content }}
           />
+
+          {/* Guía de cumplimiento P2 #3 y #7: atribución con enlace al original y aviso de contenido
+              asistido por IA. Solo se muestra lo que el artículo realmente tiene. */}
+          {(sourceLink || post.ai_assisted) && (
+            <aside
+              aria-label={dict.article.provenanceAria}
+              className="mt-10 max-w-[68ch] space-y-2 rounded-lg border border-hairline-soft bg-surface-1 px-4 py-3 text-body-sm text-ink-muted"
+            >
+              {sourceLink && (
+                <p>
+                  {t(dict.article.attribution, { source: post.source?.name ?? sourceLink.host })}{' '}
+                  {dict.article.readOriginal}{' '}
+                  <a href={sourceLink.href} target="_blank" rel="noopener noreferrer nofollow" className="font-medium text-accent-blue hover:underline">
+                    {sourceLink.host}
+                  </a>
+                  .
+                </p>
+              )}
+              {post.ai_assisted && <p>{dict.article.aiNotice}</p>}
+            </aside>
+          )}
 
           {/* Assets & Tags */}
           <footer className="mt-12 border-t border-hairline-soft pt-8">
@@ -245,7 +292,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           {/* Related Posts */}
           {relatedPosts.length > 0 && (
             <section className="mt-16" aria-labelledby="related-heading">
-              <h2 id="related-heading" className="text-display-md font-bold text-ink mb-6">{dict.article.relatedArticles}</h2>
+              <h2 id="related-heading" className="font-serif text-display-md font-bold text-ink mb-6">{dict.article.relatedArticles}</h2>
               <ul className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {relatedPosts.map((relatedPost) => (
                   <li key={relatedPost.id}>

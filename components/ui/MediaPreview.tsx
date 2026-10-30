@@ -22,7 +22,7 @@ export function MediaPreview({ src, mediaGradient, symbol }: MediaPreviewProps) 
           alt=""
           loading="lazy"
           decoding="async"
-          className="absolute inset-0 size-full object-cover transition-transform duration-300 ease-[var(--ease-out)] group-hover:scale-[1.02]"
+          className="absolute inset-0 size-full object-cover transition-transform duration-300 ease-[var(--ease-out)] motion-reduce:transition-none [@media(hover:hover)]:group-hover:scale-[1.03]"
           onError={() => setFailed(true)}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" aria-hidden="true" />

@@ -43,14 +43,14 @@ export default async function LoginPage({
       <div className="relative w-full max-w-md">
         <div className="mb-6 flex items-center justify-center gap-2">
           <Image src="/logo.png" alt="Grizzly Traders" width={36} height={36} className="size-9 object-contain" priority />
-          <span className="rounded-[4px] bg-[#f7b955] px-1.5 py-[3px] text-[9px] font-bold uppercase leading-none tracking-[0.18em] text-[#0b0b0c]">
+          <span className="rounded-xs bg-[#f7b955] px-1.5 py-[3px] text-[9px] font-bold uppercase leading-none tracking-[0.18em] text-[#0b0b0c]">
             Terminal
           </span>
         </div>
 
         <div className="rounded-2xl border border-hairline bg-surface-1/90 p-6 shadow-[0_24px_64px_rgba(0,0,0,0.55)] backdrop-blur-sm sm:p-8">
           <div className="mb-6 text-center">
-            <h1 className="text-headline font-bold text-ink">{dict.login.heading}</h1>
+            <h1 className="font-serif text-headline font-bold text-ink">{dict.login.heading}</h1>
             <p className="mt-1.5 text-body-sm text-ink-muted">{dict.login.subheading}</p>
           </div>
 

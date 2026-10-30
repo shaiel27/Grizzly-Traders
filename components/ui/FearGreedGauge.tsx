@@ -5,7 +5,29 @@ import { clsx } from 'clsx'
 import { t } from '@/lib/i18n/get-dictionary'
 import { useDictionary } from '@/lib/i18n/LocaleProvider'
 
-export function FearGreedGauge() {
+type FearGreedKind = 'crypto' | 'stocks'
+
+const ENDPOINT: Record<FearGreedKind, string> = {
+  crypto: '/api/fear-greed',
+  stocks: '/api/fear-greed-stocks',
+}
+
+type FearGreedDict = ReturnType<typeof useDictionary>['fearGreed']
+
+const COMPONENT_LABELS: Record<string, (dict: FearGreedDict) => string> = {
+  momentum: (dict) => dict.componentMomentum,
+  volatility: (dict) => dict.componentVolatility,
+  safeHaven: (dict) => dict.componentSafeHaven,
+  junkBonds: (dict) => dict.componentJunkBonds,
+}
+
+interface FearGreedComponent {
+  key: string
+  score: number
+}
+
+// `compact` es la versión del portal de inicio: sin encabezado grande ni nota de escala larga
+export function FearGreedGauge({ kind = 'crypto', compact = false }: { kind?: FearGreedKind; compact?: boolean }) {
   const dict = useDictionary().fearGreed
   const ZONES = [
     { max: 25, label: dict.extremeFear, color: 'var(--semantic-danger)' },
@@ -18,23 +40,29 @@ export function FearGreedGauge() {
 
   const [value, setValue] = useState<number | null>(null)
   const [failed, setFailed] = useState(false)
+  const [components, setComponents] = useState<FearGreedComponent[]>([])
 
   useEffect(() => {
     const controller = new AbortController()
-    fetch('/api/fear-greed', { signal: controller.signal })
+    fetch(ENDPOINT[kind], { signal: controller.signal })
       .then((response) => response.json())
       .then((body) => {
-        if (body.success) setValue(body.value)
+        if (body.success) {
+          setValue(body.value)
+          if (Array.isArray(body.components)) setComponents(body.components)
+        }
         else setFailed(true)
       })
       .catch(() => {
         if (!controller.signal.aborted) setFailed(true)
       })
     return () => controller.abort()
-  }, [])
+  }, [kind])
 
   if (failed) return null
 
+  const heading = kind === 'stocks' ? dict.headingStocks : dict.heading
+  const scaleNote = kind === 'stocks' ? dict.scaleNoteStocks : dict.scaleNote
   const zone = value === null ? null : zoneFor(value)
   // Half-circle gauge: 0 maps to the left end, 100 to the right end
   const angle = value === null ? 0 : (value / 100) * Math.PI
@@ -42,8 +70,8 @@ export function FearGreedGauge() {
   const needleY = 60 - 42 * Math.sin(angle)
 
   return (
-    <section aria-label={dict.heading}>
-      <h3 className="mb-3 text-[13px] font-semibold text-ink">{dict.heading}</h3>
+    <section aria-label={heading}>
+      <h3 className={clsx('text-[13px] font-semibold text-ink', compact ? 'mb-2' : 'mb-3')}>{heading}</h3>
       <div className="flex items-center gap-4" role={value === null ? 'status' : undefined} aria-live={value === null ? 'polite' : undefined}>
         <svg
           viewBox="0 0 120 70"
@@ -84,7 +112,17 @@ export function FearGreedGauge() {
           )}
         </div>
       </div>
-      <p className="mt-2 text-[12px] text-ink-subtle">{dict.scaleNote}</p>
+      {!compact && components.length > 0 && (
+        <dl className="mt-3 grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-[12px]" aria-label={dict.componentsTitle}>
+          {components.map((component) => (
+            <div key={component.key} className="contents">
+              <dt className="text-ink-muted">{COMPONENT_LABELS[component.key]?.(dict) ?? component.key}</dt>
+              <dd className="tabular-nums text-ink">{Math.round(component.score)}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {(!compact || kind === 'stocks') && <p className="mt-2 text-[12px] text-ink-subtle">{scaleNote}</p>}
     </section>
   )
 }

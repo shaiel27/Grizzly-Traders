@@ -15,13 +15,22 @@ interface Estrella {
   capa: 0 | 1 | 2
   fase: number
   periodo: number
-  color: string
 }
 
+// Tonos del campo estelar. Un canvas 2D no hereda variables CSS, asi que van como literales
+// con su token al lado (mismo patron que NodosSesion/PinesActivos: constante local + comentario)
+// en vez de rgb() sueltos sin origen.
+const RGB_BLANCO = '255,255,255' // --ink
+const RGB_CIAN = '127,212,255' // --accent-cyan-soft (#7fd4ff)
+
+// rgb() SIN alpha: la opacidad twinkle de cada estrella se aplica via ctx.globalAlpha (un
+// numero, cero allocations) en vez de con color.replace('alpha', ...) que reemplazaba el
+// template por un string nuevo EN CADA estrella de CADA frame (205 estrellas/frame en desktop
+// = ~12k strings/s solo para titilar). El rgb() se resuelve UNA vez a nivel de modulo.
 const CONFIG_CAPAS = [
-  { radio: 0.6, derivaPxS: 2, parallaxPx: 6, color: 'rgba(255,255,255,alpha)' },
-  { radio: 1.0, derivaPxS: 5, parallaxPx: 12, color: 'rgba(255,255,255,alpha)' },
-  { radio: 1.6, derivaPxS: 9, parallaxPx: 20, color: 'rgba(127,212,255,alpha)' },
+  { radio: 0.6, derivaPxS: 2, parallaxPx: 6, color: `rgb(${RGB_BLANCO})` },
+  { radio: 1.0, derivaPxS: 5, parallaxPx: 12, color: `rgb(${RGB_BLANCO})` },
+  { radio: 1.6, derivaPxS: 9, parallaxPx: 20, color: `rgb(${RGB_CIAN})` },
 ] as const
 
 const CANTIDAD_DESKTOP = [120, 60, 25]
@@ -55,7 +64,6 @@ function crearEstrellas(anchoMovil: boolean): Estrella[] {
         capa: capa as 0 | 1 | 2,
         fase: rng() * Math.PI * 2,
         periodo: 2 + rng() * 4,
-        color: cfg.color,
       })
     }
   })
@@ -82,13 +90,16 @@ export function FondoHero() {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    // Deliberately no prefers-reduced-motion check here, same call as the ticker (ver el
-    // comentario de .ticker-flash-down en este archivo): en Windows con "Efectos de animacion"
-    // desactivado, CUALQUIER navegador (no solo uno) reporta reduced-motion=true, y antes esto
-    // dejaba el fondo completamente congelado en el primer frame para siempre — no es un
-    // deterioro sutil de una animacion decorativa, es un fondo estatico sin aviso de que existe
-    // una preferencia de por medio. Sigue siendo decorativo y no bloquea nada (WCAG 2.2.2 ya
-    // esta cubierto por el resto de animaciones del sitio, que si se congelan).
+    // F0-18 (antes: deliberadamente sin check de reduced-motion): bajo prefers-reduced-motion
+    // el campo estelar se dibuja UN solo frame estatico y no se arranca el loop — sin deriva,
+    // sin twinkle, sin parallax de puntero y sin estrellas fugaces, pero las estrellas siguen
+    // ahi (no queda un rectangulo negro liso). Es lo que pide la auditoria F0 y es coherente
+    // con el catch-all de reduced-motion de globals.css, que ya congela el resto de animaciones
+    // del sitio. El tradeoff que documento el comentario anterior sigue siendo real: en Windows
+    // con "Efectos de animacion" desactivado cualquier navegador reporta reduce, asi que ahi el
+    // fondo queda estatico — aceptado, es decorativo y no bloquea nada (WCAG 2.2.2 la cubre el
+    // resto del sitio, que si conserva su movimiento). Sin reduce: el loop de siempre.
+    const reducido = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const dpr = Math.min(window.devicePixelRatio || 1, 1.5)
     let ancho = 0
     let alto = 0
@@ -117,20 +128,32 @@ export function FondoHero() {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       ctx.clearRect(0, 0, ancho, alto)
 
+      // Las estrellas salen agrupadas por capa (crearEstrellas las empuja capa a capa), asi
+      // que el fillStyle cambia 3 veces por frame como mucho y la deriva (que solo depende de
+      // la capa y del tiempo) se calcula una vez por capa en vez de 205.
+      let capaActual = -1
+      let derivaPx = 0
       for (const e of estrellas) {
         const cfg = CONFIG_CAPAS[e.capa]
-        const derivaPx = ((tiempoS * cfg.derivaPxS) % (ancho + 40)) - 20
+        if (e.capa !== capaActual) {
+          capaActual = e.capa
+          ctx.fillStyle = cfg.color
+          derivaPx = ((tiempoS * cfg.derivaPxS) % (ancho + 40)) - 20
+        }
         const parX = (puntero.x - 0.5) * cfg.parallaxPx
         const parY = (puntero.y - 0.5) * cfg.parallaxPx * 0.6
         const x = (((e.x * ancho - derivaPx + parX) % ancho) + ancho) % ancho
         const y = e.y * alto + parY
         const opacidad = 0.2 + 0.8 * (0.5 + 0.5 * Math.sin(tiempoS * (Math.PI * 2) / e.periodo + e.fase))
 
+        ctx.globalAlpha = opacidad
         ctx.beginPath()
-        ctx.fillStyle = cfg.color.replace('alpha', opacidad.toFixed(3))
         ctx.arc(x, y, e.radio, 0, Math.PI * 2)
         ctx.fill()
       }
+      // La estrella fugaz de abajo lleva su propio alpha dentro del gradiente: globalAlpha
+      // tiene que estar a 1 para no multiplicarlo (y para no dejarlo pisado al proximo frame).
+      ctx.globalAlpha = 1
 
       if (!fugaz.activa) {
         fugaz.proximaEn -= 1 / 60
@@ -156,7 +179,9 @@ export function FondoHero() {
           const x0 = x1 - Math.cos(fugaz.angulo) * largo * 0.5
           const y0 = y1 - Math.sin(fugaz.angulo) * largo * 0.5
           const grad = ctx.createLinearGradient(x0, y0, x1, y1)
-          grad.addColorStop(0, 'rgba(127,212,255,0)')
+          // Arranca en el cian emisivo del campo y remata en una estela mas blanca (calor del
+          // cabezal): ese blanco final es deliberadamente puntual, no un token del repo.
+          grad.addColorStop(0, `rgba(${RGB_CIAN},0)`)
           grad.addColorStop(1, `rgba(220,245,255,${1 - p})`)
           ctx.strokeStyle = grad
           ctx.lineWidth = 1.5
@@ -178,6 +203,8 @@ export function FondoHero() {
     }
 
     medir()
+    // Sin reduce, primer frame del loop; con reduce, el UNICO frame (t=0: deriva 0, parallax
+    // centrado, estrella fugaz aun no programada) — se repinta en cada resize mas abajo.
     dibujar(0)
 
     const resizeObserver = new ResizeObserver(() => {
@@ -187,16 +214,21 @@ export function FondoHero() {
     })
     resizeObserver.observe(contenedor)
 
+    // Solo el loop (y lo que alimenta: visibilidad, puntero) es exclusivo de sin-reduce; el
+    // ResizeObserver de arriba vive siempre para que el frame estatico siga respondiendo a
+    // giros de pantalla y cambios de tamano.
     let intersectionObserver: IntersectionObserver | undefined
-    if (typeof IntersectionObserver !== 'undefined') {
-      intersectionObserver = new IntersectionObserver(([entrada]) => {
-        visible = entrada.isIntersecting
-      })
-      intersectionObserver.observe(contenedor)
-    }
+    if (!reducido) {
+      if (typeof IntersectionObserver !== 'undefined') {
+        intersectionObserver = new IntersectionObserver(([entrada]) => {
+          visible = entrada.isIntersecting
+        })
+        intersectionObserver.observe(contenedor)
+      }
 
-    window.addEventListener('pointermove', onPointerMove, { passive: true })
-    loop()
+      window.addEventListener('pointermove', onPointerMove, { passive: true })
+      loop()
+    }
 
     return () => {
       cancelAnimationFrame(frame)

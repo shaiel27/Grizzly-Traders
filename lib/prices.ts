@@ -1,4 +1,5 @@
 import { unstable_cache } from 'next/cache'
+import { ASSET_BY_PLAIN, type AssetDefinition } from './assets-catalog'
 
 const COINGECKO_BASE = 'https://api.coingecko.com/api/v3'
 const FRANKFURTER_BASE = 'https://api.frankfurter.dev/v1'
@@ -99,28 +100,46 @@ const YAHOO_FALLBACK: [string, string][] = [
   ['XAUUSD', 'GC=F'],
 ]
 
-async function fetchYahooFallbackPrices(): Promise<PriceData[]> {
-  const results = await Promise.allSettled(
-    YAHOO_FALLBACK.map(async ([symbol, yahooSymbol]): Promise<PriceData | null> => {
-      const data = await fetchJson(
-        `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=1d&range=1d`
-      )
-      const meta = data?.chart?.result?.[0]?.meta
-      const price = meta?.regularMarketPrice
-      const previous = meta?.chartPreviousClose
-      if (typeof price !== 'number' || price <= 0) return null
-      const change = typeof previous === 'number' && previous > 0 ? price - previous : 0
-      return {
-        symbol,
-        price,
-        change24h: change,
-        changePercent24h: typeof previous === 'number' && previous > 0 ? (change / previous) * 100 : 0,
-        source: 'yahoo',
-        timestamp: Date.now(),
-      }
-    })
+// SPX y DXY se sirven como indices REALES desde Yahoo (SPX -> ^GSPC, DXY -> DX-Y.NYB, simbolos del
+// campo `yahoo` de lib/assets-catalog.ts). Antes venian de Finnhub como ETF proxy (SPY/UUP
+// multiplicados por un factor fijo: 10.09 / 3.71), un valor sintetico que se desvia del nivel real
+// del indice cada dia. Verificado en vivo contra Yahoo (2026-10-09): ^GSPC y DX-Y.NYB responden
+// con el nivel oficial.
+const INDEX_QUOTES = (['SPX', 'DXY'] as const)
+  .map((plain) => {
+    const asset: AssetDefinition | undefined = ASSET_BY_PLAIN.get(plain)
+    return asset?.yahoo ? ([plain, asset.yahoo] as [string, string]) : null
+  })
+  .filter((entry): entry is [string, string] => entry !== null)
+
+// Yahoo chart endpoint: devuelve el precio vivo + el cierre anterior, de donde sale el % del dia
+async function fetchYahooQuote(yahooSymbol: string, plain: string): Promise<PriceData | null> {
+  const data = await fetchJson(
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=1d&range=1d`
   )
+  const meta = data?.chart?.result?.[0]?.meta
+  const price = meta?.regularMarketPrice
+  const previous = meta?.chartPreviousClose
+  if (typeof price !== 'number' || price <= 0) return null
+  const change = typeof previous === 'number' && previous > 0 ? price - previous : 0
+  return {
+    symbol: plain,
+    price,
+    change24h: change,
+    changePercent24h: typeof previous === 'number' && previous > 0 ? (change / previous) * 100 : 0,
+    source: 'yahoo',
+    timestamp: Date.now(),
+  }
+}
+
+// Un fallo por simbolo no enmiola al resto: cada entrada se evalua por separado
+async function fetchYahooQuotes(entries: [string, string][]): Promise<PriceData[]> {
+  const results = await Promise.allSettled(entries.map(([plain, yahoo]) => fetchYahooQuote(yahoo, plain)))
   return results.flatMap((result) => (result.status === 'fulfilled' && result.value ? [result.value] : []))
+}
+
+async function fetchYahooFallbackPrices(): Promise<PriceData[]> {
+  return fetchYahooQuotes(YAHOO_FALLBACK)
 }
 
 // Frankfurter: Forex rates (free, no key, ECB reference rates published once per business day)
@@ -155,36 +174,22 @@ async function fetchForexPrices(): Promise<PriceData[]> {
   })
 }
 
-// Finnhub: Stocks + DXY (via ETF proxies)
+// Finnhub: Stocks (AAPL, NVDA). Los indices SPX/DXY ya no pasan por aca — se sirven de Yahoo
+// como ^GSPC/DX-Y.NYB via INDEX_QUOTES; el proxy SPY/UUP x factor derivaba del nivel real a diario.
 async function fetchFinnhubPrices(): Promise<PriceData[]> {
   if (!FINNHUB_API_KEY) return []
 
-  // SPY and UUP are ETF proxies for the S&P 500 and the Dollar Index; their values are scaled, not official index levels
-  const symbols = ['AAPL', 'NVDA', 'SPY', 'UUP']
-  const symbolMap: Record<string, string> = {
-    AAPL: 'AAPL',
-    NVDA: 'NVDA',
-    SPY: 'SPX',
-    UUP: 'DXY',
-  }
-
-  // Conversion factors for ETF proxies
-  const ETF_FACTORS: Record<string, number> = {
-    SPX: 10.09,
-    DXY: 3.71,
-  }
+  const symbols = ['AAPL', 'NVDA']
 
   try {
     const results = await Promise.all(
       symbols.map(async (symbol) => {
         const data = await fetchJson(`${FINNHUB_BASE}/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`)
-        const mappedSymbol = symbolMap[symbol] ?? symbol
-        const factor = ETF_FACTORS[mappedSymbol] ?? 1
 
         return {
-          symbol: mappedSymbol,
-          price: (data.c ?? 0) * factor,
-          change24h: (data.d ?? 0) * factor,
+          symbol,
+          price: (data.c ?? 0),
+          change24h: (data.d ?? 0),
           changePercent24h: data.dp ?? 0,
           source: 'finnhub',
           timestamp: Date.now(),
@@ -205,16 +210,17 @@ const lastGood = new Map<string, PriceData>()
 
 // Main function to fetch all prices from all sources
 export async function fetchAllPrices(): Promise<PriceData[]> {
-  const [coinGeckoPrices, forexPrices, finnhubPrices] = await Promise.all([
+  const [coinGeckoPrices, forexPrices, finnhubPrices, indexPrices] = await Promise.all([
     fetchCoinGeckoPrices(),
     fetchForexPrices(),
     fetchFinnhubPrices(),
+    fetchYahooQuotes(INDEX_QUOTES),
   ])
 
   // Merge all prices, later sources take precedence
   const priceMap = new Map<string, PriceData>()
 
-  for (const price of [...coinGeckoPrices, ...forexPrices, ...finnhubPrices]) {
+  for (const price of [...coinGeckoPrices, ...forexPrices, ...finnhubPrices, ...indexPrices]) {
     priceMap.set(price.symbol, price)
   }
 
@@ -227,7 +233,9 @@ export async function fetchAllPrices(): Promise<PriceData[]> {
   return Array.from(priceMap.values())
 }
 
-// Shared server-side snapshot (layout and API): stale data is served while it refreshes in the background
+// Shared server-side snapshot (layout and API): stale data is served while it refreshes in the background.
+// Sin tags: nadie llama revalidateTag('prices') (el unico flujo de mutacion, revalidateContent,
+// cubre posts/catalog) — el revalidate por tiempo es el unico mecanismo de invalidacion.
 export const getCachedPrices = unstable_cache(
   async () => {
     const prices = await fetchAllPrices()
@@ -236,5 +244,5 @@ export const getCachedPrices = unstable_cache(
     return prices
   },
   ['prices'],
-  { revalidate: 30, tags: ['prices'] }
+  { revalidate: 30 }
 )

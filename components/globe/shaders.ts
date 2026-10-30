@@ -41,9 +41,14 @@ export const puntosVertexShader = /* glsl */ `
   uniform float uTiempo;
   uniform float uTam;
   uniform vec3 uColor;
+  // F0-08 — reveal de entrada: 0..1 que GloboHolografico rampa en 800ms easeOutCubic desde
+  // que PuntosTierraCapa asigna la geometria (antes los 36k puntos aparecian de golpe a los
+  // 2-5s del muestreo, un pop encima del resto de la coreografia ya asentada).
+  uniform float uReveal;
   uniform float uSentimiento[8];
   varying float vBrillo;
   varying float vCara;
+  varying float vReveal;
   varying vec3 vColorRegion;
 
   void main() {
@@ -54,14 +59,20 @@ export const puntosVertexShader = /* glsl */ `
     vec3 viewDir = normalize(-mvPosition.xyz);
     vec3 viewNormal = normalize(normalMatrix * normal);
     vCara = dot(viewNormal, viewDir);
+    vReveal = clamp(uReveal, 0.0, 1.0);
 
-    float parpadeo = 0.75 + 0.25 * sin(uTiempo * aVel + aFase);
+    // F0-07 — amplitud del parpadeo a la mitad (0.25 -> 0.125): el temblor constante de los
+    // puntos competia con el mapa de calor de sentimiento en vez de solo darle vida.
+    float parpadeo = 0.875 + 0.125 * sin(uTiempo * aVel + aFase);
     vBrillo = aBrillo * parpadeo;
 
     int region = int(aRegion + 0.5);
     float s = (region > 0 && region < 8) ? uSentimiento[region] : 0.0;
-    vec3 verde = vec3(0.133, 0.773, 0.369);
-    vec3 rojo = vec3(1.0, 0.231, 0.188);
+    // Los tonos del mapa de calor YA son los tokens semanticos del repo (GLSL no lee variables
+    // CSS, van como literales con el token al lado): tinte hacia --semantic-success /
+    // --semantic-danger, nunca mas alla de mezcla (0.65) para no tapar el cian de los puntos.
+    vec3 verde = vec3(0.133, 0.773, 0.369); // --semantic-success (#22c55e)
+    vec3 rojo = vec3(1.0, 0.231, 0.188); // --semantic-danger (#ff3b30)
     float mezcla = min(abs(s), 1.0) * 0.65;
     vColorRegion = s > 0.0 ? mix(uColor, verde, mezcla) : mix(uColor, rojo, mezcla);
 
@@ -71,21 +82,26 @@ export const puntosVertexShader = /* glsl */ `
     // blanca solida (la silueta "de nube" era literalmente el contorno del continente
     // muestreado, cada punto gigante tapando al de al lado). Clamp como red de seguridad,
     // uTam bajado aparte — asi un cambio futuro de camara no puede reproducir esto.
-    gl_PointSize = clamp(uTam * aBrillo * (300.0 / -mvPosition.z), 1.0, 4.5);
+    // x vReveal (F0-08): los puntos crecen con el reveal ademas de fundirse via alpha.
+    gl_PointSize = clamp(uTam * aBrillo * vReveal * (300.0 / -mvPosition.z), 1.0, 4.5);
   }
 `
 
 export const puntosFragmentShader = /* glsl */ `
   varying float vBrillo;
   varying float vCara;
+  varying float vReveal;
   varying vec3 vColorRegion;
   void main() {
+    // Fuera del reveal no hay nada que dibujar (el clamp de PointSize no baja de 1px, asi
+    // que el descarte/gate por alpha es lo que mantiene el punto invisible en 0).
+    if (vReveal < 0.003) discard;
     vec2 coord = gl_PointCoord - vec2(0.5);
     float dist = length(coord);
     if (dist > 0.5) discard;
     float suavidad = smoothstep(0.5, 0.15, dist);
     float atenuacion = vCara > 0.0 ? 1.0 : 0.25;
-    gl_FragColor = vec4(min(vColorRegion * max(vBrillo, 0.0) * atenuacion, vec3(4.0)), clamp(suavidad * atenuacion, 0.0, 1.0));
+    gl_FragColor = vec4(min(vColorRegion * max(vBrillo, 0.0) * atenuacion, vec3(4.0)), clamp(suavidad * atenuacion * vReveal, 0.0, 1.0));
   }
 `
 
@@ -106,7 +122,9 @@ export const baseHologramaFragmentShader = /* glsl */ `
   void main() {
     float d = length(vUv - vec2(0.5)) * 2.0;
     float anillo = clamp(smoothstep(1.0, 0.0, d), 0.0, 1.0);
-    float pulso = 0.75 + 0.25 * sin(uTiempo * 0.8);
+    // F0-07 — el pulso de la base respiraba +-25% (casi un parpadeo): ahora +-7.5%, suficiente
+    // para que se sienta viva sin robar atencion a los puntos ni al HUD.
+    float pulso = 0.925 + 0.075 * sin(uTiempo * 0.8);
     float alpha = clamp(anillo * anillo * pulso * uOpacidad, 0.0, 1.0);
     gl_FragColor = vec4(min(uColor, vec3(4.0)), alpha);
   }

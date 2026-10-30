@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { unstable_cache } from 'next/cache'
 import { BreakingPost, NewsGrid } from '@/components/ui'
 import { HomeHero, LatestByCategory } from '@/components/modules'
 import { PivotShowcase, type ActivoPivote } from '@/components/modules/PivotShowcase'
@@ -27,10 +28,26 @@ import type { NoticiaPreview, CotizacionPreview, PivotePreview } from '@/compone
 // No estan en lib/ticker.ts (confirmado: esa lista cubre SPX/DAX/NIKKEI/FTSE/VIX pero no China
 // ni Australia) — se piden aparte, solo el % del dia, para el score de sentimiento del globo
 // (plan 009 §3.1, decision D3: SSE + XJO).
+// SSE: `TVC:SHCOMP` (lo que decia el plan 009) ya NO devuelve fila del scanner — confirmado en
+// vivo 2026-10-09 junto a `SSE:SHCOMP`, tambien vacio; `SSE:000001` si responde y trae type=index
+// (Shanghai Composite, 3813.79 ese dia). China estaba quedando siempre en neutro por ese ticker
+// muerto. XJO: `TVC:XJO` y variantes (`ASX:XJO`, `ASX:AXJO`, `TVC:AUS200`, `TVC:AU200`) tampoco
+// devuelven fila — Australia sigue sin cobertura, normalizarCambio(null) la deja en 0 (neutro).
 const GLOBE_EXTRA = [
-  { symbol: 'SSE', tv: 'TVC:SHCOMP' },
+  { symbol: 'SSE', tv: 'SSE:000001' },
   { symbol: 'XJO', tv: 'TVC:XJO' },
 ] as const
+
+// SSE/XJO no estan en el catalogo de la terminal (ni en getMarkets ni en el ticker): este scan
+// extra alimenta solo el chip de sentimiento y el tiñe del globo. Sin cache, CADA render de la
+// home le pegaba al scanner de TradingView (un POST de egresos + latencia por render) — ahora se
+// renueva como maximo cada 60 s. Sin tags: no existe ningun flujo de mutacion que invalide datos
+// de mercado (revalidateContent solo cubre posts/catalog), el revalidate por tiempo es el mecanismo.
+const getGlobeChanges = unstable_cache(
+  () => scanTradingView(GLOBE_EXTRA.map((a) => a.tv), ['change']),
+  ['home-globe-scan'],
+  { revalidate: 60 }
+)
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getServerLocale()
@@ -115,6 +132,12 @@ export default async function HomePage({
     return { titulo: title, href: `/articulos/${slug}`, sentimientoLabel: sentimiento.label, sentimientoClase: sentimiento.chip, fecha: timeAgo(post.published_at, locale) }
   })
 
+  // Vista previa del correo con los titulares reales de hoy (los mismos que entrarían en el resumen diario)
+  const resumenPreview = latest.slice(0, 3).map((post) => ({
+    categoria: post.category?.name ?? null,
+    titulo: localizedPost(post, locale).title,
+  }))
+
   // Un solo pedido al snapshot del ticker (ya cacheado 15s, lib/ticker.ts) alimenta tanto la
   // vista previa de "Terminal de mercados" como los pines de materias primas del globo (plan
   // 009 §1.4) — cubre BRENT/WTI/XAUUSD/XAGUSD/NG sin pedidos nuevos, ya estaban en TICKER_ASSETS.
@@ -143,14 +166,14 @@ export default async function HomePage({
   // simplemente se queda sin tiñe, no rompe el resto del mapa.
   let sentimientoPorRegion: Record<number, number> = {}
   try {
-    const filas = await scanTradingView(GLOBE_EXTRA.map((a) => a.tv), ['change'])
+    const filas = await getGlobeChanges()
     const porTicker = new Map(filas.map((f) => [f.s, f.d]))
     const cambioDe = (tv: string) => {
       const d = porTicker.get(tv)
       const v = d?.[0]
       return typeof v === 'number' ? v : null
     }
-    const sse = cambioDe('TVC:SHCOMP')
+    const sse = cambioDe('SSE:000001')
     const xjo = cambioDe('TVC:XJO')
     riesgo = calcularSentimiento({
       spx: cotizacionesGlobo.SPX?.cambio ?? null,
@@ -223,10 +246,14 @@ export default async function HomePage({
       <main id="main-content" tabIndex={-1} className="flex-grow pb-24 pt-10 max-w-[1200px] mx-auto px-6 md:px-8 w-full">
         {/* Only surfaces when something is actually wrong — same alert pattern as /markets */}
         {sourceDown && (
-          <p role="alert" className="mb-6 rounded-[8px] border border-semantic-warning/40 bg-semantic-warning/10 px-4 py-3 text-body-sm text-ink">
+          <p role="alert" className="mb-6 rounded-sm border border-semantic-warning/40 bg-semantic-warning/10 px-4 py-3 text-body-sm text-ink">
             {dict.home.sourceDownAlert}
           </p>
         )}
+
+        {/* Ancla de "Ver más" del hero: aquí empiezan los artículos (la alerta de última hora, si la hay,
+            o la rejilla de últimas noticias). */}
+        <div id="ultimas-noticias" className="scroll-mt-[var(--header-scroll-offset)]" />
 
         {/* Breaking alert */}
         {breaking && <div className="mb-8"><BreakingPost post={breaking} /></div>}
@@ -234,7 +261,7 @@ export default async function HomePage({
         {/* News grid */}
         <section className="mt-10" aria-label={dict.home.newsGridAria}>
           <div className="mb-4 flex flex-wrap items-end justify-between gap-x-6 gap-y-1">
-            <h2 className="text-headline text-ink">{dict.home.latestNewsTitle}</h2>
+            <h2 className="font-serif text-headline text-ink">{dict.home.latestNewsTitle}</h2>
             <p className="text-body-sm text-ink-muted">
               {t(dict.home.newsCount, { n: grid.length, unit: grid.length === 1 ? dict.home.newsUnitSingular : dict.home.newsUnitPlural })}
             </p>
@@ -261,7 +288,7 @@ export default async function HomePage({
               <span className="material-symbols-outlined text-[20px] text-accent-blue" aria-hidden="true">
                 folder_open
               </span>
-              <h2 className="text-headline text-ink">{dict.home.exploreByCategoryTitle}</h2>
+              <h2 className="font-serif text-headline text-ink">{dict.home.exploreByCategoryTitle}</h2>
             </div>
             {CATEGORY_SLUGS.map((slug) => (
               <LatestByCategory key={slug} categorySlug={slug} posts={categoryPosts[slug] ?? []} locale={locale} />
@@ -279,7 +306,7 @@ export default async function HomePage({
             vez de un parrafo, consola de alertas de ejemplo (tipeando, etiquetada) en vez de la
             tabla "el portal en cifras" (ese "cada 30s" no era verdad: el ticker real consulta
             cada 3s, lib/ticker.ts — B8). */}
-        <VipShowcase locale={locale} vipUrl={VIP_URL} telegramUrl={TELEGRAM_URL} />
+        <VipShowcase locale={locale} vipUrl={VIP_URL} telegramUrl={TELEGRAM_URL} resumen={resumenPreview} />
       </main>
 
     </>

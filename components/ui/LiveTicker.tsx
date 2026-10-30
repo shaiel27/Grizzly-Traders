@@ -5,7 +5,8 @@ import { clsx } from 'clsx'
 import type { TickerQuote } from '@/lib/ticker'
 import { formatPrice } from '@/lib/format'
 import { t } from '@/lib/i18n/get-dictionary'
-import { useDictionary } from '@/lib/i18n/LocaleProvider'
+import { ASSET_BY_PLAIN } from '@/lib/assets-catalog'
+import { useDictionary, useLocale } from '@/lib/i18n/LocaleProvider'
 
 interface TickerItem extends TickerQuote {
   // Direction of the last price change; `tick` remounts the price so the flash animation replays
@@ -56,6 +57,7 @@ function TickerItems({
   hidden?: boolean
   copyRef?: Ref<HTMLDivElement>
 }) {
+  const { locale } = useLocale()
   return (
     <div ref={copyRef} className="flex shrink-0 items-center gap-5 pr-5" aria-hidden={hidden || undefined}>
       {items.map((item, index) => {
@@ -63,7 +65,7 @@ function TickerItems({
         const isPositive = (percent ?? 0) >= 0
         return (
           <div key={`${item.symbol}-${index}`} className="flex items-center gap-2.5 whitespace-nowrap">
-            <span className="text-[11px] font-medium text-ink">{item.label}</span>
+            <span className="text-[11px] font-medium text-ink">{locale === 'en' ? (ASSET_BY_PLAIN.get(item.symbol)?.labelEn ?? item.label) : item.label}</span>
             <span
               key={item.tick}
               className={clsx(

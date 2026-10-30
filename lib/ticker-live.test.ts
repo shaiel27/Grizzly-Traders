@@ -112,4 +112,35 @@ describe('getLiveTickerSnapshot', () => {
 
     expect(snapshot.quotes.length).toBeGreaterThan(0)
   })
+
+  // Catalogo de 84 activos (20 futuros `1!`): verificado en vivo (2026-10-22) que el scanner responde las 84 filas
+  // en un solo pedido, y tambien 168 tickers juntos, asi que el ticker no necesita lotes como lib/markets.ts.
+  it('asks for the whole catalog in a single scanner request, futures included', async () => {
+    coverEverything()
+    const { getLiveTickerSnapshot } = await loadTicker()
+
+    const snapshot = await getLiveTickerSnapshot()
+
+    expect(mocks.scan).toHaveBeenCalledTimes(1)
+    const [tickers] = mocks.scan.mock.calls[0] as [string[]]
+    expect(new Set(tickers).size).toBe(tickers.length)
+    expect(tickers.filter((tv) => tv.endsWith('1!')).length).toBeGreaterThanOrEqual(20)
+    expect(tickers).toEqual(expect.arrayContaining(['CME_MINI:ES1!', 'CME_MINI:NQ1!', 'EUREX:FDAX1!']))
+    expect(snapshot.quotes).toHaveLength(tickers.length)
+  })
+
+  it('keeps the rest of the bar when the scanner skips some futures and the providers do not know them', async () => {
+    mocks.scan.mockImplementation(async (tickers: string[]) =>
+      tickers.filter((tv) => tv !== 'EUREX:FDAX1!').map((s) => ({ s, d: [100, 1] }))
+    )
+    const { getLiveTickerSnapshot } = await loadTicker()
+
+    const snapshot = await getLiveTickerSnapshot()
+
+    const symbols = snapshot.quotes.map((quote) => quote.symbol)
+    expect(symbols).toContain('ES')
+    expect(symbols).not.toContain('FDAX')
+    // el fallback si se consulta, porque quedo un activo sin cubrir
+    expect(mocks.prices).toHaveBeenCalledTimes(1)
+  })
 })

@@ -35,13 +35,13 @@ export default async function LearnPage() {
   }
 
   return (
-    <main id="main-content" tabIndex={-1} className="flex-1 pb-24 pt-[var(--header-height)]">
+    <main id="main-content" tabIndex={-1} className="flex-1 pb-24 pt-[var(--header-height-sin-ticker)]">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd) }} />
 
       <div className="mx-auto max-w-[1200px] px-6 pt-8 md:px-8">
         <Breadcrumbs items={[{ label: dict.learn.breadcrumbHome, href: '/' }, { label: dict.learn.breadcrumbLearn }]} />
 
-        <h1 className="mb-2 text-display-lg-mobile font-bold text-ink sm:text-display-lg">{dict.learn.h1}</h1>
+        <h1 className="mb-2 font-serif text-display-lg-mobile font-bold text-ink sm:text-display-lg">{dict.learn.h1}</h1>
         <p className="mb-8 max-w-2xl text-body text-on-surface-variant">{dict.learn.body}</p>
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[220px_1fr]">

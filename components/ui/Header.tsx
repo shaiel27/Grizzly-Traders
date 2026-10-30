@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { clsx } from 'clsx'
+import { permiteAnuncios } from '@/lib/ads-zonas'
 import { LiveTicker } from './LiveTicker'
 import { Button } from './Button'
 import { LocaleSwitcher } from './LocaleSwitcher'
@@ -216,6 +217,10 @@ export function Header({ categories = [], initialTicker }: HeaderProps) {
   const router = useRouter()
   const dict = useDictionary()
   const isTerminal = pathname === '/markets'
+  // Separacion datos/publicidad (PLAN-CUMPLIMIENTO.md §13.8): donde puede haber anuncios no se muestran
+  // cotizaciones. La altura del header se mide (--header-h-real), y las paginas sin barra usan
+  // --header-height-sin-ticker para su padding superior.
+  const mostrarTicker = !permiteAnuncios(pathname)
 
   // El header real puede medir distinto al valor fijo de --header-height: fuentes del sistema
   // mas grandes, zoom del navegador, o el menu movil abierto lo cambian. Sin esto, el hero y
@@ -317,7 +322,7 @@ export function Header({ categories = [], initialTicker }: HeaderProps) {
           <header> ancestro. Resultado: con el menu abierto, el scrim oscurecia tambien el logo, la
           barra de busqueda y el feed en vivo — el <header> NO se quedaba opaco como dice el
           comentario del scrim mas abajo. */}
-      <LiveTicker initialQuotes={initialTicker?.quotes} initialUpdatedAt={initialTicker?.updatedAt} />
+      {mostrarTicker && <LiveTicker initialQuotes={initialTicker?.quotes} initialUpdatedAt={initialTicker?.updatedAt} />}
 
       <div data-intro-row="nav" className="relative z-50 section-container w-full">
         {/* Row A — identity and the one action every visitor might take (search, go VIP). Fixed height,

@@ -16,7 +16,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(
       { success: true, data: markets },
-      { headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' } }
+      { headers: { 'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=20' } }
     )
   } catch (error) {
     console.error('Markets API error:', error)

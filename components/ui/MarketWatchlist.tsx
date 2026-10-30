@@ -16,8 +16,13 @@ function localizedDescription(asset: MarketItem, locale: string): string {
 export type WatchlistCategory = 'all' | 'favorites' | MarketCategory
 export type WatchlistSort = 'default' | 'change' | 'name'
 
+// Id del input de búsqueda: MarketsClient lo reutiliza para enfocarlo con la tecla "/"
+export const SEARCH_INPUT_ID = 'watchlist-search'
+
 interface MarketWatchlistProps {
   assets: MarketItem[]
+  // True when nothing loaded at all (API outage): the empty message must not blame the filters
+  unavailable?: boolean
   selectedSymbol: string | null
   favorites: string[]
   category: WatchlistCategory
@@ -30,12 +35,13 @@ interface MarketWatchlistProps {
   onToggleFavorite: (symbol: string) => void
 }
 
-function signed(value: number): string {
-  return `${value > 0 ? '+' : ''}${value.toFixed(2)}%`
+function signed(value: number | null): string {
+  return value == null || !Number.isFinite(value) ? '—' : `${value > 0 ? '+' : ''}${value.toFixed(2)}%`
 }
 
 export function MarketWatchlist({
   assets,
+  unavailable = false,
   selectedSymbol,
   favorites,
   category,
@@ -63,24 +69,44 @@ export function MarketWatchlist({
     { key: 'name', label: dict.sortName },
   ]
 
+  // Estado vacío honesto: si no hay datos cargados no se echa la culpa a la búsqueda ni a los filtros
+  let emptyText: string
+  if (unavailable) emptyText = dict.unavailable
+  else if (category === 'favorites') emptyText = dict.emptyFavorites
+  else if (search.trim()) emptyText = dict.emptySearch
+  else if (category !== 'all') emptyText = dict.emptyFiltered
+  else emptyText = dict.emptyList
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="space-y-3 border-b border-hairline-soft p-3">
-        <div className="relative">
-          <label htmlFor="watchlist-search" className="sr-only">
+        <div className="group relative">
+          <label htmlFor={SEARCH_INPUT_ID} className="sr-only">
             {dict.searchLabel}
           </label>
           <span className="material-symbols-outlined pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[18px] text-ink-subtle" aria-hidden="true">
             search
           </span>
+          {/* Pista del atajo: solo con el campo vacío y sin enfocar, que es cuando puede
+              aportar algo; no compite con el texto ni con el cursor. aria-keyshortcuts del
+              input se encarga de la parte accesible */}
+          {!search && (
+            <kbd
+              aria-hidden="true"
+              className="group-focus-within:hidden pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded-xs border border-hairline bg-surface-2 px-1.5 py-0.5 font-sans text-[11px] font-medium leading-none text-ink-subtle"
+            >
+              /
+            </kbd>
+          )}
           <input
-            id="watchlist-search"
+            id={SEARCH_INPUT_ID}
             type="search"
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder={dict.searchPlaceholder}
             autoComplete="off"
-            className="h-9 w-full rounded-[8px] border border-hairline bg-surface-1 pl-9 pr-3 text-[13px] text-ink placeholder:text-ink-subtle focus:border-accent-blue focus:outline-none"
+            aria-keyshortcuts="/"
+            className="h-9 w-full rounded-sm border border-hairline bg-surface-1 pl-9 pr-8 text-[13px] text-ink placeholder:text-ink-subtle focus:border-accent-blue focus:outline-none"
           />
         </div>
 
@@ -92,7 +118,7 @@ export function MarketWatchlist({
               aria-pressed={category === option.key}
               onClick={() => onCategoryChange(option.key)}
               className={clsx(
-                'h-7 rounded-[6px] px-2.5 text-[12px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent-blue',
+                'h-7 rounded-ctl px-2.5 text-[12px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent-blue',
                 category === option.key ? 'bg-surface-2 text-ink' : 'text-ink-muted hover:bg-surface-1 hover:text-ink'
               )}
             >
@@ -120,15 +146,14 @@ export function MarketWatchlist({
       </div>
 
       {assets.length === 0 ? (
-        <p className="px-4 py-10 text-center text-[13px] text-ink-muted">
-          {category === 'favorites' ? dict.emptyFavorites : dict.emptySearch}
-        </p>
+        <p className="px-4 py-10 text-center text-[13px] text-ink-muted">{emptyText}</p>
       ) : (
         <ul className="scroll-thin min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {assets.map((asset) => {
             const isSelected = asset.symbol === selectedSymbol
             const isFavorite = favorites.includes(asset.symbol)
-            const up = asset.change >= 0
+            const hasChange = Number.isFinite(asset.change)
+            const up = hasChange && asset.change >= 0
             return (
               <li key={asset.symbol} className="group relative border-b border-hairline-soft last:border-b-0">
                 <button
@@ -146,7 +171,7 @@ export function MarketWatchlist({
                   </span>
                   <span className="text-right tabular-nums">
                     <span className="block text-[13px] text-ink">{formatPrice(asset.close, asset.symbol)}</span>
-                    <span className={clsx('block text-[12px]', up ? 'text-semantic-success' : 'text-semantic-danger')}>{signed(asset.change)}</span>
+                    <span className={clsx('block text-[12px]', !hasChange ? 'text-ink-muted' : up ? 'text-semantic-success' : 'text-semantic-danger')}>{signed(asset.change)}</span>
                   </span>
                 </button>
 

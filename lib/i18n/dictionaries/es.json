@@ -11,6 +11,12 @@
       "page": "Página {n}",
       "showingRange": "Mostrando {first} a {last} de {total}"
     },
+    "dataAge": {
+      "now": "ahora",
+      "seconds": "hace {n} s",
+      "minutes": "hace {n} min",
+      "hours": "hace {n} h"
+    },
     "loadingSplash": {
       "caption": "Cargando mercados...",
       "srLabel": "Cargando portal..."
@@ -73,12 +79,12 @@
     "globoMarcadores": {
       "brent": "Petróleo Brent · Mar del Norte",
       "wti": "Petróleo WTI · Cushing, Oklahoma",
-      "crudoOriente": "Petróleo · Arabia Saudita",
-      "oroVenezuela": "Oro · Venezuela",
       "oroSudafrica": "Oro · Sudáfrica",
-      "oroAustralia": "Oro · Australia",
       "plataMexico": "Plata · México",
-      "gasLuisiana": "Gas natural · Luisiana"
+      "gasLuisiana": "Gas natural · Luisiana",
+      "esChicago": "Futuros S&P 500 · Chicago",
+      "fdaxFrankfurt": "Futuros DAX · Fráncfort",
+      "nikkeiTokio": "Futuros Nikkei · Tokio"
     },
     "globoSesiones": {
       "sidney": "Sídney",
@@ -92,11 +98,20 @@
     "globoVerTerminal": "Ver en el terminal",
     "globoTodasNoticias": "Todas las noticias",
     "globoCerrarTarjeta": "Cerrar",
-    "globoSesionAbierta": "abierta · cierra en {tiempo}",
-    "globoSesionCerrada": "cerrada · abre en {tiempo}",
+    "globoSesionAbierta": "Sesión abierta, cierra en {tiempo}",
+    "globoSesionCerrada": "Sesión cerrada, abre en {tiempo}",
+    "globoSesionAlCierre": "al cierre",
+    "globoSesionALaApertura": "a la apertura",
+    "globoRiesgoEtiqueta": "Riesgo global",
     "globoRiskOn": "RISK-ON",
     "globoRiskOff": "RISK-OFF",
     "globoRiskNeutral": "NEUTRAL",
+    "globoEstadoCargando": "Cargando el globo…",
+    "globoEstadoSinWebgl": "Vista 3D no disponible en este navegador.",
+    "globoEstadoError": "No se pudo iniciar la vista 3D. Los datos de mercado están más abajo.",
+    "globoErrorNoticias": "No se pudieron cargar las noticias.",
+    "globoReintentar": "Reintentar",
+    "globoCotizacionNoDisponible": "Cotización no disponible",
     "feedControlsAria": "Controles del feed",
     "newsGridAria": "Conjunto de noticias",
     "latestNewsTitle": "Últimas Noticias",
@@ -130,6 +145,21 @@
     "vipBeneficioComunidad": "Comunidad privada",
     "vipBeneficioComunidadBody": "Un canal aparte para discutir operativa con otros traders del VIP.",
     "vipTerminalEtiqueta": "terminal-alertas.log",
+    "nlSectionAria": "Suscribirse al resumen diario por correo",
+    "nlBadge": "Resumen diario por correo",
+    "nlTitle": "Las noticias del día, en tu correo",
+    "nlLead": "Un correo al día con lo más importante que publicamos en Grizzly Traders, para ponerte al día en pocos minutos.",
+    "nlBeneficioResumen": "Un resumen al día",
+    "nlBeneficioResumenBody": "Hasta 5 artículos de las últimas 24 horas, con titular, extracto y enlace para leerlos completos. Si ese día hay pocas noticias, no se envía.",
+    "nlBeneficioIdioma": "En tu idioma",
+    "nlBeneficioIdiomaBody": "Lo recibes en español o en inglés, según el idioma del sitio cuando te suscribes.",
+    "nlBeneficioControl": "Tú decides",
+    "nlBeneficioControlBody": "Confirmas tu correo con un enlace y puedes darte de baja en un clic desde cualquier resumen.",
+    "nlPreviewEtiqueta": "resumen-diario",
+    "nlPreviewCabecera": "Resumen del día",
+    "nlPreviewCategoria": "Categoría",
+    "nlPreviewPie": "Enlace de baja en cada correo",
+    "nlPreviewReal": "Con los titulares de hoy",
     "statsAria": "Estadísticas del portal",
     "statsArticles": "Artículos publicados",
     "statsCategories": "Categorías activas",
@@ -159,7 +189,8 @@
     },
     "calendar": {
       "title": "Calendario económico",
-      "body": "Los eventos que mueven el mercado, con su impacto esperado y hora exacta."
+      "body": "Los eventos que mueven el mercado, con su impacto esperado y hora exacta.",
+      "noUpcoming": "Sin eventos pendientes esta semana."
     }
   },
   "listings": {
@@ -235,7 +266,8 @@
   "articleCard": {
     "viewsTitle": "Vistas",
     "readMore": "Leer: {title}",
-    "readingTime": "{n} min"
+    "readingTime": "{n} min",
+    "briefLabel": "Breve"
   },
   "breakingPost": {
     "featuredBadge": "Destacado",
@@ -261,6 +293,7 @@
     "cookiesDescription": "Qué cookies usa Grizzly Traders, para qué y cómo puedes gestionarlas.",
     "englishNotice": "English version coming soon. This legal document is currently published in Spanish only.",
     "draftNotice": "Borrador sujeto a revisión legal externa. Este documento no constituye asesoramiento legal.",
+    "tocTitle": "En esta página",
     "lastUpdated": "Última actualización: {date}"
   },
   "article": {
@@ -270,7 +303,11 @@
     "readingTime": "{n} min lectura",
     "views": "{n} vistas",
     "relatedArticles": "Artículos Relacionados",
-    "translationPendingNotice": "This article hasn't been translated into English yet — showing the original Spanish version below."
+    "translationPendingNotice": "This article hasn't been translated into English yet — showing the original Spanish version below.",
+    "provenanceAria": "Fuente y aviso de contenido asistido por IA",
+    "attribution": "Fuente de la información: {source}. Este artículo es una redacción propia de Grizzly Traders a partir de información pública.",
+    "readOriginal": "Lee el artículo original en",
+    "aiNotice": "Este contenido ha sido redactado con asistencia de herramientas de inteligencia artificial a partir de fuentes públicas y supera una revisión automática de calidad. Puedes escribirnos a grizzlytraders@gmail.com."
   },
   "author": {
     "notFoundTitle": "Autor no encontrado",
@@ -306,6 +343,23 @@
     "impactLow": "Impacto bajo",
     "holiday": "Feriado",
     "allDay": "Todo el día",
+    "colorRed": "Rojo",
+    "colorYellow": "Amarillo",
+    "colorGray": "Gris",
+    "legendTitle": "Cómo leer los colores",
+    "legendHigh": "Puede mover el mercado con fuerza en minutos (tasas de interés, empleo, inflación).",
+    "legendMedium": "Movimiento moderado esperado (ventas minoristas, confianza del consumidor).",
+    "legendLow": "Efecto leve o poco habitual en el precio (datos secundarios).",
+    "legendHoliday": "Mercado cerrado o con poca liquidez en ese país; no hay dato que esperar.",
+    "legendDeltaTitle": "Dato real vs. previsión",
+    "legendDeltaText": "El dato salió por encima (▲) o por debajo (▼) de lo previsto.",
+    "colTime": "Hora",
+    "colCurrency": "Moneda / par",
+    "colEvent": "Evento",
+    "colPrevious": "Anterior",
+    "colForecast": "Previsto",
+    "colActual": "Real",
+    "colInfo": "Info",
     "nextEvent": "Próximo evento",
     "previous": "anterior",
     "forecast": "previsto",
@@ -315,6 +369,12 @@
     "eventsCount": "{n} eventos",
     "loadingLabel": "Cargando calendario económico…",
     "emptyMessage": "No hay eventos económicos programados en las próximas 24 horas.",
+    "weekendMessage": "Los mercados están cerrados por el fin de semana. Las publicaciones de la próxima semana aparecerán aquí cuando se publiquen.",
+    "detailsAria": "Ver la descripción de {title}",
+    "whatLabel": "Qué mide",
+    "whyLabel": "Por qué importa",
+    "sourceLabel": "Fuente oficial: {name}",
+    "detailsDisclaimer": "Descripción general e informativa; no es asesoramiento financiero. La reacción real del mercado depende de la previsión y del contexto.",
     "errorMessage": "No se pudo cargar el calendario económico. Intenta de nuevo en unos minutos.",
     "source": "Fuente: ForexFactory."
   },
@@ -322,6 +382,7 @@
     "indicatorsLabel": "Indicadores",
     "volumeLabel": "Volumen",
     "pivotsLabel": "Pivotes",
+    "livePriceLabel": "Ahora",
     "noVolumeTooltip": "Este activo no publica volumen",
     "loadingTimeframe": "Cargando {timeframe}…",
     "retry": "Reintentar",
@@ -331,13 +392,29 @@
     "noDataTimeframeHint": "Prueba con otra temporalidad o elige otro activo de la lista.",
     "staleData": "El proveedor no responde: se muestran los últimos datos guardados.",
     "sourceNote": "Datos de Yahoo Finance, con posible retraso.",
-    "timeframeAria": "Temporalidad"
+    "timeframeAria": "Temporalidad",
+    "chartAria": "Gráfico de {name}",
+    "ohlcOpen": "A",
+    "ohlcHigh": "Máx",
+    "ohlcLow": "Mín",
+    "ohlcClose": "C",
+    "ohlcVolume": "Vol",
+    "overlaysGroup": "Sobre el precio",
+    "oscillatorsGroup": "Osciladores",
+    "fullscreenEnter": "Pantalla completa",
+    "fullscreenExit": "Salir de pantalla completa",
+    "exportPng": "Exportar imagen PNG",
+    "exportFailed": "No se pudo exportar la imagen del gráfico.",
+    "noDataForTimeframe": "No hay datos para este activo en esta temporalidad",
+    "pivotsDailyOnly": "Los pivotes diarios solo se muestran hasta la temporalidad 1D"
   },
   "indicators": {
     "sma20": "Media móvil 20",
     "sma50": "Media móvil 50",
     "sma200": "Media móvil 200",
-    "ema20": "Media exponencial 20"
+    "ema20": "Media exponencial 20",
+    "rsi": "RSI",
+    "macd": "MACD"
   },
   "marketAnalysis": {
     "noData": "Sin datos",
@@ -400,7 +477,13 @@
     "eps": "BPA (TTM)",
     "range52w": "Rango 52 semanas",
     "dividendYield": "Rendimiento por dividendo",
-    "website": "Sitio web ↗"
+    "website": "Sitio web ↗",
+    "viewSpot": "Ver índice al contado",
+    "underlyingNews": "Noticias de {name}",
+    "tvChartTitle": "Gráfico de {name}",
+    "tvAttribution": "Gráfico de TradingView",
+    "tvLoading": "Cargando gráfico…",
+    "tvError": "No se pudo cargar el gráfico. Ábrelo en TradingView."
   },
   "cryptoRankings": {
     "title": "Ranking cripto",
@@ -423,14 +506,60 @@
     "updatedAt": "Actualizado {time} UTC"
   },
   "newsletterForm": {
-    "label": "Recibe las novedades del portal por correo",
+    "label": "Recibe el resumen diario en tu correo",
     "placeholder": "tu@correo.com",
     "submit": "Suscribirme",
     "submitting": "Enviando…",
     "honeypotLabel": "No rellenar",
-    "successMessage": "¡Listo! Te avisaremos de las novedades.",
+    "successMessage": "Casi listo: te enviamos un correo para confirmar tu suscripción. Revisa también la carpeta de spam.",
     "genericError": "No se pudo completar la suscripción.",
-    "networkError": "Error de conexión. Inténtalo de nuevo."
+    "networkError": "Error de conexión. Inténtalo de nuevo.",
+    "consentLabel": "Acepto recibir el resumen diario de Grizzly Traders por correo electrónico.",
+    "errorInvalidEmail": "Introduce un correo válido.",
+    "errorConsentRequired": "Marca la casilla para poder suscribirte.",
+    "errorRateLimited": "Demasiados intentos. Prueba más tarde.",
+    "errorUnavailable": "La suscripción no está disponible todavía."
+  },
+  "newsletterPages": {
+    "backHome": "Volver al inicio",
+    "confirm": {
+      "metaTitle": "Confirmar suscripción",
+      "title": "Confirma tu suscripción",
+      "body": "Pulsa el botón para empezar a recibir el resumen diario de noticias del mercado.",
+      "button": "Confirmar suscripción",
+      "working": "Confirmando…",
+      "success": "¡Listo! Tu suscripción está confirmada. Recibirás el resumen diario en tu correo.",
+      "already": "Tu suscripción ya estaba confirmada.",
+      "invalid": "Este enlace no es válido. Vuelve a suscribirte desde el pie de página para recibir uno nuevo.",
+      "expired": "Este enlace venció. Vuelve a suscribirte desde el pie de página para recibir uno nuevo.",
+      "failed": "No se pudo confirmar ahora mismo. Inténtalo de nuevo en unos minutos.",
+      "unavailable": "La suscripción no está disponible todavía.",
+      "rateLimited": "Demasiados intentos. Prueba más tarde.",
+      "networkError": "Error de conexión. Inténtalo de nuevo."
+    },
+    "unsubscribe": {
+      "metaTitle": "Darte de baja",
+      "requestTitle": "Darte de baja del resumen diario",
+      "requestBody": "Escribe tu correo y te enviaremos un enlace para confirmar la baja.",
+      "emailLabel": "Tu correo",
+      "emailPlaceholder": "tu@correo.com",
+      "requestButton": "Enviar enlace de baja",
+      "requestSending": "Enviando…",
+      "requestSent": "Si ese correo está suscrito, te enviamos un enlace para confirmar la baja. Revisa tu bandeja y la carpeta de spam.",
+      "confirmTitle": "Confirma tu baja",
+      "confirmBody": "Pulsa el botón para dejar de recibir el resumen diario.",
+      "confirmButton": "Confirmar baja",
+      "working": "Procesando…",
+      "success": "Listo. Ya no recibirás el resumen diario.",
+      "already": "Ya estabas dado de baja.",
+      "invalid": "Este enlace no es válido. Pide uno nuevo desde esta página.",
+      "expired": "Este enlace venció. Pide uno nuevo desde esta página.",
+      "invalidEmail": "Introduce un correo válido.",
+      "failed": "No se pudo completar ahora mismo. Inténtalo de nuevo en unos minutos.",
+      "unavailable": "El servicio no está disponible todavía.",
+      "rateLimited": "Demasiados intentos. Prueba más tarde.",
+      "networkError": "Error de conexión. Inténtalo de nuevo."
+    }
   },
   "riskCalculator": {
     "title": "Calculadora de tamaño de posición",
@@ -476,13 +605,18 @@
   "markets": {
     "pageTitle": "Terminal de mercados",
     "metaDescription": "Cotizaciones, mapa de calor e indicadores técnicos (RSI, MACD, medias móviles, pivotes) de criptomonedas, forex, acciones, índices y materias primas, con gráficos.",
-    "assetCount": "{n} activos de cripto, forex, materias primas, índices y acciones.",
+    "assetCount": "{n} activos de cripto, forex, materias primas, índices, futuros y acciones.",
     "updatedAt": "Actualizado a las {time}",
     "liveData": "Datos en vivo",
-    "dataError": "No se pudieron actualizar los datos de mercado. Se reintentará en un minuto.",
+    "dataError": "No se pudieron actualizar los datos de mercado. Reintentando automáticamente…",
+    "retry": "Reintentar",
     "terminalAria": "Terminal",
     "chartLoading": "Cargando gráfico…",
     "assetLoading": "Cargando activo…",
+    "dataLoading": "Cargando datos…",
+    "noData": "Sin datos",
+    "assetsUnavailable": "No hay datos de mercado disponibles",
+    "assetsUnavailableHint": "Se vuelve a intentar automáticamente cada 30 segundos.",
     "pivotLevelsLabel": "Pivotes diarios",
     "overviewHeading": "Panorama del mercado",
     "overviewSubtitle": "Una lectura rápida de cómo va hoy el mercado.",
@@ -496,7 +630,7 @@
   "pivotPoints": {
     "pageTitle": "Pivot Points",
     "metaDescription": "Soportes y resistencias diarios, semanales y mensuales (Clásico, Fibonacci, Camarilla, Woodie y DeMark) para cripto, forex, materias primas, índices y acciones, con calculadora de pivotes.",
-    "description": "Soportes y resistencias calculados con el máximo, mínimo y cierre de la {period}, con cinco métodos distintos. Los precios se actualizan solos cada 15 segundos.",
+    "description": "Soportes y resistencias calculados con el máximo, mínimo y cierre del período elegido ({period}), con cinco métodos distintos. Los precios se actualizan solos cada 15 segundos.",
     "updatedAt": "Actualizado {time} UTC",
     "dataLoaded": "Datos cargados",
     "dataLoading": "Cargando datos…",
@@ -508,7 +642,7 @@
     "sortChange": "Mayor variación hoy",
     "sortProximity": "Más cerca de un nivel",
     "periodLabel": "Período",
-    "periodTitle": "Usa la {period}",
+    "periodTitle": "Usa el período: {period}",
     "methodLabel": "Método",
     "categoriesAria": "Categorías",
     "categoryAll": "Todos",
@@ -520,7 +654,7 @@
     "searchLabel": "Buscar activo",
     "searchPlaceholder": "Buscar por nombre o símbolo",
     "assetLevelsLoading": "Cargando niveles del activo…",
-    "missingAssets": "Sin datos de la {period}: {names}.",
+    "missingAssets": "Sin datos para el período ({period}): {names}.",
     "emptyFiltered": "Ningún activo coincide con los filtros.",
     "clearFilters": "Quitar filtros",
     "emptyData": "No hay datos de pivotes disponibles por ahora.",
@@ -564,7 +698,7 @@
     "nextSupport": "Soporte próximo",
     "noResistanceAbove": "Sin resistencia por encima",
     "noSupportBelow": "Sin soporte por debajo",
-    "calculatedWith": "Calculado con la {period}: H {h} · L {l} · C {c}"
+    "calculatedWith": "Calculado con el período ({period}): H {h} · L {l} · C {c}"
   },
   "pivotLadder": {
     "ladderAria": "Escalera de niveles de pivote",
@@ -637,7 +771,8 @@
     "forex": "Forex",
     "commodity": "Materias primas",
     "stock": "Acciones",
-    "index": "Índices"
+    "index": "Índices",
+    "future": "Futuros"
   },
   "marketAssetHeader": {
     "ofRange": "{pct}% del rango",
@@ -646,7 +781,12 @@
     "statHigh": "Máximo",
     "statLow": "Mínimo",
     "dayRange": "Rango del día",
-    "range52w": "Rango de 52 semanas"
+    "range52w": "Rango de 52 semanas",
+    "continuousContract": "Contrato continuo",
+    "continuousContractHint": "Muestra el precio del contrato más próximo a vencer. En cada vencimiento trimestral pasa al siguiente, por eso el gráfico puede dar un salto.",
+    "delayed": "Diferido {min} min",
+    "delayedHint": "Datos de la bolsa con {min} minutos de retraso.",
+    "quoteCurrency": "Cotiza en {currency}"
   },
   "marketOverview": {
     "headlineUp": "Hoy suben {up} de {total} activos",
@@ -691,7 +831,13 @@
     "colPerfY": "1 año",
     "loadingAria": "Cargando activos",
     "emptyDefault": "No hay activos para mostrar.",
-    "paginationLabel": "Paginación del análisis técnico"
+    "unavailable": "No hay datos de mercado disponibles ahora mismo.",
+    "paginationLabel": "Paginación del análisis técnico",
+    "pageSizeLabel": "Filas por página",
+    "columnsLabel": "Columnas",
+    "columnsAnchorFixed": "La columna Activo siempre está visible",
+    "copySymbolAria": "Copiar {symbol} al portapapeles",
+    "copiedSymbol": "{symbol} copiado"
   },
   "marketWatchlist": {
     "categoryAll": "Todos",
@@ -706,8 +852,29 @@
     "sortAria": "Orden",
     "emptyFavorites": "Todavía no tienes favoritos. Marca la estrella de un activo para guardarlo aquí.",
     "emptySearch": "Ningún activo coincide con la búsqueda.",
+    "emptyFiltered": "Ningún activo coincide con los filtros.",
+    "emptyList": "No hay activos para mostrar.",
+    "unavailable": "No hay datos de mercado disponibles.",
     "removeAria": "Quitar {name} de favoritos",
     "addAria": "Añadir {name} a favoritos"
+  },
+  "priceAlerts": {
+    "openButton": "Alertas",
+    "title": "Alertas de precio",
+    "closeAria": "Cerrar alertas",
+    "countLabel": "({n} activas)",
+    "formHeading": "Nueva alerta",
+    "directionLabel": "Dirección",
+    "above": "Sube hasta",
+    "below": "Baja hasta",
+    "priceLabel": "Precio objetivo",
+    "errorPrice": "Introduce un precio mayor que 0",
+    "create": "Crear alerta",
+    "listHeading": "Alertas activas",
+    "empty": "Sin alertas todavía. Crea una para el activo seleccionado.",
+    "deleteAria": "Eliminar la alerta de {symbol}",
+    "firedNotice": "Alerta de {symbol}: el precio llegó a {price}",
+    "dismissAria": "Descartar los avisos"
   },
   "login": {
     "pageTitle": "Acceso editores",
@@ -747,6 +914,46 @@
     "signOut": "Cerrar sesión",
     "connectionError": "Error de conexión",
     "genericActionError": "No se pudo completar la acción",
+    "assist": {
+      "modeAssisted": "Asistido",
+      "modeManual": "Manual",
+      "briefTitleLabel": "Titular",
+      "briefTitlePlaceholder": "El titular del artículo...",
+      "briefBodyLabel": "Cuerpo",
+      "briefBodyPlaceholder": "Pega o escribe el cuerpo del artículo. El asistente genera el HTML, las etiquetas, la portada y la traducción.",
+      "briefBodyMinChars": "Mínimo 200 caracteres ({count}/200)",
+      "generateButton": "Generar borrador",
+      "generatingButton": "Generando borrador…",
+      "generatingHint": "Suele tardar entre 30 y 90 segundos (máximo {max}): redacción, portada, guardado y traducción.",
+      "progressRedaccion": "Redactando",
+      "progressPortada": "Generando portada",
+      "progressGuardado": "Guardando borrador",
+      "progressTraduccion": "Traduciendo",
+      "progressListLabel": "Etapas estimadas",
+      "progressSr": "Generando el borrador. Etapa estimada: {stage}.",
+      "progressEstimateNote": "Las etapas se estiman por el tiempo transcurrido: el asistente solo avisa cuando termina.",
+      "progressSlow": "Está tardando más de lo habitual; el límite es {max}.",
+      "progressKeepOpen": "No cierres ni recargues esta pestaña.",
+      "errorHeading": "No se generó el borrador",
+      "notConfigured": "El asistente no está configurado en este servidor.",
+      "errorBusy": "Ya hay una generación en marcha. Espera a que termine.",
+      "errorTimeout": "El asistente no respondió en {max}. Puedes intentarlo de nuevo.",
+      "errorUnreachable": "No se pudo contactar con el asistente.",
+      "errorInactive": "El flujo del asistente está desactivado en n8n. Actívalo y vuelve a intentarlo.",
+      "errorOffContract": "El asistente respondió de forma inesperada.",
+      "errorStage": "Falló en: {stage}",
+      "stageAnalisis": "análisis del artículo",
+      "stageImagen": "generación de la portada",
+      "stageStorage": "subida de la portada",
+      "stageInsercion": "inserción del borrador",
+      "stageTraduccion": "traducción",
+      "errorRetry": "Reintentar",
+      "successHeading": "Borrador generado",
+      "successBody": "El asistente creó el artículo en borrador. Revisa el contenido, las etiquetas y la portada antes de publicar.",
+      "successMeta": "Original en {locale} · Traducciones: {locales}",
+      "missingTranslation": "Falta la traducción al otro idioma — revísala antes de publicar.",
+      "anotherDraft": "Generar otro borrador"
+    },
     "editor": {
       "editingExisting": "Editando artículo existente",
       "cancelNew": "Cancelar y crear nuevo",
@@ -754,6 +961,7 @@
       "languageLabel": "Idioma:",
       "localeEs": "Español",
       "localeEn": "English",
+      "localeHasContent": "tiene contenido",
       "titleLabel": "Título",
       "titlePlaceholder": "Título del artículo...",
       "contentLabel": "Contenido (HTML)",
@@ -777,6 +985,7 @@
       "featuredCheckbox": "Marcar como destacado",
       "imagesHeading": "Imágenes",
       "coverImageLabel": "Cover Image URL",
+      "coverImageLoadError": "No se pudo cargar la imagen desde esta URL.",
       "ogImageLabel": "OG Image URL",
       "ogImagePlaceholder": "https://... (para compartir en redes)",
       "sourceHeading": "Fuente",
@@ -820,7 +1029,10 @@
       "delete": "Eliminar",
       "confirmDeletePost": "¿Eliminar este artículo?",
       "pipelineRan": "✓ Pipeline ejecutado. ID: {id}",
-      "naFallback": "N/A"
+      "naFallback": "N/A",
+      "pipelineChecklist": "Rechazado por el checklist editorial",
+      "pipelineFailure": "Fallo técnico del pipeline",
+      "pipelineAttempts": "Intentos: {n}"
     },
     "settings": {
       "categoriesTitle": "Categorías",
@@ -839,6 +1051,7 @@
       "createFailed": "No se pudo crear el elemento",
       "deleteFailed": "No se pudo eliminar",
       "noItemsYet": "Todavía no hay elementos.",
+      "addItem": "Añadir",
       "delete": "Eliminar"
     }
   },
@@ -856,7 +1069,17 @@
     "gaugeAriaLoading": "Índice de miedo y codicia",
     "gaugeAriaValue": "Índice de miedo y codicia: {value} de 100",
     "loadingLabel": "Cargando índice de miedo y codicia…",
-    "scaleNote": "Escala de 0 a 100. Fuente: alternative.me."
+    "scaleNote": "Escala de 0 a 100. Fuente: alternative.me.",
+    "headingStocks": "Miedo y codicia en bolsa",
+    "scaleNoteStocks": "Escala de 0 a 100. Cálculo propio con datos de Yahoo Finance; no es el índice de CNN.",
+    "homeHeading": "Miedo y codicia",
+    "tabCrypto": "Cripto",
+    "tabStocks": "Bolsa",
+    "componentsTitle": "Componentes del cálculo",
+    "componentMomentum": "Momentum del S&P 500",
+    "componentVolatility": "Volatilidad (VIX)",
+    "componentSafeHaven": "Demanda de refugio",
+    "componentJunkBonds": "Bonos de alto rendimiento"
   },
   "siteError": {
     "heading": "Algo salió mal",

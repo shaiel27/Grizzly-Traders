@@ -355,3 +355,14 @@ on conflict (slug) do nothing;
 -- create index posts_embedding_idx on public.posts using hnsw (embedding vector_cosine_ops)
 -- with (m = 16, ef_construction = 64);
 -- Requiere: pgvector >= 0.5.0 y tabla con >1000 rows para beneficio real
+-- ==========================================
+-- 9. BOLETÍN POR CORREO
+-- ==========================================
+-- La definición completa está en supabase/migrations/0001_subscribers.sql y 0007_newsletter.sql
+-- (esta última añade el estado, el consentimiento, el idioma y los tokens, cierra la escritura pública
+-- y crea newsletter_digests). Quedó fuera de este archivo hasta ahora: no hay que aplicarlo aquí además.
+-- Resumen del estado final:
+--   public.subscribers (id, email, status pending|confirmed|unsubscribed, locale es|en, consented_at,
+--     consent_text, source_url, ip_hash, token_hash, token_purpose, token_expires_at, token_sent_at,
+--     confirmed_at, unsubscribed_at, created_at, updated_at)  -- RLS activada, sin políticas públicas
+--   public.newsletter_digests (digest_date, locale, status, broadcast_id, post_ids)  -- RLS activada

@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createPublicClient } from '@/lib/supabase/public'
 
-// ForexFactory economic calendar, synced into Supabase every 30 min by the n8n automation (Apify actor scrapemint/forexfactory-economic-calendar)
+// ForexFactory economic calendar, synced into Supabase hourly by an n8n workflow from the free
+// official XML feed (current week only, no `actual` values).
 export async function GET() {
   try {
     const supabase = createPublicClient()

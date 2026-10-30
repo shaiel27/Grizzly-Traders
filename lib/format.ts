@@ -1,5 +1,6 @@
 // Single place to change how prices and figures are written across the site
 import { ASSETS } from './assets-catalog'
+import { getDictionary, t, type Locale } from './i18n/get-dictionary'
 
 export const NUMBER_LOCALE = 'en-US'
 
@@ -61,4 +62,26 @@ export function formatLevel(value: number, reference: number, symbol = ''): stri
 
   const decimals = reference >= 100 ? 2 : reference >= 10 ? 3 : reference >= 1 ? 4 : 5
   return value.toLocaleString(NUMBER_LOCALE, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+}
+
+export function formatChangeAbs(value: number | null | undefined, price: number | null | undefined, symbol = ''): string {
+  if (isMissing(value)) return '—'
+  const magnitude = Math.abs(value)
+  if ([...FOREX_3_DECIMALS, ...FOREX_5_DECIMALS].some((pair) => symbol.includes(pair))) return formatPrice(magnitude, symbol)
+
+  const decimals = !isMissing(price) && Math.abs(price) < 1 ? 4 : 2
+  return magnitude.toLocaleString(NUMBER_LOCALE, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+}
+
+// Edad de un dato en pantalla ("hace 5 s", luego min y h): segundos mientras el intervalo es
+// corto y un "ahora" holgado para que el primer tick no parezca viejo. Los valores no finitos
+// (NaN, undefined) se tratan como recién llegados en vez de colar "hace NaN h" en el badge.
+export function formatDataAge(ageMs: number, locale: Locale = 'es'): string {
+  const dict = getDictionary(locale).common.dataAge
+  const seconds = Number.isFinite(ageMs) ? Math.max(0, Math.floor(ageMs / 1000)) : 0
+  if (seconds < 5) return dict.now
+  if (seconds < 60) return t(dict.seconds, { n: seconds })
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return t(dict.minutes, { n: minutes })
+  return t(dict.hours, { n: Math.floor(minutes / 60) })
 }

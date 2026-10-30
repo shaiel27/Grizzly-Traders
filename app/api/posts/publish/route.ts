@@ -5,8 +5,12 @@ import { createEditorClient } from '@/lib/supabase/admin'
 import { sanitizeArticleHtml, htmlToText } from '@/lib/sanitize'
 import { publishSchema, firstIssue } from '@/lib/validation'
 
-// Always assign to Grizzly Traders author
-const GRIZZLY_AUTHOR_ID = 5
+// Regla de autoria por origen: lo que entra por el CMS lo firma la PERSONA (Moises Orraiz,
+// id 6); lo que entra por el pipeline automatizado lo firma la MARCA (Grizzly Traders, id 5).
+// Hasta la separacion de identidades la fila 5 se llamaba "Moises Orraiz" y este literal
+// coincidia por accidente; ahora el id 5 es la marca, asi que seguir usandolo aqui atribuiria
+// a la redaccion automatica los articulos escritos a mano.
+const AUTOR_MANUAL_ID = 6
 // Below this plain-text length, a post shows as a headline-only tile instead of getting its own detail page
 const BRIEF_TEXT_THRESHOLD = 350
 
@@ -51,7 +55,8 @@ export async function POST(request: Request) {
       scheduled_at: input.scheduled_at,
       category_id: input.category_id,
       is_featured: input.is_featured,
-      author_id: GRIZZLY_AUTHOR_ID,
+      author_id: AUTOR_MANUAL_ID,
+      origen: 'cms',
       reading_time_minutes: Math.max(1, Math.ceil(htmlToText(contentHtml).split(' ').length / 200)),
     })
     .select('id')

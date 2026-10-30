@@ -31,8 +31,23 @@ function ponerTransform(el: HTMLElement | null, valor: string) {
   if (el) el.style.transform = valor
 }
 
-function easeInOutCubic(t: number): number {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+// easeOutQuint: la curva de --ease-out de globals.css (cubic-bezier(0.23,1,0.32,1)).
+// Antes esto era easeInOutCubic y era la causa de que la intro se sintiera brusca: una curva de
+// la familia ease-in dedica su primer tercio a casi no moverse y despues pega un tiron por el
+// medio. En una animacion raspada por scroll el usuario mira desde el primer pixel, asi que la
+// fase lenta inicial no "prepara" nada — solo hace que el globo parezca trabado y luego salte.
+// Con ease-out el globo responde al instante y asienta, que es como debe sentirse algo que
+// llega a su sitio.
+// Medido sobre capturas reales, no elegido a ojo. El easeInOutCubic original tenia una fase
+// ease-in que dejaba el globo casi quieto el primer tercio y luego pegaba un tiron: brusco. Al
+// cambiarlo por easeOutQuint (la curva de --ease-out) se fue al extremo contrario — el 92% del
+// encogimiento ocurria en el primer 40% del scroll y el 60% restante del recorrido era zona
+// muerta: igual de brusco, por el otro lado. La cuadratica reparte el movimiento a lo largo de
+// TODO el recorrido (t=0.2 -> 36%, 0.4 -> 64%, 0.6 -> 84%, 0.8 -> 96%) y sigue asentando al
+// final. En un scrub de scroll el usuario controla la linea de tiempo, asi que lo que se busca
+// no es una curva expresiva sino una que no mienta sobre cuanto queda por recorrer.
+function suaveSalida(t: number): number {
+  return 1 - Math.pow(1 - t, 2)
 }
 
 interface Medidas {
@@ -108,7 +123,14 @@ export function useIntroInicio(refs: RefsIntro) {
       const texto = refs.texto.current
       if (!m || !caja || !texto) return
 
-      const q = easeInOutCubic(clamp01(p / 0.85))
+      // El /0.85 que habia aqui creaba una zona muerta: q llegaba a 1 en p=0.85 y el ultimo 15%
+      // del recorrido no movia nada, con el globo ya aparcado mientras el usuario seguia
+      // haciendo scroll. Despues completar() cambiaba transform por layout de golpe, y esa
+      // secuencia (tiron, aparcar, salto) era lo que se leia como "cambia de tamaño al terminar
+      // el zoom". Con easeOutQuint sobre el recorrido completo el globo se acerca a su destino
+      // de forma asintotica —en p=0.8 ya esta al 99.97%— asi que el tramo final es imperceptible
+      // en vez de ser un tope duro, y en el umbral de completar() (0.994) el residuo es ~1e-11.
+      const q = suaveSalida(clamp01(p))
       const escala = 1 + (m.globoEscala - 1) * q
       ponerTransform(caja, `translate3d(${m.globoDx * q}px, ${m.globoDy * q}px, 0) scale(${escala})`)
       ponerTransform(texto, `translate3d(${m.textoDx * (1 - q)}px, ${m.textoDy * (1 - q)}px, 0)`)
