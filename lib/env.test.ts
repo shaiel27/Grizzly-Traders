@@ -39,4 +39,23 @@ describe('parseEnv', () => {
     expect(parseEnv({ ...valid, CMS_ALLOWED_EMAILS: 'a@example.com, b@example.com' }).ok).toBe(true)
     expect(parseEnv({ ...valid, CMS_ALLOWED_EMAILS: 'a@example.com, nope' }).ok).toBe(false)
   })
+
+  it('acepta la configuración opcional del boletín', () => {
+    const result = parseEnv({
+      ...valid,
+      RESEND_API_KEY: 're_test',
+      EMAIL_FROM: 'Grizzly Traders <resumen@example.com>',
+      EMAIL_REPLY_TO: 'hola@example.com',
+      RESEND_SEGMENT_ES: 'seg-es',
+      RESEND_SEGMENT_EN: 'seg-en',
+      DIGEST_CRON_SECRET: 'x'.repeat(32),
+    })
+    expect(result.ok).toBe(true)
+  })
+
+  it('rechaza un secreto de cron demasiado corto', () => {
+    const result = parseEnv({ ...valid, DIGEST_CRON_SECRET: 'corto' })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.issues[0]).toContain('DIGEST_CRON_SECRET')
+  })
 })

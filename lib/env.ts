@@ -25,6 +25,20 @@ const schema = z.object({
   N8N_API_KEY: optionalText,
   NEXT_PUBLIC_VIP_URL: z.url().optional(),
   NEXT_PUBLIC_TELEGRAM_URL: z.url().optional(),
+  // Boletín por correo. Todo opcional: sin RESEND_API_KEY se usa el proveedor simulado (solo fuera de producción)
+  RESEND_API_KEY: optionalText,
+  EMAIL_FROM: optionalText,
+  EMAIL_REPLY_TO: z.email().optional(),
+  RESEND_SEGMENT_ES: optionalText,
+  RESEND_SEGMENT_EN: optionalText,
+  // Secreto del cron que dispara el resumen diario; largo para que no se pueda adivinar
+  DIGEST_CRON_SECRET: z.string().min(32).optional(),
+  PIPELINE_API_SECRET: z.string().min(32).optional(),
+  DIGEST_TIMEZONE: optionalText,
+  NEWSLETTER_IP_SALT: optionalText,
+  NEWSLETTER_POSTAL_ADDRESS: optionalText,
+  // URL pública (https) del logo de los correos; sin ella se usa `${NEXT_PUBLIC_SITE_URL}/logo.png`
+  NEWSLETTER_LOGO_URL: optionalText,
 })
 
 export type Env = z.infer<typeof schema>

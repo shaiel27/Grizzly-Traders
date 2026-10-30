@@ -69,20 +69,72 @@ function ConsolaAlertas({ etiqueta }: { etiqueta: string }) {
   )
 }
 
+export interface ResumenPreviewItem {
+  categoria: string | null
+  titulo: string
+}
+
+// Vista previa del resumen diario con los titulares reales de hoy. Si el sitio aún no tiene artículos,
+// muestra solo la estructura del correo (barras) y se rotula como ejemplo.
+function ResumenPreview({ etiqueta, cabecera, categoria, pie, items }: { etiqueta: string; cabecera: string; categoria: string; pie: string; items: ResumenPreviewItem[] }) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-hairline bg-[#0a0a0a]">
+      <div className="flex items-center gap-2 border-b border-hairline-soft bg-white/[0.02] px-3 py-2">
+        <span className="material-symbols-outlined text-[14px] text-brand-amber" aria-hidden="true">
+          mail
+        </span>
+        <span className="font-mono text-[10px] text-ink-subtle">{etiqueta}</span>
+      </div>
+      <div className="p-4">
+        <p className="font-serif text-body font-semibold text-ink">{cabecera}</p>
+        <ul className="mt-3 flex flex-col gap-3">
+          {items.length > 0
+            ? items.map((item) => (
+                <li key={item.titulo} className="border-t border-hairline-soft pt-3 first:border-t-0 first:pt-0">
+                  {item.categoria && <p className="text-[10px] font-semibold uppercase tracking-wide text-brand-amber">{item.categoria}</p>}
+                  <p className="mt-1 line-clamp-2 text-body-sm font-semibold text-ink">{item.titulo}</p>
+                </li>
+              ))
+            : [0, 1, 2].map((i) => (
+                <li key={i} aria-hidden="true" className="border-t border-hairline-soft pt-3 first:border-t-0 first:pt-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-brand-amber">{categoria}</p>
+                  <span className="mt-1.5 block h-2.5 w-[85%] rounded bg-white/15" />
+                  <span className="mt-1.5 block h-2 w-full rounded bg-white/[0.07]" />
+                </li>
+              ))}
+        </ul>
+        <p className="mt-4 border-t border-hairline-soft pt-3 text-[10px] text-ink-subtle">{pie}</p>
+      </div>
+    </div>
+  )
+}
+
 const BENEFICIOS = (dict: ReturnType<typeof getDictionary>) => [
   { icon: 'bolt', title: dict.home.vipBeneficioAlertas, body: dict.home.vipBeneficioAlertasBody },
   { icon: 'psychology', title: dict.home.vipBeneficioAnalisis, body: dict.home.vipBeneficioAnalisisBody },
   { icon: 'groups', title: dict.home.vipBeneficioComunidad, body: dict.home.vipBeneficioComunidadBody },
 ]
 
+// Lo que de verdad incluye la suscripción por correo: el resumen diario. Las alertas, el análisis con IA y la
+// comunidad son del VIP, no del correo, así que esta lista no los menciona.
+const BENEFICIOS_CORREO = (dict: ReturnType<typeof getDictionary>) => [
+  { icon: 'mail', title: dict.home.nlBeneficioResumen, body: dict.home.nlBeneficioResumenBody },
+  { icon: 'language', title: dict.home.nlBeneficioIdioma, body: dict.home.nlBeneficioIdiomaBody },
+  { icon: 'check', title: dict.home.nlBeneficioControl, body: dict.home.nlBeneficioControlBody },
+]
+
 interface VipShowcaseProps {
   locale: Locale
   vipUrl?: string
   telegramUrl?: string
+  // Titulares reales de hoy para la vista previa del correo
+  resumen?: ResumenPreviewItem[]
 }
 
-export function VipShowcase({ locale, vipUrl, telegramUrl }: VipShowcaseProps) {
+export function VipShowcase({ locale, vipUrl, telegramUrl, resumen = [] }: VipShowcaseProps) {
   const dict = getDictionary(locale)
+  // Sin enlaces del VIP la tarjeta ofrece solo la suscripción por correo, con lo que esta incluye de verdad
+  const modoCorreo = !vipUrl && !telegramUrl
   const sectionRef = useRef<HTMLDivElement>(null)
   const [visible, setVisible] = useState(false)
 
@@ -110,7 +162,7 @@ export function VipShowcase({ locale, vipUrl, telegramUrl }: VipShowcaseProps) {
       <section
         id="vip"
         className="relative overflow-hidden rounded-2xl bg-surface-container-lowest p-6 md:p-8"
-        aria-label={dict.home.vipSectionAria}
+        aria-label={modoCorreo ? dict.home.nlSectionAria : dict.home.vipSectionAria}
       >
         <div
           aria-hidden="true"
@@ -125,13 +177,13 @@ export function VipShowcase({ locale, vipUrl, telegramUrl }: VipShowcaseProps) {
               <span className="material-symbols-outlined text-[13px]" aria-hidden="true">
                 workspace_premium
               </span>
-              {dict.home.vipBadge}
+              {modoCorreo ? dict.home.nlBadge : dict.home.vipBadge}
             </span>
-            <h2 className="mt-3 text-headline tracking-tight text-ink">{dict.home.vipTitle}</h2>
-            <p className="mt-2 max-w-xl text-body text-ink-subtle">{dict.home.vipLead}</p>
+            <h2 className="mt-3 font-serif text-headline tracking-tight text-ink">{modoCorreo ? dict.home.nlTitle : dict.home.vipTitle}</h2>
+            <p className="mt-2 max-w-xl text-body text-ink-subtle">{modoCorreo ? dict.home.nlLead : dict.home.vipLead}</p>
 
             <ul className="mt-6 flex flex-col gap-4">
-              {BENEFICIOS(dict).map((b) => (
+              {(modoCorreo ? BENEFICIOS_CORREO(dict) : BENEFICIOS(dict)).map((b) => (
                 <li key={b.title} className="flex gap-3">
                   <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-brand-amber/25 bg-brand-amber/10">
                     <span className="material-symbols-outlined text-[18px] text-brand-amber" aria-hidden="true">
@@ -179,7 +231,7 @@ export function VipShowcase({ locale, vipUrl, telegramUrl }: VipShowcaseProps) {
             {/* Sin NEXT_PUBLIC_VIP_URL ni NEXT_PUBLIC_TELEGRAM_URL configuradas, la tarjeta se
                 quedaba sin ninguna accion (plan 009 B10) — se ofrece el newsletter como
                 alternativa en vez de un bloque sin salida. */}
-            {!vipUrl && !telegramUrl && (
+            {modoCorreo && (
               <div className="mt-6">
                 <NewsletterForm />
               </div>
@@ -187,8 +239,18 @@ export function VipShowcase({ locale, vipUrl, telegramUrl }: VipShowcaseProps) {
           </div>
 
           <div className="w-full lg:w-[360px] shrink-0">
-            <ConsolaAlertas etiqueta={dict.home.vipTerminalEtiqueta} />
-            <p className="mt-2 text-right text-[10px] uppercase tracking-wide text-ink-subtle">{dict.home.pivotEjemplo}</p>
+            {modoCorreo ? (
+              <ResumenPreview
+                etiqueta={dict.home.nlPreviewEtiqueta}
+                cabecera={dict.home.nlPreviewCabecera}
+                categoria={dict.home.nlPreviewCategoria}
+                pie={dict.home.nlPreviewPie}
+                items={resumen}
+              />
+            ) : (
+              <ConsolaAlertas etiqueta={dict.home.vipTerminalEtiqueta} />
+            )}
+            <p className="mt-2 text-right text-[10px] uppercase tracking-wide text-ink-subtle">{modoCorreo && resumen.length > 0 ? dict.home.nlPreviewReal : dict.home.pivotEjemplo}</p>
           </div>
         </div>
       </section>

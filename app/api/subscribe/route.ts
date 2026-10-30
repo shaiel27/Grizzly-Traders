@@ -1,60 +1,69 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createPublicClient } from '@/lib/supabase/public'
+import { getDictionary } from '@/lib/i18n/get-dictionary'
+import { clientIp, createRateLimiter } from '@/lib/newsletter/guards'
+import { isMissingTable } from '@/lib/newsletter/repo'
+import { getNewsletterRuntime } from '@/lib/newsletter/runtime'
+import { requestSubscription } from '@/lib/newsletter/subscribe'
+
+// Alta con doble confirmación: guarda al suscriptor como "pendiente" y le envía un enlace de confirmación.
+// Los errores devuelven un código; el texto en el idioma de la persona lo pone el formulario.
 
 const schema = z.object({
-  email: z.string().trim().toLowerCase().max(254).pipe(z.email()),
-  // Honeypot: real visitors never fill this hidden field
-  website: z.string().max(0).optional(),
+  email: z.string().max(254),
+  consent: z.boolean().optional(),
+  locale: z.enum(['es', 'en']).optional(),
+  // Honeypot: las personas reales nunca rellenan este campo oculto. Se acepta cualquier valor aquí y se
+  // comprueba más abajo: si el esquema lo rechazara, un bot recibiría un error distinto y sabría que cayó.
+  website: z.string().max(500).optional(),
+  sourceUrl: z.url().max(500).optional(),
 })
 
-const WINDOW_MS = 60 * 60 * 1000
-const MAX_PER_WINDOW = 5
-const attempts = new Map<string, number[]>()
+const limiter = createRateLimiter({ windowMs: 60 * 60 * 1000, max: 5 })
 
-function tooManyRequests(ip: string): boolean {
-  const now = Date.now()
-  const recent = (attempts.get(ip) ?? []).filter((time) => now - time < WINDOW_MS)
-  recent.push(now)
-  attempts.set(ip, recent)
-  if (attempts.size > 5_000) attempts.clear()
-  return recent.length > MAX_PER_WINDOW
+function fail(code: string, status: number) {
+  return NextResponse.json({ success: false, code }, { status })
 }
 
 export async function POST(request: Request) {
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
-  if (tooManyRequests(ip)) {
-    return NextResponse.json({ success: false, error: 'Demasiados intentos. Prueba más tarde.' }, { status: 429 })
-  }
+  const ip = clientIp(request)
+  if (limiter.exceeded(ip)) return fail('rate_limited', 429)
 
   let json: unknown
   try {
     json = await request.json()
   } catch {
-    return NextResponse.json({ success: false, error: 'Solicitud inválida' }, { status: 400 })
+    return fail('invalid_request', 400)
   }
 
   const parsed = schema.safeParse(json)
-  if (!parsed.success) {
-    return NextResponse.json({ success: false, error: 'Introduce un correo válido' }, { status: 400 })
-  }
+  if (!parsed.success) return fail('invalid_email', 400)
 
-  // A filled honeypot gets the same answer as a real signup so bots learn nothing
+  // Un honeypot relleno recibe la misma respuesta que un alta real, para que los bots no aprendan nada
   if (parsed.data.website) return NextResponse.json({ success: true })
 
-  const { error } = await createPublicClient().from('subscribers').insert({ email: parsed.data.email })
+  const runtime = getNewsletterRuntime(request)
+  if (!runtime) return fail('unavailable', 503)
 
-  if (error) {
-    // Already subscribed: answer the same way to avoid revealing who is on the list
-    if (error.code === '23505') return NextResponse.json({ success: true })
+  const locale = parsed.data.locale ?? 'es'
 
-    console.error('Subscribe error:', error)
-    const missingTable = error.code === '42P01' || error.code === 'PGRST205'
-    return NextResponse.json(
-      { success: false, error: missingTable ? 'La suscripción no está disponible todavía.' : 'No se pudo completar la suscripción.' },
-      { status: missingTable ? 503 : 500 }
+  try {
+    const result = await requestSubscription(
+      {
+        email: parsed.data.email,
+        consent: parsed.data.consent === true,
+        locale,
+        consentText: getDictionary(locale).newsletterForm.consentLabel,
+        sourceUrl: parsed.data.sourceUrl ?? null,
+        ip,
+      },
+      runtime.deps
     )
-  }
 
-  return NextResponse.json({ success: true })
+    if (!result.ok) return fail(result.code, result.code === 'failed' ? 502 : 400)
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Subscribe error:', error)
+    return isMissingTable(error) ? fail('unavailable', 503) : fail('failed', 500)
+  }
 }

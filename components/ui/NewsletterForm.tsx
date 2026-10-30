@@ -2,15 +2,35 @@
 
 import { useId, useState, type FormEvent } from 'react'
 import Link from 'next/link'
-import { useDictionary } from '@/lib/i18n/LocaleProvider'
+import { useLocale } from '@/lib/i18n/LocaleProvider'
+import type { Dictionary } from '@/lib/i18n/get-dictionary'
 
 type Status = { kind: 'idle' } | { kind: 'loading' } | { kind: 'done' } | { kind: 'error'; message: string }
 
+// El servidor responde con un código; el texto lo pone el formulario, en el idioma de la persona
+function errorMessage(code: unknown, dict: Dictionary['newsletterForm']): string {
+  switch (code) {
+    case 'invalid_email':
+    case 'invalid_request':
+      return dict.errorInvalidEmail
+    case 'consent_required':
+      return dict.errorConsentRequired
+    case 'rate_limited':
+      return dict.errorRateLimited
+    case 'unavailable':
+      return dict.errorUnavailable
+    default:
+      return dict.genericError
+  }
+}
+
 export function NewsletterForm() {
   const id = useId()
-  const dict = useDictionary()
+  const { locale, dictionary: dict } = useLocale()
   const [email, setEmail] = useState('')
   const [website, setWebsite] = useState('')
+  // La casilla nunca viene premarcada: el consentimiento tiene que ser un acto expreso
+  const [consent, setConsent] = useState(false)
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
 
   const handleSubmit = async (event: FormEvent) => {
@@ -21,15 +41,16 @@ export function NewsletterForm() {
       const response = await fetch('/api/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, website }),
+        body: JSON.stringify({ email, website, consent, locale, sourceUrl: window.location.href }),
       })
       const body = await response.json().catch(() => null)
 
       if (response.ok && body?.success) {
         setEmail('')
+        setConsent(false)
         setStatus({ kind: 'done' })
       } else {
-        setStatus({ kind: 'error', message: body?.error ?? dict.newsletterForm.genericError })
+        setStatus({ kind: 'error', message: errorMessage(body?.code, dict.newsletterForm) })
       }
     } catch {
       setStatus({ kind: 'error', message: dict.newsletterForm.networkError })
@@ -57,6 +78,17 @@ export function NewsletterForm() {
           {status.kind === 'loading' ? dict.newsletterForm.submitting : dict.newsletterForm.submit}
         </button>
       </div>
+
+      <label className="mt-3 flex items-start gap-2 text-micro text-ink-muted">
+        <input
+          type="checkbox"
+          required
+          checked={consent}
+          onChange={(event) => setConsent(event.target.checked)}
+          className="mt-0.5 size-4 shrink-0 accent-accent-blue"
+        />
+        <span>{dict.newsletterForm.consentLabel}</span>
+      </label>
 
       <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
         <label>
