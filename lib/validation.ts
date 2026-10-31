@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { briefTextLength, MAX_BRIEF_IMAGES } from './brief'
 
 const emptyToNull = (value: unknown) => (value === '' || value === undefined ? null : value)
 
@@ -59,10 +60,25 @@ export const postIdSchema = z.string().uuid()
 
 // Lo unico que escribe el editor en modo asistido. El minimo de 200 caracteres del cuerpo lo fija
 // el contrato: por debajo de eso el analisis no tiene material con el que redactar un articulo.
-export const asistirSchema = z.object({
-  titular: z.string().trim().min(1).max(200),
-  cuerpo: z.string().trim().min(200, 'El cuerpo necesita al menos 200 caracteres').max(100_000),
+// Imagen del cuerpo: viaja aparte del texto, que solo lleva el marcador [[IMG:n]] (ver lib/brief.ts). Que la URL sea
+// del bucket propio lo comprueba la ruta, que es código de servidor.
+const briefImageSchema = z.object({
+  n: z.number().int().min(1).max(MAX_BRIEF_IMAGES),
+  url: z.string().url().max(500),
+  alt: z.string().max(300).default(''),
+  caption: z.string().max(300).default(''),
+  width: z.number().int().positive().max(10_000).optional(),
+  height: z.number().int().positive().max(10_000).optional(),
 })
+
+export const asistirSchema = z
+  .object({
+    titular: z.string().trim().min(1).max(200),
+    cuerpo: z.string().trim().max(100_000),
+    imagenes: z.array(briefImageSchema).max(MAX_BRIEF_IMAGES).default([]),
+  })
+  // El mínimo cuenta solo el texto visible: ni etiquetas HTML ni marcadores de imagen
+  .refine((value) => briefTextLength(value.cuerpo) >= 200, { message: 'El cuerpo necesita al menos 200 caracteres', path: ['cuerpo'] })
 
 export const etapaAsistenteSchema = z.enum(['analisis', 'imagen', 'storage', 'insercion', 'traduccion'])
 

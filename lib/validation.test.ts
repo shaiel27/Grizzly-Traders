@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { patchPostSchema, publishSchema } from './validation'
+import { asistirSchema, patchPostSchema, publishSchema } from './validation'
 
 // Shape sent by components/ui/CMSPanel.tsx: every optional field is an empty string
 const cmsPayload = {
@@ -57,5 +57,31 @@ describe('patchPostSchema', () => {
     expect(patchPostSchema.safeParse({ id: 'x', status: 'draft' }).success).toBe(false)
     expect(patchPostSchema.safeParse({ id }).success).toBe(false)
     expect(patchPostSchema.safeParse({ id, is_featured: true }).success).toBe(true)
+  })
+})
+
+describe('asistirSchema', () => {
+  const texto = 'a'.repeat(210)
+  const imagen = { n: 1, url: 'https://p.supabase.co/storage/v1/object/public/post-images/inline/2026/a.webp', alt: 'x', caption: '' }
+
+  it('acepta un cuerpo de texto plano y sin imágenes', () => {
+    const out = asistirSchema.safeParse({ titular: 'T', cuerpo: texto })
+    expect(out.success).toBe(true)
+    expect(out.success && out.data.imagenes).toEqual([])
+  })
+
+  it('el mínimo cuenta solo el texto visible, no el HTML ni los marcadores', () => {
+    const corto = `<p>${'a'.repeat(120)}</p><p>[[IMG:1]]</p><p><strong>${'b'.repeat(50)}</strong></p>`
+    const out = asistirSchema.safeParse({ titular: 'T', cuerpo: corto, imagenes: [imagen] })
+    expect(out.success).toBe(false)
+    const largo = `<p>${'a'.repeat(120)}</p><p>[[IMG:1]]</p><p>${'b'.repeat(90)}</p>`
+    expect(asistirSchema.safeParse({ titular: 'T', cuerpo: largo, imagenes: [imagen] }).success).toBe(true)
+  })
+
+  it('limita el número de imágenes y valida sus campos', () => {
+    const muchas = Array.from({ length: 11 }, (_, i) => ({ ...imagen, n: i + 1 }))
+    expect(asistirSchema.safeParse({ titular: 'T', cuerpo: texto, imagenes: muchas }).success).toBe(false)
+    expect(asistirSchema.safeParse({ titular: 'T', cuerpo: texto, imagenes: [{ ...imagen, url: 'no es una url' }] }).success).toBe(false)
+    expect(asistirSchema.safeParse({ titular: 'T', cuerpo: texto, imagenes: [{ ...imagen, n: 0 }] }).success).toBe(false)
   })
 })

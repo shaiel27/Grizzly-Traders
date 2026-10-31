@@ -49,3 +49,4 @@ next-env.d.ts
 # en .claude/worktrees/ — sin esto, `git status` las mostraba como directorios sin trackear listos
 # para commitearse por accidente (serian repos git anidados, un desastre si entran al historial).
 .claude/
+dev-server.log

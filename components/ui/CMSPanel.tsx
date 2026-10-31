@@ -5,6 +5,9 @@ import { clsx } from 'clsx'
 import { Header, Button, Card, Footer } from '@/components/ui'
 import { createClient } from '@/lib/supabase/client'
 import { t } from '@/lib/i18n/get-dictionary'
+import { copyFigures, figuresOf } from '@/lib/rich-html'
+import { briefImageCount, briefTextLength, briefToPayload, MAX_BRIEF_IMAGES } from '@/lib/brief'
+import { RichEditor } from './RichEditor'
 import { useLocale, useDictionary } from '@/lib/i18n/LocaleProvider'
 import type { Category, Tag, Asset, AssetType, Source } from '@/lib/types'
 
@@ -134,6 +137,9 @@ function generateSlug(title: string): string {
 // anillo, y disabled baja opacidad Y cambia el cursor (el color no es el unico canal).
 const fieldStateClass =
   'border border-outline-variant transition-[border-color,box-shadow] duration-150 hover:border-ink-subtle focus:border-accent-blue focus:ring-2 focus:ring-accent-blue/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-outline-variant'
+// Contenedor del editor visual: el foco lo recibe el texto de dentro, así que el anillo va con focus-within
+const richFieldClass =
+  'border border-outline-variant transition-[border-color,box-shadow] duration-150 hover:border-ink-subtle focus-within:border-accent-blue focus-within:ring-2 focus-within:ring-accent-blue/30'
 const inputClass = `w-full rounded-xl bg-surface-2 px-4 py-2.5 text-sm text-ink placeholder:text-ink-subtle ${fieldStateClass}`
 const labelClass = 'text-micro font-bold text-ink-muted uppercase tracking-wider block mb-2'
 // Anillo de foco de teclado para todo lo clicable del panel que no es un <Button>: mismo patron
@@ -261,8 +267,9 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
   const assistSlow = assistRunning && assistElapsed >= ASSIST_SLOW_MS
   const assistMaxLabel = formatClock(ASSIST_MAX_MS)
   const editorMode: 'assisted' | 'manual' = editingId ? 'manual' : mode
-  const bodyLength = brief.cuerpo.trim().length
-  const briefReady = brief.titular.trim().length > 0 && bodyLength >= BODY_MIN_CHARS
+  const bodyLength = briefTextLength(brief.cuerpo)
+  const briefImages = briefImageCount(brief.cuerpo)
+  const briefReady = brief.titular.trim().length > 0 && bodyLength >= BODY_MIN_CHARS && briefImages <= MAX_BRIEF_IMAGES
   // The success banner replaces the generic "editing an existing article" one while the draft the
   // assistant just produced is the one loaded in the form.
   const generatedDraft = assist.phase === 'done' && editingId === assist.postId ? assist : null
@@ -357,6 +364,38 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
     }))
   }
 
+  const [copyMsg, setCopyMsg] = useState('')
+  const [coverUploading, setCoverUploading] = useState(false)
+  const [coverUploadError, setCoverUploadError] = useState('')
+
+  // Pasa las imágenes de la versión que se está editando a la otra, al final del texto
+  const copyImagesToOtherVersion = () => {
+    const from = postData.locale
+    const to: Locale = from === 'es' ? 'en' : 'es'
+    const { html, added } = copyFigures(translations[from].content_html, translations[to].content_html)
+    if (added > 0) setTranslations((prev) => ({ ...prev, [to]: { ...prev[to], content_html: html } }))
+    setCopyMsg(added > 0 ? t(dict.editor.richCopyImagesDone, { n: added }) : dict.editor.richCopyImagesNone)
+  }
+
+  const uploadCover = async (file: File) => {
+    setCoverUploadError('')
+    setCoverUploading(true)
+    try {
+      const form = new FormData()
+      form.set('file', file)
+      form.set('kind', 'cover')
+      const response = await fetch('/api/posts/upload-image', { method: 'POST', body: form })
+      const body = (await response.json().catch(() => null)) as { success?: boolean; url?: string } | null
+      if (!response.ok || !body?.success || !body.url) throw new Error('upload failed')
+      setPostData((prev) => ({ ...prev, cover_image_url: body.url as string }))
+      setCoverFailedUrl('')
+    } catch {
+      setCoverUploadError(dict.editor.coverUploadFailed)
+    } finally {
+      setCoverUploading(false)
+    }
+  }
+
   const updateTranslationField = (field: keyof TranslationDraft, value: string) => {
     setTranslations((prev) => ({ ...prev, [postData.locale]: { ...prev[postData.locale], [field]: value } }))
   }
@@ -449,7 +488,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
       const res = await fetch('/api/posts/asistir', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ titular: brief.titular, cuerpo: brief.cuerpo }),
+        body: JSON.stringify({ titular: brief.titular, ...briefToPayload(brief.cuerpo) }),
       })
       if (res.status === 401 || res.status === 403) {
         window.location.assign('/login')
@@ -793,15 +832,15 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
 
                   <div>
                     <label htmlFor={`${fieldId}-cuerpo`} className={labelClass}>{assistDict.briefBodyLabel}</label>
-                    <textarea
+                    <RichEditor
                       id={`${fieldId}-cuerpo`}
                       value={brief.cuerpo}
-                      onChange={(e) => setBrief((prev) => ({ ...prev, cuerpo: e.target.value }))}
+                      onChange={(html) => setBrief((prev) => ({ ...prev, cuerpo: html }))}
                       placeholder={assistDict.briefBodyPlaceholder}
-                      rows={10}
+                      ariaLabel={assistDict.briefBodyLabel}
                       disabled={assistRunning}
-                      aria-describedby={`${fieldId}-cuerpo-min`}
-                      className={clsx('w-full resize-y rounded-xl bg-surface-container-lowest px-4 py-3 text-sm leading-relaxed text-ink placeholder:text-ink-subtle', fieldStateClass)}
+                      minHeightClass="min-h-[55vh]"
+                      fieldClass={richFieldClass}
                     />
                     {/* Icono + texto, no solo el color: el minimo cumplido se ve tambien en escala de grises. */}
                     <p
@@ -814,6 +853,12 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                       {bodyLength >= BODY_MIN_CHARS && <StatusIcon kind="check" className="size-3.5 text-semantic-success" />}
                       {t(assistDict.briefBodyMinChars, { count: bodyLength })}
                     </p>
+                    <p className="mt-1 text-[12px] text-ink-muted">{t(assistDict.briefImagesNote, { max: MAX_BRIEF_IMAGES })}</p>
+                    {briefImages > MAX_BRIEF_IMAGES && (
+                      <p role="alert" className="mt-1 text-[12px] font-medium text-semantic-danger">
+                        {t(assistDict.briefImagesTooMany, { count: briefImages, max: MAX_BRIEF_IMAGES, extra: briefImages - MAX_BRIEF_IMAGES })}
+                      </p>
+                    )}
                   </div>
 
                   {assist.phase === 'error' && (
@@ -996,14 +1041,25 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                   {/* Content */}
                   <div>
                     <label htmlFor={`${fieldId}-contentLabel`} className={labelClass}>{dict.editor.contentLabel}</label>
-                    <textarea
+                    <RichEditor
+                      key={`${editingId ?? 'new'}-${postData.locale}`}
                       id={`${fieldId}-contentLabel`}
                       value={current.content_html}
-                      onChange={(e) => updateTranslationField('content_html', e.target.value)}
-                      placeholder={dict.editor.contentPlaceholder}
-                      rows={18}
-                      className={clsx('w-full resize-y rounded-xl bg-surface-2 px-4 py-3 font-mono text-sm leading-relaxed text-ink placeholder:text-ink-subtle', fieldStateClass)}
+                      onChange={(html) => updateTranslationField('content_html', html)}
+                      fieldClass={richFieldClass}
                     />
+                    {figuresOf(current.content_html).length > 0 && (
+                      <div className="mt-2 flex flex-wrap items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={copyImagesToOtherVersion}
+                          className={clsx('rounded-lg border border-outline-variant px-3 py-1.5 text-[13px] font-medium text-ink-muted transition-colors hover:border-ink-subtle hover:text-ink', focusRing)}
+                        >
+                          {t(dict.editor.richCopyImages, { lang: postData.locale === 'es' ? dict.editor.localeEn : dict.editor.localeEs })}
+                        </button>
+                        {copyMsg && <p role="status" className="text-[12px] text-ink-muted">{copyMsg}</p>}
+                      </div>
+                    )}
                   </div>
 
                   {/* SEO meta rides along with the content it describes, at lower visual weight */}
@@ -1121,6 +1177,23 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                         placeholder="https://..."
                         className={inputClass}
                       />
+                      <div className="mt-2 flex flex-wrap items-center gap-3">
+                        <label className={clsx('inline-flex cursor-pointer items-center rounded-lg border border-outline-variant px-3 py-1.5 text-[13px] font-medium text-ink-muted transition-colors hover:border-ink-subtle hover:text-ink focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent-blue', coverUploading && 'pointer-events-none opacity-60')}>
+                          {coverUploading ? dict.editor.coverUploading : dict.editor.coverUpload}
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            className="sr-only"
+                            disabled={coverUploading}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) void uploadCover(file)
+                              e.target.value = ''
+                            }}
+                          />
+                        </label>
+                        {coverUploadError && <p role="alert" className="text-[12px] font-medium text-semantic-danger">{coverUploadError}</p>}
+                      </div>
                       {/* Portada generada o pegada a mano: el editor tiene que VER que cargo antes de
                           publicar, no fiarse de una cadena de texto. Si falla, se dice por que en vez
                           de dejar un hueco mudo — coverFailedUrl evita reintentar la misma URL rota en

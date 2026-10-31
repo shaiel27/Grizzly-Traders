@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireEditor } from '@/lib/auth'
+import { isOwnStorageImage } from '@/lib/sanitize'
 import { asistirSchema, asistirWebhookSchema, firstIssue } from '@/lib/validation'
 
 // La generacion asistida encadena analisis + portada + insercion + traduccion en una sola
@@ -65,6 +66,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, code: 'entrada_invalida', error: firstIssue(parsed.error) }, { status: 400 })
   }
 
+  // Las imágenes solo pueden ser del bucket propio (las subió el editor del CMS): lo mismo que exige el saneador
+  if (parsed.data.imagenes.some((imagen) => !isOwnStorageImage(imagen.url))) {
+    return NextResponse.json({ success: false, code: 'entrada_invalida', error: 'Hay una imagen que no es de la web: súbela de nuevo desde el editor' }, { status: 400 })
+  }
+
   if (enCurso) {
     return NextResponse.json(
       { success: false, code: 'ocupado', error: 'Ya hay una generación en marcha' },
@@ -80,6 +86,7 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         titular: parsed.data.titular,
         cuerpo: parsed.data.cuerpo,
+        imagenes: parsed.data.imagenes,
         author_id: AUTOR_MANUAL_ID,
         solicitado_por: auth.user.email ?? '',
       }),

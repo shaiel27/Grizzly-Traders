@@ -1,0 +1,1297 @@
+{
+  "updatedAt": "2026-10-21T13:29:34.612Z",
+  "createdAt": "2026-10-14T17:26:57.896Z",
+  "id": "LsHnIJHOeA3iHrEG",
+  "name": "CMS Editorial -> Supabase (borrador + traduccion)",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "f7c774bd-36e0-430d-8665-96b2a190d6b4",
+      "name": "Webhook CMS",
+      "webhookId": "a7f3c0de-91b4-4d2e-8c15-6b2ad9f1e240",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1120,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cms-editorial",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "8dc0c73d-6bc9-487c-b7cd-633d2eb1879b",
+      "name": "Normalizar entrada",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -900,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Constantes de autoria por origen. Este workflow SOLO sirve al CMS: por eso author_id\n// y origen son constantes aqui y no pueden confundirse con los del pipeline RSS.\nconst AUTOR_MANUAL = 6;      // Moises Orraiz\nconst ORIGEN = 'cms';\nconst body = ($json && typeof $json.body === 'object' && $json.body !== null) ? $json.body : $json;\nconst texto = (v) => (typeof v === 'string' ? v.trim() : '');\nconst titular = texto(body.titular);\nconst cuerpo = texto(body.cuerpo);\nconst solicitado_por = texto(body.solicitado_por);\n// Imagenes que puso el editor entre los parrafos (el texto lleva solo marcadores [[IMG:n]]). Solo se aceptan las del\n// bucket propio: lo mismo que exige el sitio al guardar.\nconst BUCKET = 'https://pudzvatuubywmwdmboiq.supabase.co/storage/v1/object/public/post-images/';\nconst numero = (v) => (Number(v) > 0 ? Number(v) : null);\nconst imagenes = (Array.isArray(body.imagenes) ? body.imagenes : []).slice(0, 10)\n  .map((i) => ({ n: Number(i && i.n), url: texto(i && i.url), alt: texto(i && i.alt).slice(0, 300), caption: texto(i && i.caption).slice(0, 300), width: numero(i && i.width), height: numero(i && i.height) }))\n  .filter((i) => Number.isInteger(i.n) && i.n >= 1 && i.url.startsWith(BUCKET) && !i.url.slice(BUCKET.length).includes('..'));\nconst visible = cuerpo.replace(/\\[\\[IMG:\\d+\\]\\]/g, ' ').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\\s+/g, ' ').trim();\nconst errores = [];\nif (!titular) errores.push('El titular es obligatorio.');\nelse if (titular.length > 200) errores.push('El titular no puede pasar de 200 caracteres (tiene ' + titular.length + ').');\nif (!cuerpo) errores.push('El cuerpo es obligatorio.');\nelse if (visible.length < 200) errores.push('El cuerpo necesita al menos 200 caracteres (tiene ' + visible.length + ').');\nreturn [{ json: {\n  valido: errores.length === 0,\n  error: errores.join(' '),\n  titular,\n  cuerpo,\n  imagenes,\n  solicitado_por,\n  author_id: AUTOR_MANUAL,\n  origen: ORIGEN\n} }];"
+      }
+    },
+    {
+      "id": "ac79d16f-06d4-4a34-8592-72f333683923",
+      "name": "Entrada valida",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -680,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-valido",
+              "leftValue": "={{ $json.valido }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "73222a30-2a45-4c9f-808b-8221e9784ee5",
+      "name": "Error entrada",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -460,
+        220
+      ],
+      "parameters": {
+        "jsCode": "return [{ json: { ok: false, etapa: 'analisis', error: $json.error || 'La entrada enviada por el CMS no es valida.' } }];"
+      }
+    },
+    {
+      "id": "10b31a04-ace0-4fa7-abf6-faf92f4ab7ef",
+      "name": "Responder 400",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        220
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: $json.error, etapa: $json.etapa }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      }
+    },
+    {
+      "id": "83375c1e-f898-45fa-bf01-dc1570f78f12",
+      "name": "Obtener tags",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "onError": "continueErrorOutput",
+      "position": [
+        -460,
+        0
+      ],
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "url": "https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/tags?select=id,name,slug&order=id.asc",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "dfdc9fa0-2410-4607-b0fc-a505d688f037",
+      "name": "GPT · Analisis",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "onError": "continueErrorOutput",
+      "position": [
+        -240,
+        0
+      ],
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-4o-mini"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Eres el Editor Jefe del portal financiero Grizzly Traders. Recibes un titular y un cuerpo escritos a mano por un editor humano y los conviertes en un articulo listo para revisar. Devuelves SIEMPRE un JSON valido y estricto, sin markdown y sin bloques de codigo, con estas claves exactas: original_locale (detecta el idioma en el que el EDITOR escribio el cuerpo y devuelve exactamente \"es\" si es espanol o \"en\" si es ingles; si no es ninguno de los dos, devuelve \"es\"), title (titular final optimizado para SEO, maximo 200 caracteres, EN EL MISMO IDIOMA que original_locale; respeta la intencion del titular del editor y no inventes hechos), slug (kebab-case, minusculas, SIN tildes ni caracteres especiales, derivado del title), content_html (el articulo en HTML, EN EL MISMO IDIOMA que original_locale, basado EXCLUSIVAMENTE en el cuerpo que escribio el editor: no anadas hechos, cifras, fechas, citas ni fuentes que no esten en ese texto. Usa <p> para los parrafos, <h2> para subtitulos solo si hay suficiente contenido real que lo justifique, <blockquote> unicamente para citas que aparezcan literalmente en el cuerpo, y <ul>/<li> para datos numericos o puntos clave que ya esten en el cuerpo. Convierte el markdown del editor a HTML equivalente: negritas, cursivas, listas y enlaces. No anadas un parrafo de fuente externa, porque el articulo es original del portal), meta_title (igual o mas corto que el title, mismo idioma), meta_description (descripcion SEO de maximo 160 caracteres, mismo idioma), sentiment (exactamente uno de: bullish, bearish, neutral), category (exactamente una de: criptomonedas, forex, materias-primas, acciones), tags (array de slugs de etiquetas. REGLA ABSOLUTA: solo puedes usar slugs que aparezcan en la lista de etiquetas existentes que recibes en el mensaje del usuario, copiados caracter a caracter. Elige como maximo 3, y solo las que encajen de verdad con el contenido. Si ninguna encaja, devuelve un array vacio. TIENES PROHIBIDO inventar, traducir, derivar o proponer una etiqueta que no este en esa lista), prompt_imagen (descripcion EN INGLES del OBJETO-SIMBOLO FISICO de un bodegon editorial fotografico, disenado especificamente para ESTE articulo, en dos pasos. PASO 1 - NO elijas de un menu de categorias. Lee los HECHOS CONCRETOS de ESTE articulo (que cambia, que se gana o se pierde, que se rompe, se revela, se detiene o se acumula) y conviertelos en 1 o 2 CONCEPTOS FISICOS que nazcan de esos hechos particulares, nunca de la categoria formal ni del tema general. Dos articulos de la MISMA categoria con hechos distintos deben producir objetos distintos entre si: la categoria es solo contexto, nunca una plantilla de objeto. Todo lo que elijas debe existir fisicamente y poder fotografiarse sobre una mesa: nada de graficos, diagramas, interfaces, paneles ni simbolos dibujados. Metodo, con ejemplos de calibracion que ilustran el RAZONAMIENTO (no una lista para copiar): un pronostico que mejora por demanda sostenida -> algo que crece o se acumula mas alla de su contenedor, nunca una balanza (eso pertenece a regulacion, no a un pronostico); una autorizacion o licencia obtenida tras cumplir requisitos -> aqui SI cabe un sello de cera recien estampado o una balanza, porque el hecho concreto ES un acto regulatorio; una caida de precio por un shock externo repentino -> algo que resbala o se desequilibra por el peso de un elemento que acaba de caer encima, no un pendulo generico; una investigacion que fuerza a frenar una actividad -> un mecanismo detenido a medio giro por una cuña insertada, no un simbolo abstracto de justicia. Cada objeto debe poder explicarse por los hechos de ESTE articulo a alguien que no lo haya leido, y nadie debe poder confundirlo con el de otro articulo de la misma categoria. Identifica tambien la ESCALA del asunto (si es un evento puntual de un solo actor o algo sistemico que afecta a muchas partes) y usala en el Paso 2: un unico objeto grande y dominante si es puntual; varios objetos similares repetidos si es sistemico. PROHIBIDO EN ABSOLUTO, sin excepcion y sin importar la categoria: graficos de barras, velas de trading, lineas de tendencia, flechas que suben o bajan, pantallas, paneles, esferas con numeros, interfaces, y cualquier logotipo o simbolo de marca real, incluido el simbolo de Bitcoin y el de cualquier otra criptomoneda o empresa. NINGUN OBJETO puede convertirse en el simbolo fijo y repetido de una categoria entera -- ni una balanza para toda noticia de regulacion, ni una caja fuerte para toda noticia de cripto, ni ningun otro objeto reciclado articulo tras articulo: una balanza SOLO es correcta cuando el hecho concreto de ESTE articulo sea literalmente un acto regulatorio, una licencia, un fallo judicial o una investigacion -- nunca como simbolo generico de las finanzas, del equilibrio economico o de la estabilidad. PASO 2 - Combina los 2 a 4 conceptos elegidos en UN SOLO OBJETO-SIMBOLO FISICO, descrito como algo que pueda fotografiarse realmente sobre una superficie: materiales concretos (vidrio esmerilado, metal cepillado, piedra, papel, ceramica, cera), forma, escala y disposicion entre las piezas. Si el objeto incluye monedas, discos, sellos, medallones, fichas o cualquier pieza troquelada o acunada, describelas EXPLICITAMENTE como lisas y sin ninguna marca: sin cifras, sin letras, sin iniciales, sin simbolos de moneda (ni €, $, £, ¥, ₿ ni ningun otro), sin relieve figurativo de rostros o escudos. Decir solo una moneda no basta: el modelo de imagen las dibuja con inscripciones realistas por defecto, y eso es tan texto prohibido como una cifra en una pantalla. Describe UNICAMENTE el objeto y su disposicion fisica. NO especifiques color, paleta, iluminacion, fondo, encuadre ni angulo de camara: de todo eso se encarga la plantilla de portada, y cualquier indicacion tuya al respecto la contradice. Si la noticia tiene un matiz negativo, de riesgo o de algo inacabado, exprésalo en el ESTADO FISICO del objeto (una grieta, una fisura, una pieza desalineada, algo que se derrama o se escapa), nunca mediante el color. EVITA composiciones planas, estaticas o repetitivas; cada imagen debe sentirse unica. REGLA CRITICA: ningun grafico, vela de trading, linea de tendencia ni flecha direccional puede aparecer, ni siquiera cuando el articulo trate literalmente del movimiento de precio de un activo: en ese caso la direccion se expresa con el ESTADO FISICO del objeto que ya elegiste en el Paso 1 (algo que se inclina, se derrama, se acumula o resbala), nunca con un diagrama ni con una lista fija de objetos. PROHIBIDO TERMINANTEMENTE incluir: nombres o rostros de personas reales (politicos, ejecutivos, celebridades), banderas o mapas de paises, logos o simbolos de empresas y criptomonedas, SIN NINGUNA EXCEPCION (el simbolo de Bitcoin queda prohibido tambien cuando la categoria es criptomonedas: ahi el objeto es un disco metalico liso, sin marca alguna), edificios o monumentos reales identificables, escenas politicas, militares, de protesta o de conflicto, y cualquier elemento que remita a las personas, lugares, organizaciones o eventos especificos mencionados en la noticia. RECORDATORIO FINAL Y OBLIGATORIO: la imagen NO debe contener absolutamente ningun texto, letra, numero, cifra, palabra o simbolo tipografico de ningun tipo, en ninguna parte de la composicion, sin excepcion alguna.). RECUERDA: prompt_imagen va SIEMPRE en ingles, aunque el resto del JSON este en espanol. Todos los demas campos de texto van en el idioma de original_locale. NO anades markdown, NO envuelvas el JSON en bloques de codigo. Responde SOLO con el JSON. REGLA SOBRE IMAGENES: el cuerpo puede contener marcadores de imagen con la forma [[IMG:1]], [[IMG:2]]... Son imagenes que el editor puso entre los parrafos. Conserva CADA marcador EXACTAMENTE como esta escrito, solo en su propia linea como <p>[[IMG:n]]</p> dentro de content_html, justo despues del parrafo que lo precedia en el cuerpo y antes del que lo seguia. No los modifiques, no los traduzcas, no los repitas, no inventes marcadores nuevos y no los trates como contenido ni como un hecho del articulo. Si reorganizas o fusionas parrafos, cada marcador acompana al parrafo que tenia justo antes."
+            },
+            {
+              "content": "=Convierte este borrador del editor en un articulo publicable.\n\nTitular del editor:\n{{ $('Normalizar entrada').first().json.titular }}\n\nCuerpo del editor (texto plano, markdown o HTML; puede traer marcadores [[IMG:n]] de imagenes):\n{{ $('Normalizar entrada').first().json.cuerpo }}\n\nETIQUETAS EXISTENTES EN LA BASE DE DATOS (formato \"slug = nombre\"). Son las unicas que puedes usar, y debes copiar el slug exacto:\n{{ ($json.body || []).map(t => t.slug + ' = ' + t.name).join('\\n') }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "MCllGOOMXeswQUEW",
+          "name": "OpenAI account 2"
+        }
+      }
+    },
+    {
+      "id": "1ab4b204-5e2f-4075-aa10-c2d1b9358886",
+      "name": "Parsear analisis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput",
+      "position": [
+        -20,
+        0
+      ],
+      "parameters": {
+        "jsCode": "let data = $json.output?.[0]?.content?.[0]?.text ?? $json.choices?.[0]?.message?.content ?? $json.message?.content ?? $json.text;\nif (typeof data === 'string') {\n  data = data.trim().replace(/^```json\\s*/i, '').replace(/```\\s*$/, '');\n  data = JSON.parse(data);\n}\nif (!data || typeof data !== 'object') throw new Error('El analisis no devolvio un JSON interpretable.');\nconst entrada = $('Normalizar entrada').first().json;\nconst tagRows = $('Obtener tags').first().json.body || [];\nconst slugify = (s) => (s == null ? '' : String(s)).toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '')\n  .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80).replace(/-+$/g, '');\nconst title = String(data.title || entrada.titular).trim().slice(0, 200);\nconst slug_base = slugify(data.slug || title) || 'articulo-' + $now.toFormat('yyyyMMddHHmmss');\nconst content_html_gpt = typeof data.content_html === 'string' ? data.content_html.trim() : '';\nif (!content_html_gpt) throw new Error('El analisis no devolvio content_html.');\n// Imagenes del editor: cada marcador [[IMG:n]] se cambia por su <figure>. Las URL, el alt y el pie salen de lo que mando\n// el editor, no de GPT. Si GPT se comio un marcador, la imagen se anade al final en vez de perderse.\nconst imagenesEditor = Array.isArray(entrada.imagenes) ? entrada.imagenes : [];\nconst escAttr = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/\"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst escText = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst figura = (im) => '<figure><img src=\"' + escAttr(im.url) + '\" alt=\"' + escAttr(im.alt) + '\"' + (im.width ? ' width=\"' + im.width + '\"' : '') + (im.height ? ' height=\"' + im.height + '\"' : '') + '>' + (im.caption ? '<figcaption>' + escText(im.caption) + '</figcaption>' : '') + '</figure>';\nconst usadas = new Set();\nlet content_html = content_html_gpt.replace(/<p>\\s*\\[\\[IMG:(\\d+)\\]\\]\\s*<\\/p>|\\[\\[IMG:(\\d+)\\]\\]/g, (m, a, b) => {\n  const n = Number(a || b);\n  const im = imagenesEditor.find((x) => x.n === n);\n  if (!im || usadas.has(n)) return '';\n  usadas.add(n);\n  return figura(im);\n});\ncontent_html += imagenesEditor.filter((im) => !usadas.has(im.n)).map(figura).join('');\ncontent_html = content_html.replace(/\\[\\[IMG:[^\\]]*\\]\\]/g, '');\nconst original_locale = ['es', 'en'].includes(String(data.original_locale || '').toLowerCase()) ? String(data.original_locale).toLowerCase() : 'es';\nconst sentimentMap = { bullish: 'bullish', bearish: 'bearish', neutral: 'neutral', Bullish: 'bullish', Bearish: 'bearish', Neutral: 'neutral', Neutro: 'neutral' };\nconst sentiment = sentimentMap[data.sentiment] || 'neutral';\nconst categoryMap = { 'criptomonedas': 1, 'forex': 2, 'materias-primas': 3, 'acciones': 4 };\nconst category_id = categoryMap[slugify(data.category)] || 1;\n// Mapeo de etiquetas: SOLO las que existen en la tabla tags. Acepta slug o nombre; nunca inventa.\nconst permitidos = new Map();\nfor (const t of tagRows) { permitidos.set(t.slug, t.id); permitidos.set(slugify(t.name), t.id); }\nconst pedidos = Array.isArray(data.tags) ? data.tags : [];\nconst tag_ids = [...new Set(pedidos.map((t) => permitidos.get(slugify(t))).filter((v) => v != null))].slice(0, 3);\nconst tags_descartadas = pedidos.filter((t) => !permitidos.has(slugify(t)));\nconst plainText = content_html_gpt.replace(/\\[\\[IMG:\\d+\\]\\]/g, ' ').replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\nconst format = plainText.length < 350 ? 'brief' : 'article';\nconst wordCount = plainText ? plainText.split(' ').filter(Boolean).length : 0;\nconst reading_time_minutes = Math.max(1, Math.ceil(wordCount / 200));\nconst meta_description = String(data.meta_description || title).trim().slice(0, 160);\nconst meta_title = String(data.meta_title || title).trim().slice(0, 200);\nreturn [{ json: {\n  title, slug_base, content_html, meta_title, meta_description, sentiment, category_id,\n  original_locale, format, reading_time_minutes, tag_ids, tags_descartadas,\n  prompt_imagen: data.prompt_imagen || 'A single large smooth brushed-metal disc resting on coarse stone, with one hairline crack across its surface, no markings of any kind',\n  author_id: entrada.author_id, origen: entrada.origen, solicitado_por: entrada.solicitado_por\n} }];"
+      }
+    },
+    {
+      "id": "bda1149c-7730-4bf9-91d6-372e1754a439",
+      "name": "Error analisis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -20,
+        240
+      ],
+      "parameters": {
+        "jsCode": "const it = $input.first().json || {};\nconst raw = it.error ?? it.message ?? it.reason ?? '';\nlet msg = typeof raw === 'string' ? raw : (raw && (raw.message || raw.description)) || '';\nif (!msg && raw && typeof raw === 'object') { try { msg = JSON.stringify(raw).slice(0, 400); } catch (e) { msg = ''; } }\nreturn [{ json: { ok: false, etapa: \"analisis\", error: msg || \"Fallo el analisis del borrador con GPT.\" } }];"
+      }
+    },
+    {
+      "id": "d4b1ac8f-42e8-4c0b-9c66-45514ce0ca6a",
+      "name": "Slugs en uso · posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "onError": "continueErrorOutput",
+      "position": [
+        200,
+        0
+      ],
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "url": "=https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts?select=slug&limit=200&slug=like.{{ encodeURIComponent($json.slug_base) }}*",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "71092bb5-6a5f-4ca2-a148-05aa27543c77",
+      "name": "Slugs en uso · traducciones",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "onError": "continueErrorOutput",
+      "position": [
+        420,
+        0
+      ],
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "url": "=https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts_translations?select=slug,locale&limit=200&slug=like.{{ encodeURIComponent($('Parsear analisis').first().json.slug_base) }}*",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "94d65132-3ae4-4889-8088-d7581b7aacb7",
+      "name": "Resolver slug",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput",
+      "position": [
+        640,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// posts.slug es UNIQUE global y posts_translations tiene UNIQUE(locale, slug).\n// Reservamos un slug libre en AMBAS tablas antes de generar la imagen, porque el\n// nombre del fichero en Storage se deriva del slug definitivo.\nconst a = $('Parsear analisis').first().json;\nconst usados = new Set();\nfor (const r of ($('Slugs en uso · posts').first().json.body || [])) if (r && r.slug) usados.add(r.slug);\nfor (const r of ($('Slugs en uso · traducciones').first().json.body || [])) if (r && r.slug) usados.add(r.slug);\nlet slug = a.slug_base;\nfor (let i = 2; usados.has(slug) && i <= 60; i++) slug = a.slug_base + '-' + i;\nif (usados.has(slug)) slug = a.slug_base + '-' + Date.now().toString(36);\nreturn [{ json: { ...a, slug, slug_colisiono: slug !== a.slug_base } }];"
+      }
+    },
+    {
+      "id": "9a6ce8f5-4764-4299-94be-38c8c7e41137",
+      "name": "Error insercion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        240
+      ],
+      "parameters": {
+        "jsCode": "const it = $input.first().json || {};\nconst raw = it.error ?? it.message ?? it.reason ?? '';\nlet msg = typeof raw === 'string' ? raw : (raw && (raw.message || raw.description)) || '';\nif (!msg && raw && typeof raw === 'object') { try { msg = JSON.stringify(raw).slice(0, 400); } catch (e) { msg = ''; } }\nreturn [{ json: { ok: false, etapa: \"insercion\", error: msg || \"Fallo al guardar el articulo en la base de datos.\" } }];"
+      }
+    },
+    {
+      "id": "1536d005-c3d2-4fec-9296-090e49ece6e3",
+      "name": "OpenAI · Imagen",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "onError": "continueErrorOutput",
+      "position": [
+        860,
+        0
+      ],
+      "parameters": {
+        "resource": "image",
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-image-1-mini"
+        },
+        "prompt": "=Editorial photography evoking vintage newsprint and offset printing, for a financial news portal cover. The whole image is printed in a rich duotone of charcoal black and warm grey, with a visible halftone dot pattern, coarse paper fibre and grain clearly visible in raking light, and slight ink misregistration. Deep shadow, high contrast, tactile analogue imperfection, dust and fibre detail. Subject: {{ $('Resolver slug').first().json.prompt_imagen }}. No printed words, no headlines, no columns of type. Absolutely no text, no letters, no numbers, no typography, no logos, no real human faces, no flags, no maps.",
+        "options": {
+          "quality": "high",
+          "size": "1536x1024"
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "MCllGOOMXeswQUEW",
+          "name": "OpenAI account 2"
+        }
+      }
+    },
+    {
+      "id": "edc111d5-24c4-46c9-bd7d-9beb9de207c6",
+      "name": "Optimizar imagen",
+      "type": "n8n-nodes-base.editImage",
+      "typeVersion": 1.1,
+      "onError": "continueErrorOutput",
+      "position": [
+        1080,
+        0
+      ],
+      "parameters": {
+        "operation": "resize",
+        "width": 1536,
+        "height": 1024,
+        "resizeOption": "ignoreAspectRatio",
+        "options": {
+          "destinationKey": "data",
+          "format": "webp"
+        }
+      }
+    },
+    {
+      "id": "86fc206c-64ae-4670-8a76-ec66c0219125",
+      "name": "Error imagen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        970,
+        240
+      ],
+      "parameters": {
+        "jsCode": "const it = $input.first().json || {};\nconst raw = it.error ?? it.message ?? it.reason ?? '';\nlet msg = typeof raw === 'string' ? raw : (raw && (raw.message || raw.description)) || '';\nif (!msg && raw && typeof raw === 'object') { try { msg = JSON.stringify(raw).slice(0, 400); } catch (e) { msg = ''; } }\nreturn [{ json: { ok: false, etapa: \"imagen\", error: msg || \"Fallo la generacion o la optimizacion de la portada.\" } }];"
+      }
+    },
+    {
+      "id": "2504430e-ce32-4c6b-abce-6a6e6ed6aae5",
+      "name": "Subir a Storage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "onError": "continueErrorOutput",
+      "position": [
+        1300,
+        0
+      ],
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "method": "POST",
+        "url": "=https://pudzvatuubywmwdmboiq.supabase.co/storage/v1/object/post-images/{{ $('Resolver slug').first().json.slug }}.webp",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "image/webp"
+            },
+            {
+              "name": "x-upsert",
+              "value": "true"
+            },
+            {
+              "name": "cache-control",
+              "value": "max-age=86400"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "a10796eb-30db-45c0-a9db-4368b53d2134",
+      "name": "Error storage",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        240
+      ],
+      "parameters": {
+        "jsCode": "const it = $input.first().json || {};\nconst raw = it.error ?? it.message ?? it.reason ?? '';\nlet msg = typeof raw === 'string' ? raw : (raw && (raw.message || raw.description)) || '';\nif (!msg && raw && typeof raw === 'object') { try { msg = JSON.stringify(raw).slice(0, 400); } catch (e) { msg = ''; } }\nreturn [{ json: { ok: false, etapa: \"storage\", error: msg || \"Fallo la subida de la portada a Storage.\" } }];"
+      }
+    },
+    {
+      "id": "9510aaf8-4955-4bc7-9de7-220f2c9dcfca",
+      "name": "Insertar post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "onError": "continueErrorOutput",
+      "position": [
+        1520,
+        0
+      ],
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "method": "POST",
+        "url": "https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"title\": {{ JSON.stringify($('Resolver slug').first().json.title) }},\n  \"slug\": {{ JSON.stringify($('Resolver slug').first().json.slug) }},\n  \"content_html\": {{ JSON.stringify($('Resolver slug').first().json.content_html) }},\n  \"format\": {{ JSON.stringify($('Resolver slug').first().json.format) }},\n  \"sentiment\": {{ JSON.stringify($('Resolver slug').first().json.sentiment) }},\n  \"cover_image_url\": \"https://pudzvatuubywmwdmboiq.supabase.co/storage/v1/object/public/post-images/{{ $('Resolver slug').first().json.slug }}.webp\",\n  \"author_id\": {{ $('Resolver slug').first().json.author_id }},\n  \"origen\": {{ JSON.stringify($('Resolver slug').first().json.origen) }},\n  \"original_locale\": {{ JSON.stringify($('Resolver slug').first().json.original_locale) }},\n  \"status\": \"draft\",\n  \"category_id\": {{ $('Resolver slug').first().json.category_id }},\n  \"meta_title\": {{ JSON.stringify($('Resolver slug').first().json.meta_title) }},\n  \"meta_description\": {{ JSON.stringify($('Resolver slug').first().json.meta_description) }},\n  \"reading_time_minutes\": {{ $('Resolver slug').first().json.reading_time_minutes }},\n  \"ai_assisted\": true\n}",
+        "options": {}
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "06a03016-5701-4a86-af94-85073e67b9c6",
+      "name": "Tiene tags",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1740,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-tags",
+              "leftValue": "={{ $('Resolver slug').first().json.tag_ids.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "c8e62626-b8b0-4dc9-b387-f9824fb65239",
+      "name": "Insertar tags",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "onError": "continueRegularOutput",
+      "position": [
+        1960,
+        -180
+      ],
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "method": "POST",
+        "url": "https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/post_tags?on_conflict=post_id,tag_id",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=ignore-duplicates,return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Resolver slug').first().json.tag_ids.map(id => ({ post_id: $('Insertar post').first().json.id, tag_id: id }))) }}",
+        "options": {}
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "98d9cf2f-2331-438f-b62f-2dda95bf5ed1",
+      "name": "GPT · Traducir",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "onError": "continueErrorOutput",
+      "position": [
+        2180,
+        0
+      ],
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-4o-mini"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Eres un traductor editorial especializado en prensa financiera. Recibes un articulo ya maquetado en HTML y lo traduces al idioma opuesto. Devuelves SIEMPRE un JSON valido y estricto, sin markdown y sin bloques de codigo, con estas claves exactas: title, slug, content_html, meta_title, meta_description. REGLAS OBLIGATORIAS: 1. Preserva la estructura HTML EXACTA: los mismos tags, en el mismo orden, con los mismos atributos y el mismo anidamiento. Solo cambia el texto que hay entre los tags. No anadas, no elimines y no reordenes etiquetas. 2. NO traduzcas nombres propios, tickers, nombres de empresas ni nombres de productos financieros. Los nombres de instituciones usan su denominacion habitual en el idioma destino cuando esa denominacion existe (Reserva Federal <-> Federal Reserve) y se dejan en el original cuando no existe. 3. Regenera el slug en el idioma destino: kebab-case, minusculas, sin tildes ni caracteres especiales, derivado del title traducido. 4. Las citas dentro de <blockquote> se traducen, y al final de la cita traducida se anade entre parentesis la nota de que es una traduccion: \"(traduccion)\" si el idioma destino es espanol, \"(translated)\" si el idioma destino es ingles. 5. meta_description traducida: maximo 160 caracteres. 6. No resumas, no amplies y no corrijas el contenido: traduces, no reescribes. 7. EXCEPCION a la regla 1: dentro de <figure>, traduce tambien el atributo alt de <img> y el texto de <figcaption>; no cambies src, width ni height. Responde SOLO con el JSON."
+            },
+            {
+              "content": "=Traduce este articulo del idioma \"{{ $('Resolver slug').first().json.original_locale }}\" al idioma \"{{ $('Resolver slug').first().json.original_locale === 'es' ? 'en' : 'es' }}\".\n\nARTICULO ORIGEN (JSON):\n{{ JSON.stringify({ title: $('Resolver slug').first().json.title, slug: $('Resolver slug').first().json.slug, content_html: $('Resolver slug').first().json.content_html, meta_title: $('Resolver slug').first().json.meta_title, meta_description: $('Resolver slug').first().json.meta_description }) }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "MCllGOOMXeswQUEW",
+          "name": "OpenAI account 2"
+        }
+      }
+    },
+    {
+      "id": "ef7d6a0f-ef21-4ce2-85d5-12fda3dda488",
+      "name": "Parsear traduccion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput",
+      "position": [
+        2400,
+        0
+      ],
+      "parameters": {
+        "jsCode": "let data = $json.output?.[0]?.content?.[0]?.text ?? $json.choices?.[0]?.message?.content ?? $json.message?.content ?? $json.text;\nif (typeof data === 'string') {\n  data = data.trim().replace(/^```json\\s*/i, '').replace(/```\\s*$/, '');\n  data = JSON.parse(data);\n}\nif (!data || typeof data !== 'object') throw new Error('La traduccion no devolvio un JSON interpretable.');\nconst o = $('Resolver slug').first().json;\nconst slugify = (s) => (s == null ? '' : String(s)).toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '')\n  .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80).replace(/-+$/g, '');\nconst locale_original = o.original_locale;\nconst locale_opuesto = locale_original === 'es' ? 'en' : 'es';\nconst title = String(data.title || o.title).trim().slice(0, 200);\nconst content_html = typeof data.content_html === 'string' ? data.content_html.trim() : '';\nif (!content_html) throw new Error('La traduccion no devolvio content_html.');\nreturn [{ json: {\n  post_id: $('Insertar post').first().json.id,\n  locale_original, locale_opuesto,\n  original: { title: o.title, slug: o.slug, content_html: o.content_html, meta_title: o.meta_title, meta_description: o.meta_description },\n  traducida: {\n    title,\n    slug_base: slugify(data.slug || title) || o.slug + '-' + locale_opuesto,\n    content_html,\n    meta_title: String(data.meta_title || title).trim().slice(0, 200),\n    meta_description: String(data.meta_description || title).trim().slice(0, 160)\n  }\n} }];"
+      }
+    },
+    {
+      "id": "ad2ced14-1621-44e0-804b-9d1ea368d6ae",
+      "name": "Slugs en uso · locale opuesto",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "onError": "continueErrorOutput",
+      "position": [
+        2620,
+        0
+      ],
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "url": "=https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts_translations?select=slug&limit=200&locale=eq.{{ $json.locale_opuesto }}&slug=like.{{ encodeURIComponent($json.traducida.slug_base) }}*",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "862cda25-371f-457b-aef2-04c17bc4231f",
+      "name": "Resolver slug traducido",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput",
+      "position": [
+        2840,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// UNIQUE(locale, slug): el slug traducido solo tiene que estar libre DENTRO de su locale.\n// Que coincida con el slug del original en el otro idioma es legal y deseable.\nconst t = $('Parsear traduccion').first().json;\nconst usados = new Set();\nfor (const r of ($('Slugs en uso · locale opuesto').first().json.body || [])) if (r && r.slug) usados.add(r.slug);\nconst base = t.traducida.slug_base;\nlet slug = base;\nfor (let i = 2; usados.has(slug) && i <= 60; i++) slug = base + '-' + i;\nif (usados.has(slug)) slug = base + '-' + Date.now().toString(36);\nreturn [{ json: { ...t, traducida: { ...t.traducida, slug }, slug_traducido_colisiono: slug !== base } }];"
+      }
+    },
+    {
+      "id": "07c3c3c1-40d1-499d-b4e4-1c2e6bf417e5",
+      "name": "Insertar traduccion · original",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "onError": "continueErrorOutput",
+      "position": [
+        3060,
+        0
+      ],
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "method": "POST",
+        "url": "https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts_translations?on_conflict=post_id,locale",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"post_id\": {{ JSON.stringify($('Resolver slug traducido').first().json.post_id) }},\n  \"locale\": {{ JSON.stringify($('Resolver slug traducido').first().json.locale_original) }},\n  \"title\": {{ JSON.stringify($('Resolver slug traducido').first().json.original.title) }},\n  \"slug\": {{ JSON.stringify($('Resolver slug traducido').first().json.original.slug) }},\n  \"content_html\": {{ JSON.stringify($('Resolver slug traducido').first().json.original.content_html) }},\n  \"meta_title\": {{ JSON.stringify($('Resolver slug traducido').first().json.original.meta_title) }},\n  \"meta_description\": {{ JSON.stringify($('Resolver slug traducido').first().json.original.meta_description) }}\n}",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "f129e679-6316-4d26-acda-301d6c6475fd",
+      "name": "Insertar traduccion · opuesta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "onError": "continueErrorOutput",
+      "position": [
+        3280,
+        0
+      ],
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "method": "POST",
+        "url": "https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts_translations?on_conflict=post_id,locale",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"post_id\": {{ JSON.stringify($('Resolver slug traducido').first().json.post_id) }},\n  \"locale\": {{ JSON.stringify($('Resolver slug traducido').first().json.locale_opuesto) }},\n  \"title\": {{ JSON.stringify($('Resolver slug traducido').first().json.traducida.title) }},\n  \"slug\": {{ JSON.stringify($('Resolver slug traducido').first().json.traducida.slug) }},\n  \"content_html\": {{ JSON.stringify($('Resolver slug traducido').first().json.traducida.content_html) }},\n  \"meta_title\": {{ JSON.stringify($('Resolver slug traducido').first().json.traducida.meta_title) }},\n  \"meta_description\": {{ JSON.stringify($('Resolver slug traducido').first().json.traducida.meta_description) }}\n}",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=minimal"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "025c25a3-8cd0-42f9-bef6-dd8df034b003",
+      "name": "Error traduccion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3060,
+        240
+      ],
+      "parameters": {
+        "jsCode": "const it = $input.first().json || {};\nconst raw = it.error ?? it.message ?? it.reason ?? '';\nlet msg = typeof raw === 'string' ? raw : (raw && (raw.message || raw.description)) || '';\nif (!msg && raw && typeof raw === 'object') { try { msg = JSON.stringify(raw).slice(0, 400); } catch (e) { msg = ''; } }\nreturn [{ json: { ok: false, etapa: \"traduccion\", error: msg || \"Fallo la traduccion o el guardado de las traducciones.\" } }];"
+      }
+    },
+    {
+      "id": "8175de7b-e4e2-454e-ac6c-fe435e3204ef",
+      "name": "Log ejecucion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "onError": "continueRegularOutput",
+      "position": [
+        3500,
+        0
+      ],
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "method": "POST",
+        "url": "https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/pipeline_logs",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"timestamp\": {{ JSON.stringify($now.toISO()) }},\n  \"fuente\": {{ JSON.stringify('CMS · ' + ($('Normalizar entrada').first().json.solicitado_por || 'editor desconocido')) }},\n  \"titulo\": {{ JSON.stringify($('Resolver slug').first().json.title) }},\n  \"status\": \"success\",\n  \"error_message\": null\n}",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "dcf90973-5286-4545-aef1-805be91df317",
+      "name": "Responder OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        3720,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, post_id: $('Insertar post').first().json.id, slug: $('Resolver slug').first().json.slug, status: 'draft', original_locale: $('Resolver slug').first().json.original_locale, cover_image_url: $('Insertar post').first().json.cover_image_url, traducciones: [$('Resolver slug traducido').first().json.locale_original, $('Resolver slug traducido').first().json.locale_opuesto] }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "18d6eea2-fecc-4afd-81e8-f5af813f81ba",
+      "name": "Responder error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1740,
+        460
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: $json.error, etapa: $json.etapa }) }}",
+        "options": {
+          "responseCode": 500
+        }
+      }
+    },
+    {
+      "id": "8757b62f-2a73-42f9-99a1-63ea94a504f7",
+      "name": "Checklist editorial P2",
+      "notes": "Puerta de cumplimiento P2 (auditoria legal 21/10/2026). Ver PLAN-CUMPLIMIENTO.md seccion 9.",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1410,
+        120
+      ],
+      "parameters": {
+        "jsCode": "// P2 (guia de cumplimiento) -- checklist editorial mecanico antes de insertar. Si algo falla,\n// esta linea lanza un Error: la ejecucion de n8n queda marcada como fallida, SIN insertar el\n// post, visible en el historial de ejecuciones para revision humana. No inventa un estado\n// 'pendiente_revision' nuevo en la tabla posts -- usa el mecanismo de error que n8n ya tiene.\n\nconst datos = $('Resolver slug').first().json;\nconst errores = [];\n\nconst textoPlano = (datos.content_html || '').replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\n\nif (!datos.title || !datos.title.trim()) {\n  errores.push('Falta el titulo.');\n}\nif (!textoPlano) {\n  errores.push('Falta el contenido.');\n}\n\nconst senales = [\n  /comprar\\s+ahora/i, /vender\\s+ahora/i, /se[nñ]al\\s+de\\s+(compra|venta)/i,\n  /zona\\s+de\\s+entrada/i, /take[\\s-]?profit/i, /stop[\\s-]?loss/i,\n  /precio\\s+objetivo/i, /target\\s+price/i, /\\brecomendamos\\b/i,\n  /\\bdebes?\\s+(comprar|vender)\\b/i, /\\b(buy|sell)\\s+now\\b/i\n];\nconst textoCompleto = (datos.title || '') + ' ' + textoPlano;\nfor (const patron of senales) {\n  if (patron.test(textoCompleto)) {\n    errores.push('Lenguaje de senal/recomendacion de inversion detectado.');\n    break;\n  }\n}\n\nif (errores.length > 0) {\n  throw new Error('Checklist editorial P2 (auditoria legal) fallo: ' + errores.join(' | '));\n}\n\nreturn $input.all();"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook CMS": {
+      "main": [
+        [
+          {
+            "node": "Normalizar entrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar entrada": {
+      "main": [
+        [
+          {
+            "node": "Entrada valida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entrada valida": {
+      "main": [
+        [
+          {
+            "node": "Obtener tags",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error entrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error entrada": {
+      "main": [
+        [
+          {
+            "node": "Responder 400",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtener tags": {
+      "main": [
+        [
+          {
+            "node": "GPT · Analisis",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error analisis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT · Analisis": {
+      "main": [
+        [
+          {
+            "node": "Parsear analisis",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error analisis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear analisis": {
+      "main": [
+        [
+          {
+            "node": "Slugs en uso · posts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error analisis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slugs en uso · posts": {
+      "main": [
+        [
+          {
+            "node": "Slugs en uso · traducciones",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error insercion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slugs en uso · traducciones": {
+      "main": [
+        [
+          {
+            "node": "Resolver slug",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error insercion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolver slug": {
+      "main": [
+        [
+          {
+            "node": "OpenAI · Imagen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error insercion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI · Imagen": {
+      "main": [
+        [
+          {
+            "node": "Optimizar imagen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error imagen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Optimizar imagen": {
+      "main": [
+        [
+          {
+            "node": "Subir a Storage",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error imagen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Subir a Storage": {
+      "main": [
+        [
+          {
+            "node": "Checklist editorial P2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insertar post": {
+      "main": [
+        [
+          {
+            "node": "Tiene tags",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error insercion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tiene tags": {
+      "main": [
+        [
+          {
+            "node": "Insertar tags",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GPT · Traducir",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insertar tags": {
+      "main": [
+        [
+          {
+            "node": "GPT · Traducir",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT · Traducir": {
+      "main": [
+        [
+          {
+            "node": "Parsear traduccion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error traduccion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear traduccion": {
+      "main": [
+        [
+          {
+            "node": "Slugs en uso · locale opuesto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error traduccion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slugs en uso · locale opuesto": {
+      "main": [
+        [
+          {
+            "node": "Resolver slug traducido",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error traduccion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolver slug traducido": {
+      "main": [
+        [
+          {
+            "node": "Insertar traduccion · original",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error traduccion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insertar traduccion · original": {
+      "main": [
+        [
+          {
+            "node": "Insertar traduccion · opuesta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error traduccion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insertar traduccion · opuesta": {
+      "main": [
+        [
+          {
+            "node": "Log ejecucion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error traduccion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log ejecucion": {
+      "main": [
+        [
+          {
+            "node": "Responder OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error analisis": {
+      "main": [
+        [
+          {
+            "node": "Responder error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error imagen": {
+      "main": [
+        [
+          {
+            "node": "Responder error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error storage": {
+      "main": [
+        [
+          {
+            "node": "Responder error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error insercion": {
+      "main": [
+        [
+          {
+            "node": "Responder error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error traduccion": {
+      "main": [
+        [
+          {
+            "node": "Responder error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checklist editorial P2": {
+      "main": [
+        [
+          {
+            "node": "Insertar post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "saveManualExecutions": true,
+    "executionTimeout": 300,
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": null,
+  "nodeGroups": [],
+  "pinData": {},
+  "versionCounter": 7,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": []
+}
