@@ -23,6 +23,7 @@ pnpm dev                     # http://localhost:3000
 | `SUPABASE_SERVICE_ROLE_KEY` | Opcional, solo servidor. Escrituras del CMS sin depender de RLS. |
 | `CMS_ALLOWED_EMAILS` | Correos (separados por coma) de usuarios de Supabase Auth con acceso al CMS. Vacío = nadie. |
 | `FINNHUB_API_KEY` | Cotizaciones de acciones e índices. |
+| `COINGECKO_API_KEY` | Opcional, solo servidor. Llave gratuita "Demo" de CoinGecko para cotizaciones y ranking cripto (sin ella, acceso anónimo con menos cupo). |
 | `N8N_MCP_TOKEN`, `N8N_MCP_URL`, `N8N_WORKFLOW_ID` | Pipeline de contenido en n8n (solo servidor). |
 | `N8N_API_KEY` | API REST de n8n (solo servidor). Permite pausar/reanudar la automatización desde el CMS (`/api/automation/*`). Sin definir, esos botones quedan deshabilitados. |
 | `NEXT_PUBLIC_VIP_URL`, `NEXT_PUBLIC_TELEGRAM_URL` | Botones de la home (se ocultan si están vacías). |

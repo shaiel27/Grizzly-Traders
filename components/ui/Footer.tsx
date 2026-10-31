@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { NewsletterForm } from './NewsletterForm'
 import { LocaleSwitcher } from './LocaleSwitcher'
+import { COINGECKO_CREDIT_URL } from '@/lib/coingecko'
 import { getDictionary, t, type Dictionary, type Locale } from '@/lib/i18n/get-dictionary'
 
 interface CategoryData {
@@ -128,6 +129,12 @@ export function Footer({ categories = [], locale = 'es', dictionary }: FooterPro
       <div className="border-t border-hairline-soft">
         <p className="section-container py-4 text-[11px] leading-relaxed text-ink-muted">
           {dict.footer.riskNotice}
+        </p>
+        <p className="section-container pb-4 text-[11px] leading-relaxed text-ink-subtle">
+          {dict.footer.dataCredit}{' '}
+          <a href={COINGECKO_CREDIT_URL} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-ink">
+            Powered by CoinGecko
+          </a>
         </p>
       </div>
     </footer>

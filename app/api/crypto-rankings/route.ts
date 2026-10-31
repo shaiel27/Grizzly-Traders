@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
+import { COINGECKO_BASE, coingeckoHeaders } from '@/lib/coingecko'
 
 const COINGECKO_URL =
-  'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1&price_change_percentage=24h&sparkline=false'
+  `${COINGECKO_BASE}/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1&price_change_percentage=24h&sparkline=false`
 
 // CoinGecko: same provider already used in lib/prices.ts, just a different endpoint (market-wide ranking instead of a handful of spot prices)
 export async function GET() {
   try {
-    const response = await fetch(COINGECKO_URL, { next: { revalidate: 60 }, signal: AbortSignal.timeout(8_000) })
+    const response = await fetch(COINGECKO_URL, { headers: coingeckoHeaders(), next: { revalidate: 60 }, signal: AbortSignal.timeout(8_000) })
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
 
     const body = await response.json()

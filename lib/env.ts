@@ -19,6 +19,7 @@ const schema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: optionalText,
   CMS_ALLOWED_EMAILS: emailList.optional(),
   FINNHUB_API_KEY: optionalText,
+  COINGECKO_API_KEY: optionalText,
   N8N_MCP_TOKEN: optionalText,
   N8N_MCP_URL: z.url().optional(),
   N8N_WORKFLOW_ID: optionalText,

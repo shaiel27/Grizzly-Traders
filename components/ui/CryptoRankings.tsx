@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { clsx } from 'clsx'
 import { formatNumber, formatPrice } from '@/lib/format'
 import { useDictionary } from '@/lib/i18n/LocaleProvider'
+import { COINGECKO_CREDIT_URL } from '@/lib/coingecko'
 
 interface CryptoRanking {
   id: string
@@ -123,6 +124,8 @@ export function CryptoRankings() {
                           alt=""
                           width={18}
                           height={18}
+                          // Iconos de 18 px que CoinGecko ya sirve pequeños: pasar 50 por el optimizador no ahorra nada
+                          unoptimized
                           className="rounded-full"
                           onError={() => setBrokenIcons((prev) => new Set(prev).add(coin.id))}
                         />
@@ -144,7 +147,12 @@ export function CryptoRankings() {
           </table>
         </div>
       )}
-      <p className="mt-4 text-[11px] text-ink-subtle">{dict.cryptoRankings.source}</p>
+      <p className="mt-4 text-[11px] text-ink-subtle">
+        {dict.cryptoRankings.source}{' '}
+        <a href={COINGECKO_CREDIT_URL} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-ink">
+          Powered by CoinGecko
+        </a>
+      </p>
     </section>
   )
 }

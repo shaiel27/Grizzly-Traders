@@ -1,7 +1,7 @@
 import { unstable_cache } from 'next/cache'
 import { ASSET_BY_PLAIN, type AssetDefinition } from './assets-catalog'
+import { COINGECKO_BASE, coingeckoHeaders } from './coingecko'
 
-const COINGECKO_BASE = 'https://api.coingecko.com/api/v3'
 const FRANKFURTER_BASE = 'https://api.frankfurter.dev/v1'
 const FINNHUB_BASE = 'https://finnhub.io/api/v1'
 
@@ -15,8 +15,9 @@ class HttpError extends Error {
   }
 }
 
-async function fetchJson(url: string) {
+async function fetchJson(url: string, headers?: HeadersInit) {
   const response = await fetch(url, {
+    headers,
     next: { revalidate: 10 },
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
@@ -53,7 +54,8 @@ async function fetchCoinGeckoPrices(): Promise<PriceData[]> {
 
   try {
     const data = await fetchJson(
-      `${COINGECKO_BASE}/simple/price?ids=bitcoin,ethereum,solana,pax-gold&vs_currencies=usd&include_24hr_change=true`
+      `${COINGECKO_BASE}/simple/price?ids=bitcoin,ethereum,solana,pax-gold&vs_currencies=usd&include_24hr_change=true`,
+      coingeckoHeaders()
     )
     const now = Date.now()
 
