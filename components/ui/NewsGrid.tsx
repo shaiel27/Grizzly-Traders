@@ -8,13 +8,15 @@ import { t } from '@/lib/i18n/get-dictionary'
 import type { PostWithRelations } from '@/lib/types'
 
 const INITIAL_COUNT = 6
+const STEP = 6
 type SortMode = 'recent' | 'views'
 
 // Shows today's news capped to a handful of cards, with a "ver más" toggle to reveal the rest without
 // leaving the home page. Both sort modes reuse the same already-fetched 24h list — re-sorting client-side
 // avoids a second request just to answer "what's trending today".
 export function NewsGrid({ posts }: { posts: PostWithRelations[] }) {
-  const [expanded, setExpanded] = useState(false)
+  // Se muestran de 6 en 6: antes "ver más" montaba de golpe hasta 60 tarjetas con su imagen
+  const [count, setCount] = useState(INITIAL_COUNT)
   const [sort, setSort] = useState<SortMode>('recent')
   const { locale } = useLocale()
   const dict = useDictionary()
@@ -24,8 +26,8 @@ export function NewsGrid({ posts }: { posts: PostWithRelations[] }) {
     return [...posts].sort((a, b) => b.view_count - a.view_count)
   }, [posts, sort])
 
-  const hasMore = sorted.length > INITIAL_COUNT
-  const visible = expanded ? sorted : sorted.slice(0, INITIAL_COUNT)
+  const remaining = sorted.length - count
+  const visible = sorted.slice(0, count)
 
   return (
     <>
@@ -72,14 +74,14 @@ export function NewsGrid({ posts }: { posts: PostWithRelations[] }) {
         ))}
       </ul>
 
-      {hasMore && !expanded && (
+      {remaining > 0 && (
         <div className="mt-6 flex justify-center">
           <button
             type="button"
-            onClick={() => setExpanded(true)}
+            onClick={() => setCount((current) => current + STEP)}
             className="inline-flex items-center gap-2 rounded-full border border-hairline px-5 py-2.5 text-sm font-medium text-ink transition-[background-color,transform] duration-150 ease-out hover:bg-white/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-blue active:scale-[0.97] motion-reduce:transition-none"
           >
-            {t(dict.newsGrid.viewMore, { n: posts.length - INITIAL_COUNT })}
+            {t(dict.newsGrid.viewMore, { n: remaining })}
             <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
               expand_more
             </span>

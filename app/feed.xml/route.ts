@@ -1,5 +1,5 @@
 import { SITE_NAME, SITE_URL } from '@/lib/site'
-import { createPublicClient } from '@/lib/supabase/public'
+import { getFeedPosts } from '@/lib/api'
 import { htmlToText } from '@/lib/sanitize'
 
 function escapeXml(value: string): string {
@@ -12,20 +12,15 @@ function escapeXml(value: string): string {
 }
 
 export async function GET() {
-  const { data, error } = await createPublicClient()
-    .from('posts')
-    .select('title, published_at, created_at, translations:posts_translations!inner(slug, title, content_html, meta_description)')
-    .eq('status', 'published')
-    .eq('translations.locale', 'es')
-    .order('published_at', { ascending: false })
-    .limit(30)
-
-  if (error) {
+  let data: Awaited<ReturnType<typeof getFeedPosts>>
+  try {
+    data = await getFeedPosts()
+  } catch (error) {
     console.error('RSS query failed:', error)
     return new Response('Feed no disponible', { status: 503 })
   }
 
-  const items = (data ?? []).flatMap((post) => {
+  const items = data.flatMap((post) => {
     const translation = (post.translations as unknown as {
       slug: string
       title: string

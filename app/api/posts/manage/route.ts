@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { revalidateContent } from '@/lib/cache'
+import { revalidatePosts } from '@/lib/cache'
 import { requireEditor } from '@/lib/auth'
 import { createEditorClient } from '@/lib/supabase/admin'
 import { sanitizeArticleHtml, htmlToText } from '@/lib/sanitize'
@@ -75,7 +75,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ success: false, error: 'Artículo no encontrado' }, { status: 404 })
   }
 
-  revalidateContent()
+  revalidatePosts()
   return NextResponse.json({ success: true, message: 'Artículo eliminado' })
 }
 
@@ -118,7 +118,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ success: false, error: 'Artículo no encontrado' }, { status: 404 })
   }
 
-  revalidateContent()
+  revalidatePosts()
   return NextResponse.json({ success: true, message: 'Artículo actualizado' })
 }
 
@@ -228,7 +228,7 @@ export async function PUT(request: Request) {
     if (error) console.error('Update post tags error:', error)
   }
 
-  revalidateContent()
+  revalidatePosts()
 
   return NextResponse.json({
     success: true,

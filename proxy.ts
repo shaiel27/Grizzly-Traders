@@ -1,5 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { LOCALE_COOKIE, LOCALE_MAX_AGE } from '@/lib/i18n/constants'
+import { resolveRewrite } from '@/lib/i18n/rewrite'
 
 // Ventana fija por IP y ruta, solo en memoria: cada instancia del servidor (y cada réplica
 // en despliegues multi-instancia) aplica su propio presupuesto; no hay estado compartido.
@@ -41,9 +43,34 @@ function rateLimit(request: NextRequest): NextResponse | null {
 
 // Only refreshes the Supabase session cookie. Authorization is enforced in each
 // page and route handler (see lib/auth.ts), never here.
+// Páginas públicas: las URL no llevan idioma, pero el sitio vive en app/(site)/[locale]. Se reescribe según la cookie
+// `gt_locale` (la URL del navegador no cambia) para que cada idioma sea una página prerenderizada. No toca Supabase.
+function rewritePublicPage(request: NextRequest): NextResponse | null {
+  const decision = resolveRewrite(request.nextUrl.pathname, request.cookies.get(LOCALE_COOKIE)?.value)
+  if (decision.type === 'none') return null
+
+  if (decision.type === 'redirect') {
+    const target = request.nextUrl.clone()
+    target.pathname = decision.to
+    const response = NextResponse.redirect(target, 308)
+    response.cookies.set(LOCALE_COOKIE, decision.locale, { path: '/', maxAge: LOCALE_MAX_AGE, sameSite: 'lax' })
+    return response
+  }
+
+  const target = request.nextUrl.clone()
+  target.pathname = decision.to
+  const response = NextResponse.rewrite(target)
+  // El HTML depende de la cookie de idioma: cualquier caché compartida debe variar por ella
+  response.headers.set('Vary', 'Cookie')
+  return response
+}
+
 export async function proxy(request: NextRequest) {
   const limited = rateLimit(request)
   if (limited) return limited
+
+  const page = rewritePublicPage(request)
+  if (page) return page
 
   let response = NextResponse.next({ request })
 
@@ -86,5 +113,14 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/cms/:path*', '/login', '/api/posts/:path*', '/api/candles', '/api/quote', '/api/markets'],
+  matcher: [
+    '/cms/:path*',
+    '/login',
+    '/api/posts/:path*',
+    '/api/candles',
+    '/api/quote',
+    '/api/markets',
+    // Páginas públicas (se reescriben al idioma de la cookie): todo menos API, internos de Next, panel, acceso y archivos
+    '/((?!api|_next|cms|login|auth|.*\\..*).*)',
+  ],
 }

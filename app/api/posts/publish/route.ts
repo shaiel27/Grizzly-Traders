@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { revalidateContent } from '@/lib/cache'
+import { revalidatePosts } from '@/lib/cache'
 import { requireEditor } from '@/lib/auth'
 import { createEditorClient } from '@/lib/supabase/admin'
 import { sanitizeArticleHtml, htmlToText } from '@/lib/sanitize'
@@ -120,7 +120,7 @@ export async function POST(request: Request) {
     }
   }
 
-  revalidateContent()
+  revalidatePosts()
 
   return NextResponse.json({
     success: true,

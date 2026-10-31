@@ -1,8 +1,9 @@
 import type { MetadataRoute } from 'next'
 import { SITE_URL } from '@/lib/site'
-import { createPublicClient } from '@/lib/supabase/public'
+import { getSitemapPosts } from '@/lib/api'
 
-export const dynamic = 'force-dynamic'
+// Se regenera cada hora y al publicar (tag 'posts'); antes era dinámico y consultaba hasta 5000 filas en cada petición
+export const revalidate = 3600
 
 const STATIC_ROUTES: { path: string; changeFrequency: 'hourly' | 'daily' | 'weekly' | 'monthly'; priority: number }[] = [
   { path: '/', changeFrequency: 'hourly', priority: 1 },
@@ -24,20 +25,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: route.priority,
   }))
 
-  const { data, error } = await createPublicClient()
-    .from('posts')
-    .select('published_at, updated_at, translations:posts_translations!inner(slug)')
-    .eq('status', 'published')
-    .eq('translations.locale', 'es')
-    .order('published_at', { ascending: false })
-    .limit(5000)
-
-  if (error) {
+  let data: Awaited<ReturnType<typeof getSitemapPosts>>
+  try {
+    data = await getSitemapPosts()
+  } catch (error) {
     console.error('Sitemap posts query failed:', error)
     return entries
   }
 
-  for (const post of data ?? []) {
+  for (const post of data) {
     const translations = post.translations as unknown as { slug: string }[]
     const slug = translations?.[0]?.slug
     if (!slug) continue

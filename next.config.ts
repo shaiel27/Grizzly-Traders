@@ -47,7 +47,19 @@ const nextConfig: NextConfig = {
   // mismo dos veces, asi que el host especifico del log (assets-opt-snowboard-mini...) habria
   // dejado de servir apenas se reinicie el tunel.
   ...(isDev ? { allowedDevOrigins: ["*.trycloudflare.com"] } : {}),
+  // 404 global sin layouts (ver app/global-not-found.tsx): el sitio tiene varios layouts raíz y un segmento [locale] arriba
+  experimental: {
+    globalNotFound: true,
+  },
   images: {
+    // Las URL de portada llevan el id del post o un hash: no cambian. Una semana de caché en el optimizador evita
+    // recalcular las variantes (el VPS comparte CPU con n8n).
+    minimumCacheTTL: 60 * 60 * 24 * 7,
+    qualities: [75],
+    // Solo los anchos que de verdad se piden (tarjetas ~380 px, portada del artículo 896 px, iconos y avatares): menos
+    // variantes distintas por imagen = menos CPU y menos disco
+    deviceSizes: [640, 828, 1200, 1920],
+    imageSizes: [48, 96, 256, 384],
     remotePatterns: [
       {
         protocol: "https",
@@ -62,7 +74,12 @@ const nextConfig: NextConfig = {
     ],
   },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // Texturas del globo y fuente de iconos: no cambian entre despliegues salvo a mano, una semana basta
+      { source: "/globo/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=86400" }] },
+      { source: "/fonts/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=86400" }] },
+    ];
   },
 };
 

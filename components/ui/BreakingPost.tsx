@@ -116,7 +116,7 @@ export function BreakingPost({ post }: { post: PostWithRelations }) {
         </div>
 
         <div className="relative min-h-[280px] lg:min-h-full overflow-hidden border-t lg:border-t-0 lg:border-l border-hairline-soft">
-          <MediaPreview src={post.cover_image_url} icon={meta.icon} mediaGradient={meta.media} symbol={symbol} />
+          <MediaPreview src={post.cover_image_url} icon={meta.icon} mediaGradient={meta.media} symbol={symbol} sizes="(min-width: 1200px) 560px, (min-width: 1024px) 45vw, 100vw" />
           <div className="absolute top-3 left-3 rounded-lg border border-hairline bg-surface-container-lowest/90 px-2.5 py-1.5 backdrop-blur-sm">
             <span className="block font-mono text-sm font-bold text-gradient-coral">{symbol ?? meta.name}</span>
           </div>

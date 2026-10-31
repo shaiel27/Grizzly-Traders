@@ -247,6 +247,10 @@
             {
               "name": "x-upsert",
               "value": "true"
+            },
+            {
+              "name": "cache-control",
+              "value": "max-age=31536000"
             }
           ]
         },
@@ -1173,7 +1177,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ 'http://localhost:3100/api/cover/compose?flags=' + encodeURIComponent(($('Parsear JSON').item.json.cover_flags || []).join(',')) + '&assets=' + encodeURIComponent(($('Parsear JSON').item.json.cover_assets || []).join(',')) }}",
+        "url": "={{ 'http://localhost:3000/api/cover/compose?flags=' + encodeURIComponent(($('Parsear JSON').item.json.cover_flags || []).join(',')) + '&assets=' + encodeURIComponent(($('Parsear JSON').item.json.cover_assets || []).join(',')) }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
@@ -1426,6 +1430,47 @@
         "supabaseApi": {
           "id": "WZ5kOBX6Ia6HMoQs",
           "name": "Supabase account 2"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3000/api/revalidate",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"scope\":\"posts\"}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "5b1f2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c88",
+      "name": "Revalidar sitio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2380,
+        2380
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "coverApiCred0001",
+          "name": "Pipeline API portadas"
         }
       },
       "retryOnFail": true,
@@ -1895,6 +1940,11 @@
         [
           {
             "node": "Log ejecucion",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Revalidar sitio",
             "type": "main",
             "index": 0
           }

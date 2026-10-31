@@ -19,7 +19,7 @@ La portada de cada artículo automático se hace en dos pasos:
 | `PIPELINE_API_SECRET` | sitio | Secreto (32+ caracteres) del endpoint. Sin él la ruta responde 503 |
 | Credencial "Pipeline API portadas" | n8n (Header Auth) | `Authorization: Bearer <PIPELINE_API_SECRET>` |
 
-El nodo "Componer portada" apunta a `http://localhost:3100`. En el VPS hay que cambiarlo por la dirección del sitio (por ejemplo `http://localhost:3000`).
+El nodo "Componer portada" apunta a `http://localhost:3000`. En el VPS hay que cambiarlo por la dirección del sitio (por ejemplo `http://localhost:3000`).
 
 ## Si el sitio no responde
 
