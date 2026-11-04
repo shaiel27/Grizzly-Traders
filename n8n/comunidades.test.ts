@@ -14,14 +14,14 @@ const nodo = (name: string) => flujo.nodes.find((n) => n.name === name)!
 
 const CODIGO = nodo('Armar mensaje comunidades').parameters.jsCode!
 
-function ejecutar(post: Record<string, unknown>, vars: Record<string, string> = {}) {
-  const fn = new Function('$vars', '$', CODIGO)
+function ejecutar(post: Record<string, unknown>, vars: Record<string, string> = {}, entorno: Record<string, string> = {}) {
+  const fn = new Function('$vars', '$', '$env', CODIGO)
   const salidas: Record<string, unknown> = {
     'Parsear JSON': { item: { json: post } },
     'Reservar URL': { item: { json: { body: [{ id: '908db814-6cfb-4f50-8528-742626c5f8f3' }] } } },
   }
   // En modo "una vez por elemento" n8n exige devolver UN objeto { json }, no una lista
-  const salida = fn(vars, (name: string) => salidas[name])
+  const salida = fn(vars, (name: string) => salidas[name], entorno)
   if (Array.isArray(salida)) throw new Error('El nodo debe devolver { json }, no una lista')
   return salida.json as {
     url: string
@@ -50,6 +50,15 @@ describe('mensaje para las comunidades', () => {
     expect(m.telegram.reply_markup.inline_keyboard[0][0]).toEqual({ text: 'Leer artículo', url: m.url })
     expect(m.discord.embeds[0].url).toBe(m.url)
     expect(JSON.stringify(m)).not.toContain('investing.com')
+  })
+
+  it('toma SITE_URL de la variable de entorno del VPS, y si el acceso a $env está bloqueado usa $vars o el dominio', () => {
+    expect(ejecutar(post, {}, { SITE_URL: 'https://otro.example/' }).url).toBe('https://otro.example/articulos/estancamiento-economico-canada')
+    const bloqueado = new Proxy({}, { get() { throw new Error('access to env vars denied') } })
+    const fn = new Function('$vars', '$', '$env', CODIGO)
+    const salidas: Record<string, unknown> = { 'Parsear JSON': { item: { json: post } }, 'Reservar URL': { item: { json: { body: [{ id: '908db814-6cfb-4f50-8528-742626c5f8f3' }] } } } }
+    expect(fn({ SITE_URL: 'https://vars.example' }, (n: string) => salidas[n], bloqueado).json.url).toBe('https://vars.example/articulos/estancamiento-economico-canada')
+    expect(fn({}, (n: string) => salidas[n], bloqueado).json.url).toBe('https://grizzlytraders.com/articulos/estancamiento-economico-canada')
   })
 
   it('usa grizzlytraders.com si no hay SITE_URL', () => {
@@ -119,8 +128,8 @@ describe('flujo de noticias: cableado de las comunidades', () => {
 
   it('las llaves salen de variables de n8n, nunca escritas en el flujo', () => {
     const texto = readFileSync('n8n/pipeline-noticias.json', 'utf8')
-    expect(texto).toContain('$vars.TELEGRAM_BOT_TOKEN')
-    expect(texto).toContain('$vars.DISCORD_WEBHOOK_URL')
+    expect(texto).toContain('$env.TELEGRAM_BOT_TOKEN')
+    expect(texto).toContain('$env.DISCORD_WEBHOOK_URL')
     expect(texto).not.toMatch(/discord\.com\/api\/webhooks\/\d/)
     expect(texto).not.toMatch(/bot\d{6,}:/)
   })
