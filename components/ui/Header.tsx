@@ -408,19 +408,6 @@ export function Header({ categories = [], initialTicker }: HeaderProps) {
                 <span>{dict.header.telegramDiscord}</span>
               </Link>
             </Button>
-
-            {/* Admin-only, so it stays quiet at rest instead of matching the weight of public controls */}
-            <Link
-              href="/cms"
-              prefetch={false}
-              className="flex size-8 items-center justify-center rounded-full text-ink-subtle hover:bg-white/[0.06] hover:text-ink transition-colors"
-              aria-label={dict.header.adminPanel}
-              title={dict.header.adminPanel}
-            >
-              <span className="material-symbols-outlined text-[17px]" aria-hidden="true">
-                edit_note
-              </span>
-            </Link>
           </div>
         </nav>
       </div>
