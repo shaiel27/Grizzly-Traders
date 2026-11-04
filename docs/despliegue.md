@@ -29,9 +29,16 @@ Como `grizzly`: `git clone https://github.com/shaiel27/Grizzly-Traders.git /srv/
 
 Copiar `deploy/Caddyfile` a `/etc/caddy/Caddyfile` y `deploy/grizzly-web.service` a `/etc/systemd/system/`, luego `systemctl enable --now grizzly-web && systemctl reload caddy`. (Caddy pide el certificado solo cuando el DNS ya apunta al VPS.)
 
-## 3. n8n
-`deploy/docker-compose.n8n.yml` con un `.env` junto a él (`N8N_ENCRYPTION_KEY`, y luego los de Telegram/Discord). Entrar por túnel SSH a `http://localhost:5678`, importar `n8n/*.json`, recrear las credenciales (Supabase, "Pipeline API portadas", Resend…) y activar los flujos. **Aviso:** las *Variables* de n8n (`$vars`) son de pago en la edición gratuita; el pipeline las usa para SITE_URL, Telegram y Discord. Con la imagen oficial hay que cambiarlas por `$env` (el compose ya las pasa como variables de entorno) — pendiente antes de activar las comunidades.
+## 3. n8n (Docker, solo local en el VPS)
+En `/srv/grizzly/n8n`: `docker-compose.yml` (de `deploy/docker-compose.n8n.yml`) y un `.env` con `N8N_ENCRYPTION_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` y `DISCORD_WEBHOOK_URL` (chmod 600). Escucha en `127.0.0.1:5678`: no se publica; se entra por túnel SSH:
+`ssh -L 5678:127.0.0.1:5678 -i ~/.ssh/id_ed25519 grizzly@IP` y abrir `http://localhost:5678`.
+
+- **Credenciales:** se exportan cifradas del n8n anterior (`export:credentials --all`) y se importan con la **misma `N8N_ENCRYPTION_KEY`**, así nunca viajan en texto plano. Flujos: `import:workflow` de `n8n/*.json`, luego `publish:workflow` y reiniciar el contenedor.
+- **Nodo Firecrawl** (comunidad): `docker compose exec n8n sh -c "cd /home/node/.n8n/nodes && npm i --omit=dev --omit=peer --ignore-scripts @mendable/n8n-nodes-firecrawl@2.2.0"` y reiniciar (la imagen no trae compilador, por eso `--ignore-scripts`).
+- **Variables:** las *Variables* de n8n son de pago; los flujos leen variables de entorno (`$env`), que define el compose.
+- **Un solo n8n activo:** si el de otra máquina sigue encendido, el pipeline publicaría por duplicado. Detener el anterior al traspasar.
+- Propietario inicial: la contraseña aleatoria está en `/srv/grizzly/n8n/owner-password.txt` (solo `grizzly`); cambiarla al primer ingreso.
 
 ## 4. Después de publicar
-Supabase → Auth → URL del sitio y redirecciones a `https://grizzlytraders.com`; comprobar un correo de prueba de la newsletter; activar los nodos de Telegram/Discord; regenerar el webhook de Discord; copias de seguridad/snapshots del VPS; etiqueta `v0.1.0`.
+Supabase → Authentication → URL Configuration: *Site URL* `https://grizzlytraders.com` y *Redirect URLs* `https://grizzlytraders.com/auth/callback` (y `http://localhost:3000/auth/callback` para desarrollo); comprobar un correo de prueba de la newsletter; activar los nodos de Telegram/Discord; regenerar el webhook de Discord; copias de seguridad/snapshots del VPS; etiqueta `v0.1.0`.
 Actualizar el sitio: `bash deploy/actualizar.sh`. CDN delante (si se añade): debe variar por la cookie `gt_locale`.

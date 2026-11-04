@@ -11,7 +11,10 @@ services:
       GENERIC_TIMEZONE: America/Caracas
       TZ: America/Caracas
       N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}   # guardar aparte: sin ella no se descifran las credenciales
-      # Telegram/Discord/SITE_URL: ver docs/despliegue.md (las "Variables" de n8n pueden requerir licencia; alternativa: $env)
+      N8N_SECURE_COOKIE: "false"                  # se entra por túnel SSH (http://localhost:5678), no por HTTPS
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_PERSONALIZATION_ENABLED: "false"
+      # Las "Variables" de n8n son de pago: los flujos leen estas como variables de entorno ($env)
       SITE_URL: https://grizzlytraders.com
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
