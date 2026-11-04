@@ -14,3 +14,5 @@ n8n publish:workflow --id=xvENLqv9HYCbOVcj
 Probar una vuelta sin esperar los 15 minutos: `n8n execute --id=xvENLqv9HYCbOVcj` (arranca desde el nodo "Prueba manual"; si n8n ya está corriendo, usar otro `N8N_RUNNERS_BROKER_PORT`).
 
 Antes de desplegar en el VPS: el nodo "Componer portada" apunta a `http://localhost:3000`; cambiarlo a la dirección del sitio. Detalles en `docs/portadas.md`.
+
+Telegram y Discord: `docs/comunidades.md` (variables de n8n, formato del mensaje y cómo encenderlos).
