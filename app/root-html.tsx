@@ -19,9 +19,15 @@ export function RootHtml({ locale, children }: { locale: Locale; children: React
     <html lang={locale} className={`${inter.variable} ${serif.variable} h-full antialiased`} suppressHydrationWarning>
       <head>
         <link rel="preload" href="/fonts/material-symbols.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
-        <script dangerouslySetInnerHTML={{ __html: INTRO_SCRIPT }} />
       </head>
-      <body className="min-h-full flex flex-col bg-canvas text-on-surface">{children}</body>
+      <body className="min-h-full flex flex-col bg-canvas text-on-surface">
+        {/* El script va como HTML dentro de un elemento, no como <script> de React: al cambiar de idioma Next vuelve a montar
+            todo el layout raíz en el cliente (cambia el parámetro [locale]) y React avisa ("Encountered a script tag
+            while rendering React component") cuando crea un <script> ahí. Al servir la página el navegador lo ejecuta
+            igual, justo al empezar el <body>, antes de pintar nada. */}
+        <span hidden dangerouslySetInnerHTML={{ __html: `<script>${INTRO_SCRIPT}</script>` }} />
+        {children}
+      </body>
     </html>
   )
 }
