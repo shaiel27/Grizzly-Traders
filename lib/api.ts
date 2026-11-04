@@ -335,6 +335,19 @@ export async function incrementViewCount(postId: string) {
   if (error) console.error('Failed to increment view count:', error)
 }
 
+// Lectura del contador sin caché de datos: el lector la pide justo después de contar su visita.
+export async function getPostViewCount(postId: string): Promise<number | null> {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!serviceKey) return null
+  const client = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } })
+  const { data, error } = await client.from('posts').select('view_count').eq('id', postId).maybeSingle()
+  if (error) {
+    console.error('Failed to read view count:', error)
+    return null
+  }
+  return data?.view_count ?? null
+}
+
 async function getPostsByCategoryRaw(categorySlug: string, limit = 3, locale: 'es' | 'en' = 'es') {
   const supabase = createPublicClient()
 

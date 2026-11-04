@@ -1,5 +1,5 @@
 // Contador de vistas de los artículos. El artículo es una página que se puede cachear: la visita se cuenta con una
-// petición aparte (components/ui/ViewBeacon.tsx → POST /api/views/[id]), no en el render.
+// petición aparte (components/ui/ArticleViews.tsx → POST y GET /api/views/[id]), no en el render.
 
 const BOT_PATTERN = /bot|crawl|spider|slurp|preview|facebookexternalhit|headless/i
 
