@@ -11,20 +11,8 @@ interface CategoryData {
   slug: string
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  criptomonedas: 'Crypto',
-  forex: 'Forex',
-  'materias-primas': 'Commodities',
-  acciones: 'Equities',
-}
-
-const FALLBACK_LINKS = [
-  { label: 'Forex', href: '/articulos?categoria=forex' },
-  { label: 'Crypto', href: '/articulos?categoria=criptomonedas' },
-  { label: 'Commodities', href: '/articulos?categoria=materias-primas' },
-  { label: 'Equities', href: '/articulos?categoria=acciones' },
-]
-
+// Respaldo si la base de datos no devuelve categorías: mismas cuatro, con el nombre del idioma activo (dict.header.categoryNav)
+const FALLBACK_SLUGS = ['forex', 'criptomonedas', 'materias-primas', 'acciones'] as const
 interface FooterProps {
   categories?: CategoryData[]
   // Footer has no 'use client' directive (no hooks), so — unlike Header — it can't read LocaleContext
@@ -35,12 +23,10 @@ interface FooterProps {
 
 export function Footer({ categories = [], locale = 'es', dictionary }: FooterProps) {
   const dict = dictionary ?? getDictionary(locale)
-  const navLinks = categories.length > 0
-    ? categories.map((cat) => ({
-        label: CATEGORY_LABELS[cat.slug] ?? cat.name,
-        href: `/articulos?categoria=${cat.slug}`,
-      }))
-    : FALLBACK_LINKS
+  const categoryLabels = dict.header.categoryNav as Record<string, string>
+  const navLinks = (categories.length > 0 ? categories.map((cat) => ({ slug: cat.slug, name: cat.name })) : FALLBACK_SLUGS.map((slug) => ({ slug, name: slug }))).map(
+    (cat) => ({ label: categoryLabels[cat.slug] ?? cat.name, href: `/articulos?categoria=${cat.slug}` })
+  )
 
   return (
     <footer className="border-t border-hairline-soft bg-surface-container-lowest">
