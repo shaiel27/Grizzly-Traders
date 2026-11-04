@@ -1,0 +1,16 @@
+# /etc/systemd/system/grizzly-web.service
+[Unit]
+Description=Grizzly Traders (Next.js)
+After=network.target
+
+[Service]
+User=grizzly
+WorkingDirectory=/srv/grizzly/web
+EnvironmentFile=/srv/grizzly/web/.env.production
+Environment=NODE_ENV=production PORT=3000 HOSTNAME=127.0.0.1
+ExecStart=/usr/bin/pnpm start
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
