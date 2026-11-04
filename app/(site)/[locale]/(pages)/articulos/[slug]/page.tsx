@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArticleCard, Badge, Chip, Breadcrumbs } from '@/components/ui'
 import { ShareButtons } from '@/components/ui/ShareButtons'
-import { ViewBeacon } from '@/components/ui/ViewBeacon'
+import { ArticleViews } from '@/components/ui/ArticleViews'
 import { getPostBySlug, getRelatedPosts } from '@/lib/api'
 import { htmlToText, optimizeArticleImages, sanitizeArticleHtml } from '@/lib/sanitize'
 import { SITE_NAME, SITE_URL } from '@/lib/site'
@@ -88,7 +88,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
     notFound()
   }
 
-  // El contador sube con ViewBeacon (una petición aparte): así esta página no lee cabeceras ni consulta view_count
+  // El contador lo cuenta ArticleViews (una petición aparte): así esta página no lee cabeceras ni consulta view_count
   const viewCount = post.view_count
 
   const dict = getDictionary(locale)
@@ -138,7 +138,6 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
         dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd) }}
       />
 
-      <ViewBeacon postId={post.id} />
       <main id="main-content" tabIndex={-1} className="flex-1 pt-[var(--header-height-sin-ticker)] pb-24">
         <article className="section-container max-w-4xl pt-8">
           <Breadcrumbs
@@ -215,7 +214,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
                 </>
               )}
               <span>•</span>
-              <span>{t(dict.article.views, { n: viewCount.toLocaleString(locale === 'en' ? 'en-US' : 'es-ES') })}</span>
+              <ArticleViews postId={post.id} initial={viewCount} template={dict.article.views} locale={locale} />
             </div>
           </header>
 
