@@ -20,7 +20,10 @@ function ejecutar(post: Record<string, unknown>, vars: Record<string, string> = 
     'Parsear JSON': { item: { json: post } },
     'Reservar URL': { item: { json: { body: [{ id: '908db814-6cfb-4f50-8528-742626c5f8f3' }] } } },
   }
-  return fn(vars, (name: string) => salidas[name])[0].json as {
+  // En modo "una vez por elemento" n8n exige devolver UN objeto { json }, no una lista
+  const salida = fn(vars, (name: string) => salidas[name])
+  if (Array.isArray(salida)) throw new Error('El nodo debe devolver { json }, no una lista')
+  return salida.json as {
     url: string
     portada: string
     portadaJpeg: string
