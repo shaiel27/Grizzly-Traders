@@ -31,13 +31,6 @@ interface NavEntry {
   group?: 'content' | 'tools'
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  criptomonedas: 'Crypto',
-  forex: 'Forex',
-  'materias-primas': 'Commodities',
-  acciones: 'Equities',
-}
-
 // Icono por slug, solo para el menu movil (el desktop no lleva iconos en la fila de categorias).
 // 'category' de respaldo: una categoria nueva creada desde el CMS con un slug que no esta aca
 // no se queda sin icono, solo con uno generico.
@@ -55,12 +48,8 @@ const NAV_ICONS: Record<string, string> = {
   __markets: 'candlestick_chart',
 }
 
-const FALLBACK_NAV: NavEntry[] = [
-  { label: 'Forex', slug: 'forex', href: '/articulos?categoria=forex' },
-  { label: 'Crypto', slug: 'criptomonedas', href: '/articulos?categoria=criptomonedas' },
-  { label: 'Commodities', slug: 'materias-primas', href: '/articulos?categoria=materias-primas' },
-  { label: 'Equities', slug: 'acciones', href: '/articulos?categoria=acciones' },
-]
+// Respaldo si la base de datos no devuelve categorías: mismas cuatro, con el nombre del idioma activo (dict.header.categoryNav)
+const FALLBACK_SLUGS = ['forex', 'criptomonedas', 'materias-primas', 'acciones'] as const
 
 interface NavLinksProps {
   items: NavEntry[]
@@ -238,16 +227,16 @@ export function Header({ categories = [], initialTicker }: HeaderProps) {
     return () => observer.disconnect()
   }, [])
 
-  // Category nav labels (Forex/Crypto/Commodities/Equities) stay as short English trading jargon in
-  // both locales, by existing design (CATEGORY_LABELS/FALLBACK_NAV below) — not translated here.
-  const categoryItems: NavEntry[] =
-    categories.length > 0
-      ? categories.map((cat) => ({
-          label: CATEGORY_LABELS[cat.slug] ?? cat.name,
-          slug: cat.slug,
-          href: `/articulos?categoria=${cat.slug}`,
-        }))
-      : FALLBACK_NAV
+  // Nombres de las categorías en la barra: salen del diccionario del idioma activo (Stocks, Cripto/Crypto, Materias
+  // primas/Commodities…). Una categoría nueva creada desde el CMS usa el nombre que tenga en la base de datos.
+  const categoryLabels = dict.header.categoryNav as Record<string, string>
+  const categoryItems: NavEntry[] = (
+    categories.length > 0 ? categories.map((cat) => ({ slug: cat.slug, name: cat.name })) : FALLBACK_SLUGS.map((slug) => ({ slug, name: slug }))
+  ).map((cat) => ({
+    label: categoryLabels[cat.slug] ?? cat.name,
+    slug: cat.slug,
+    href: `/articulos?categoria=${cat.slug}`,
+  }))
   const navItems: NavEntry[] = [{ label: dict.header.navNews, slug: '', href: '/articulos' }, ...categoryItems]
   const desktopItems: NavEntry[] = [...navItems, { label: dict.header.navAuthor, slug: '__autor', href: '/autor' }]
   const mobileItems: NavEntry[] = [

@@ -29,6 +29,12 @@
     "searchAriaLabel": "Search news",
     "searchButtonAria": "Search",
     "navNews": "News",
+    "categoryNav": {
+      "criptomonedas": "Crypto",
+      "forex": "Forex",
+      "materias-primas": "Commodities",
+      "acciones": "Stocks"
+    },
     "navAuthor": "Author",
     "navPivotPoints": "Pivot Points",
     "navCalendar": "Economic calendar",
@@ -252,7 +258,7 @@
       "criptomonedas": "Crypto",
       "forex": "Forex",
       "materias-primas": "Commodities",
-      "acciones": "Equities",
+      "acciones": "Stocks",
       "default": "News"
     },
     "timeAgo": {
