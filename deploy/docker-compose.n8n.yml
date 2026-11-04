@@ -1,0 +1,23 @@
+# n8n en el mismo VPS, solo accesible desde el propio servidor. Lanzar: docker compose -f docker-compose.n8n.yml up -d
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:2.41.0   # misma versión que en local; fijarla evita sorpresas al actualizar
+    restart: always
+    network_mode: host                      # así "http://localhost:3000" de los flujos llega al sitio
+    environment:
+      N8N_HOST: 127.0.0.1
+      N8N_PORT: 5678
+      N8N_LISTEN_ADDRESS: 127.0.0.1
+      GENERIC_TIMEZONE: America/Caracas
+      TZ: America/Caracas
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}   # guardar aparte: sin ella no se descifran las credenciales
+      # Telegram/Discord/SITE_URL: ver docs/despliegue.md (las "Variables" de n8n pueden requerir licencia; alternativa: $env)
+      SITE_URL: https://grizzlytraders.com
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+    volumes:
+      - n8n_data:/home/node/.n8n
+volumes:
+  n8n_data:

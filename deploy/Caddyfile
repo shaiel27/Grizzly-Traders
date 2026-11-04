@@ -1,0 +1,15 @@
+# /etc/caddy/Caddyfile — HTTPS automático (Let's Encrypt) y www → dominio sin www
+www.grizzlytraders.com {
+	redir https://grizzlytraders.com{uri} permanent
+}
+
+grizzlytraders.com {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:3000
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+}
+# n8n NO se publica: solo escucha en 127.0.0.1:5678 y se usa por túnel SSH (ssh -L 5678:127.0.0.1:5678 usuario@IP)
