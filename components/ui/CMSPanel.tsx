@@ -8,6 +8,7 @@ import { t } from '@/lib/i18n/get-dictionary'
 import { copyFigures, figuresOf } from '@/lib/rich-html'
 import { briefImageCount, briefTextLength, briefToPayload, MAX_BRIEF_IMAGES } from '@/lib/brief'
 import { RichEditor } from './RichEditor'
+import { SubscribersPanel } from './SubscribersPanel'
 import { useLocale, useDictionary } from '@/lib/i18n/LocaleProvider'
 import type { Category, Tag, Asset, AssetType, Source } from '@/lib/types'
 
@@ -209,7 +210,7 @@ function StatusIcon({ kind, className }: { kind: 'error' | 'warning' | 'check'; 
 export function CMSPanel({ initialCategories, initialTags, initialAssets, initialSources, initialAssetTypes }: CMSPanelProps) {
   const { locale } = useLocale()
   const dict = useDictionary().cms
-  const [activeTab, setActiveTab] = useState<'editor' | 'posts' | 'settings'>('editor')
+  const [activeTab, setActiveTab] = useState<'editor' | 'posts' | 'subscribers' | 'settings'>('editor')
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
   const [pipelineRunning, setPipelineRunning] = useState(false)
@@ -292,7 +293,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
     }
   }
 
-  const selectTab = (tab: 'editor' | 'posts' | 'settings') => {
+  const selectTab = (tab: 'editor' | 'posts' | 'subscribers' | 'settings') => {
     setActiveTab(tab)
     if (tab === 'posts') loadPosts()
   }
@@ -706,6 +707,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
               {([
                 { key: 'editor', label: dict.tabEditor, icon: 'edit' },
                 { key: 'posts', label: dict.tabPosts, icon: 'article' },
+                { key: 'subscribers', label: dict.tabSubscribers, icon: 'groups' },
                 { key: 'settings', label: dict.tabSettings, icon: 'settings' },
               ] as const).map((tab) => (
                 <button
@@ -1581,6 +1583,8 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
           )}
 
           {/* SETTINGS TAB */}
+          {activeTab === 'subscribers' && <SubscribersPanel />}
+
           {activeTab === 'settings' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <CatalogCard
