@@ -8,7 +8,7 @@ User=grizzly
 WorkingDirectory=/srv/grizzly/web
 EnvironmentFile=/srv/grizzly/web/.env.production
 Environment=NODE_ENV=production PORT=3000 HOSTNAME=127.0.0.1
-ExecStart=/usr/bin/pnpm start
+ExecStart=/usr/bin/pnpm start -H 127.0.0.1
 Restart=always
 RestartSec=3
 
