@@ -39,7 +39,11 @@ interface PostListItem {
   // no romper si la API vieja aun no los manda.
   pipeline_error?: string | null
   pipeline_attempts?: number | null
+  // Lo que le falta al artículo (portada, categoría, traducción): el CMS ofrece completarlo
+  faltantes?: { portada: boolean; categoria: boolean; traduccion: boolean }
 }
+
+const hayFalta = (f?: PostListItem['faltantes']) => !!f && (f.portada || f.categoria || f.traduccion)
 
 // `pipeline_error` llega con prefijo: `checklist:` = el checklist editorial lo rechazo (hay que
 // corregir el contenido), `error:` = fallo tecnico (reintentar). Sin prefijo conocido se muestra
@@ -222,6 +226,8 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
     toggling: false,
   })
   const [postsList, setPostsList] = useState<PostListItem[]>([])
+  // Artículos que se están completando en segundo plano (id -> cuándo empezó). Mientras haya alguno se consulta la lista.
+  const [completando, setCompletando] = useState<Record<string, number>>({})
   const [loadingPosts, setLoadingPosts] = useState(false)
   const [loadingEdit, setLoadingEdit] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -276,8 +282,8 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
   const generatedDraft = assist.phase === 'done' && editingId === assist.postId ? assist : null
 
   // Load posts list
-  const loadPosts = async () => {
-    setLoadingPosts(true)
+  const loadPosts = async (quiet = false) => {
+    if (!quiet) setLoadingPosts(true)
     try {
       const res = await fetch('/api/posts/list')
       if (res.status === 401 || res.status === 403) {
@@ -285,11 +291,56 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
         return
       }
       const data = await res.json()
-      if (data.success) setPostsList(data.data)
+      if (data.success) {
+        setPostsList(data.data)
+        // El seguimiento de "completando" termina cuando ya no falta nada o pasan 6 minutos
+        setCompletando((prev) => {
+          const next = { ...prev }
+          for (const id of Object.keys(prev)) {
+            const post = (data.data as PostListItem[]).find((p) => p.id === id)
+            if (!post || !hayFalta(post.faltantes) || Date.now() - prev[id] > 6 * 60_000) delete next[id]
+          }
+          return Object.keys(next).length === Object.keys(prev).length ? prev : next
+        })
+      }
     } catch (e) {
       console.error('Failed to load posts:', e)
     } finally {
       setLoadingPosts(false)
+    }
+  }
+
+  const iniciarSeguimiento = (id: string) => setCompletando((prev) => ({ ...prev, [id]: Date.now() }))
+
+  // Mientras se completa algo, la lista se refresca sola; el seguimiento termina cuando ya no falta nada o pasan 6 minutos
+  const seguimientoActivo = Object.keys(completando).length > 0
+  useEffect(() => {
+    if (!seguimientoActivo) return
+    const timer = window.setInterval(() => void loadPosts(true), 12_000)
+    return () => window.clearInterval(timer)
+  }, [seguimientoActivo])
+  const handleCompletar = async (id: string) => {
+    iniciarSeguimiento(id)
+    const quitar = () => setCompletando((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => k !== id)))
+    try {
+      const res = await fetch('/api/posts/completar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      if (res.status === 401 || res.status === 403) {
+        window.location.assign('/login')
+        return
+      }
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data?.success) {
+        window.alert(data?.error ?? dict.genericActionError)
+        quitar()
+      }
+    } catch (e) {
+      console.error('Complete post error:', e)
+      window.alert(dict.connectionError)
+      quitar()
     }
   }
 
@@ -570,7 +621,10 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
       const data = await res.json()
 
       if (data.success) {
-        setSaveMsg(`✓ ${data.message}`)
+        // Lo que falte (portada, categoría, traducción) se completa en segundo plano: se avisa y se sigue en la lista
+        const completar = hayFalta(data.data?.completando) && data.data?.id
+        setSaveMsg(`✓ ${data.message}${completar ? ` · ${dict.editor.completingNote}` : ''}`)
+        if (completar) iniciarSeguimiento(data.data.id)
         if (!editingId && postData.status === 'published') resetForm()
       } else {
         setSaveMsg(`✗ ${data.error}`)
@@ -594,6 +648,8 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
         window.alert(data?.error ?? dict.genericActionError)
         return
       }
+      // Publicar desde la lista también completa lo que falte
+      if (hayFalta(data.data?.completando) && typeof init.body === 'string') iniciarSeguimiento(String(JSON.parse(init.body).id))
       loadPosts()
     } catch (e) {
       console.error('Manage request error:', e)
@@ -1462,6 +1518,29 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                               : dict.posts.noDate}{' '}
                             · {post.view_count} {dict.posts.viewsSuffix}
                           </p>
+                          {(() => {
+                            // Lo que le falta al artículo: portada, categoría o traducción (el modo Manual solo guarda lo escrito)
+                            const f = post.faltantes
+                            if (!hayFalta(f) || post.status !== 'published') return null
+                            const faltan = [f?.portada && dict.posts.missingCover, f?.categoria && dict.posts.missingCategory, f?.traduccion && dict.posts.missingTranslation].filter(Boolean)
+                            const enCurso = post.id in completando
+                            return (
+                              <div className="mt-2.5 flex flex-wrap items-center gap-2 rounded-lg border border-semantic-warning/30 bg-semantic-warning/[0.07] px-3 py-2 text-[12px] leading-relaxed">
+                                <StatusIcon kind="warning" className="size-3.5 text-semantic-warning" />
+                                <p className="min-w-0 flex-1 text-ink-muted">
+                                  <span className="font-bold text-semantic-warning">{dict.posts.missingLabel}</span> {faltan.join(' · ')}
+                                </p>
+                                <button
+                                  type="button"
+                                  disabled={enCurso}
+                                  onClick={() => handleCompletar(post.id)}
+                                  className={clsx('rounded-md bg-accent-blue/10 px-2.5 py-1 text-xs font-bold text-accent-blue-hover transition-colors hover:bg-accent-blue/20 disabled:cursor-wait disabled:opacity-60', focusRing)}
+                                >
+                                  {enCurso ? dict.posts.completing : dict.posts.complete}
+                                </button>
+                              </div>
+                            )
+                          })()}
                           {(() => {
                             // Motivo visible de por que este borrador no salio solo (columna
                             // pipeline_error). Etiqueta + icono + color: tres canales, no uno.

@@ -1,0 +1,1641 @@
+{
+  "name": "CMS Completar articulo -> portada, categoria y traduccion",
+  "id": "cmsCompletar0001",
+  "nodes": [
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000001",
+      "name": "Webhook Completar",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cms-completar",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "b8e1a7c2-5d34-4f90-a1c6-3e9d2f7b4a15"
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000002",
+      "name": "Validar entrada",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Entrada: { post_id, solicitado_por }. Solo se acepta un UUID: el resto se lee de la base, nunca del cuerpo.\nconst body = ($json && typeof $json.body === 'object' && $json.body !== null) ? $json.body : $json;\nconst id = typeof body.post_id === 'string' ? body.post_id.trim() : '';\nconst ok = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);\nreturn [{ json: { valido: ok, ok: false, error: ok ? '' : 'post_id debe ser un UUID.', etapa: 'entrada', post_id: id, solicitado_por: typeof body.solicitado_por === 'string' ? body.solicitado_por.trim().slice(0, 120) : '' } }];"
+      }
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000003",
+      "name": "Entrada valida",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.valido }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000004",
+      "name": "Responder 400",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        240
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: $json.error, etapa: $json.etapa }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      }
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000005",
+      "name": "Leer post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "method": "GET",
+        "url": "=https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts?id=eq.{{ $json.post_id }}&select=id,status,cover_image_url,category_id,original_locale,posts_translations(locale,title,slug,content_html,meta_title,meta_description)",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000006",
+      "name": "Decidir",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Que le falta al articulo. Solo se completa lo que falta: el texto del editor no se toca nunca.\nconst entrada = $('Validar entrada').first().json;\nconst filas = $json.body;\nconst post = Array.isArray(filas) ? filas[0] : null;\nif (!post) throw new Error('No existe el articulo ' + entrada.post_id + '.');\nconst trads = Array.isArray(post.posts_translations) ? post.posts_translations : [];\nconst locales = trads.map((t) => t.locale);\nconst original_locale = locales.includes(post.original_locale) ? post.original_locale : (locales[0] || 'es');\nconst origen = trads.find((t) => t.locale === original_locale) || trads[0];\nif (!origen) throw new Error('El articulo no tiene ninguna version escrita.');\nconst opuesto = original_locale === 'es' ? 'en' : 'es';\nconst falta_portada = !post.cover_image_url;\nconst falta_categoria = post.category_id === null || post.category_id === undefined;\nconst falta_traduccion = !locales.includes(opuesto);\nconst texto = String(origen.content_html || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\\s+/g, ' ').trim();\nconst slugArchivo = String(origen.slug || 'articulo').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80).replace(/-+$/g, '') || 'articulo';\nreturn [{ json: {\n  post_id: post.id, status: post.status, titulo: origen.title, texto: texto.slice(0, 3000),\n  original_locale, opuesto,\n  origen: { title: origen.title, slug: origen.slug, content_html: origen.content_html, meta_title: origen.meta_title, meta_description: origen.meta_description },\n  archivo_portada: slugArchivo + '-' + String(post.id).slice(0, 8) + '.webp',\n  falta_portada, falta_categoria, falta_traduccion,\n  solicitado_por: entrada.solicitado_por\n} }];"
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000007",
+      "name": "Error lectura",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        240
+      ],
+      "parameters": {
+        "jsCode": "const it = $input.first().json || {};\nconst raw = it.error ?? it.message ?? '';\nlet msg = typeof raw === 'string' ? raw : (raw && (raw.message || raw.description)) || '';\nif (!msg && raw && typeof raw === 'object') { try { msg = JSON.stringify(raw).slice(0, 300); } catch (e) { msg = ''; } }\nreturn [{ json: { ok: false, etapa: 'lectura', error: msg || 'No se pudo leer el articulo.' } }];"
+      }
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000008",
+      "name": "Responder error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1080,
+        240
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: $json.error, etapa: $json.etapa }) }}",
+        "options": {
+          "responseCode": 500
+        }
+      }
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000009",
+      "name": "Falta portada o categoria",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1360,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $('Decidir').first().json.falta_portada || $('Decidir').first().json.falta_categoria }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000010",
+      "name": "GPT · Clasificar",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        1580,
+        0
+      ],
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-4o-mini"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Eres editor de un portal de noticias financieras. Recibes un articulo ya escrito y NO lo modificas: solo lo clasificas y describes la escena de su portada. Devuelves SIEMPRE un JSON valido y estricto, sin markdown, con estas claves exactas: category (una de: criptomonedas, forex, materias-primas, acciones; si trata de banca, empresas, bolsa o economia general usa acciones), prompt_imagen (descripcion EN INGLES de la ESCENA FOTOGRAFICA de la portada, de 25 a 60 palabras, hecha a la medida de ESTE articulo). Identifica al PROTAGONISTA de la noticia (la materia prima, el activo, el sector, la industria, el tipo de empresa o el organismo) y el HECHO concreto (que cambia, que se gana o se pierde, que se rompe o se acumula). Describe una escena fotografica realista y especifica de ESE protagonista en su entorno real, de modo que alguien que vea la portada sin leer el titular entienda de que trata: oro -> lingotes apilados en una camara acorazada; petroleo -> plataforma maritima, tanques de refineria o un petrolero; semiconductores -> obleas de silicio en una sala blanca; trigo o maiz -> espigas o un silo en plena cosecha; banco central -> la sala de un consejo con una mesa larga vacia; farmaceutica o biotecnologia -> material de laboratorio e instrumentos de analisis; automocion -> una linea de ensamblaje; energia -> turbinas, paneles o lineas de alta tension; logistica y comercio exterior -> un puerto con gruas y contenedores; banca -> la fachada de piedra de una sede bancaria generica. Son validos y deseables los objetos, maquinas y lugares reales y reconocibles del sector, siempre genericos (sin marcas ni rotulos legibles). Si la noticia trata de UNA EMPRESA concreta, NUNCA escribas su nombre, su marca ni sus productos por nombre en prompt_imagen (el generador los dibujaria como texto): describe lo que la hace reconocible, es decir, lo que fabrica u opera, con formas y objetos reales. Cohetes y espacio -> un cohete de acero inoxidable en su plataforma de lanzamiento, con la torre y el vapor, al anochecer; coches electricos -> una linea de ensamblaje con brazos roboticos; smartphones, portatiles y electronica de consumo -> las manos de un tecnico montando un dispositivo de metal y cristal en un banco limpio; comercio electronico y logistica -> un almacen enorme con cintas transportadoras y cajas lisas; chips -> obleas de silicio o un tecnico con traje blanco en una sala blanca; software, nube e inteligencia artificial -> pasillos de servidores de un centro de datos; aerolineas y aviones -> el fuselaje de un avion en un hangar; restaurantes y comida rapida -> un mostrador de cocina con manos pasando comida envuelta en papel liso; inmobiliario y oficinas -> rascacielos de oficinas vistos desde la acera, con la arquitectura propia de la ciudad de la noticia; automocion tradicional, energia, banca y farmaceuticas -> como en la lista anterior. Prefiere pocos objetos grandes y reconocibles; si hay personas, de espaldas o en silueta."
+            },
+            {
+              "content": "=TITULAR: {{ $('Decidir').first().json.titulo }}\n\nTEXTO DEL ARTICULO:\n{{ $('Decidir').first().json.texto }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "MCllGOOMXeswQUEW",
+          "name": "OpenAI account 2"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000011",
+      "name": "Parsear clasificacion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Nunca falla: si GPT no responde, la portada sale con una escena neutra y la categoria queda sin asignar.\nconst DEFECTO = 'A single large smooth brushed-metal disc resting on coarse stone, with one hairline crack across its surface, no markings of any kind';\nlet data = null; let error = '';\ntry {\n  let t = $json.output?.[0]?.content?.[0]?.text ?? $json.choices?.[0]?.message?.content ?? $json.message?.content ?? $json.text;\n  if (typeof t === 'string') { t = t.trim().replace(/^```json\\s*/i, '').replace(/```\\s*$/, ''); data = JSON.parse(t); }\n  else if (t && typeof t === 'object') data = t;\n} catch (e) { error = String(e.message || e).slice(0, 200); }\nif (!data) error = error || String(($json.error && ($json.error.message || $json.error)) || 'sin respuesta').slice(0, 200);\nconst slugify = (s) => (s == null ? '' : String(s)).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');\nconst mapa = { criptomonedas: 1, forex: 2, 'materias-primas': 3, acciones: 4 };\nconst category_id = data ? (mapa[slugify(data.category)] || null) : null;\nconst p = data && typeof data.prompt_imagen === 'string' ? data.prompt_imagen.trim() : '';\nreturn [{ json: { analisis_ok: !!data, error, category_id, prompt_imagen: p.length > 10 ? p.slice(0, 600) : DEFECTO } }];"
+      }
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000012",
+      "name": "Falta portada",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2020,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $('Decidir').first().json.falta_portada }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.higgsfield.ai/higgsfield-ai/soul/v2/standard",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $execution.id + '-' + $('Decidir').first().json.post_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ prompt: \"Grainy black-and-white duotone photograph, charcoal and warm grey, halftone texture, dramatic shadows. One continuous scene fills the whole frame. \" + $('Parsear clasificacion').first().json.prompt_imagen + \". Plain surfaces everywhere, no signs, no labels, no screens, no lettering. People are seen from behind or in silhouette. The lower-left corner falls into dark shadow.\", resolution: '1080p', aspect_ratio: '3:2', enhance_prompt: false, batch_size: 1 }) }}"
+      },
+      "id": "c0c0c0c0-0000-4000-8000-000000000013",
+      "name": "Higgsfield - Enviar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2240,
+        420
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "higgsfieldCred0001",
+          "name": "Higgsfield API"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 12,
+        "unit": "seconds"
+      },
+      "id": "c0c0c0c0-0000-4000-8000-000000000014",
+      "name": "Higgsfield - Esperar",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2460,
+        420
+      ],
+      "webhookId": "f2a1b2c3-d4e5-4f60-9a7b-1c2d3e4f5a12"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Higgsfield - Enviar').first().json.status_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "c0c0c0c0-0000-4000-8000-000000000015",
+      "name": "Higgsfield - Estado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2680,
+        420
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "higgsfieldCred0001",
+          "name": "Higgsfield API"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Decide qué hacer con la respuesta de Higgsfield: listo, seguir esperando o pasar al respaldo (OpenAI).\n// El contador de intentos se guarda por solicitud (no por nodo) para que no se acumule entre las notas de una misma vuelta.\nconst j = $json;\nconst id = $('Higgsfield - Enviar').first().json.request_id || 'sin-id';\nconst sd = $getWorkflowStaticData('global');\nsd.hf = sd.hf || {};\nif (Object.keys(sd.hf).length > 50) sd.hf = {};\nsd.hf[id] = (sd.hf[id] || 0) + 1;\nconst intentos = sd.hf[id];\nconst url = j.images && j.images[0] && j.images[0].url;\nlet decision = 'esperar';\nif (j.status === 'completed' && url) decision = 'listo';\nelse if (['failed', 'nsfw', 'canceled', 'completed'].includes(j.status)) decision = 'fallo';\nelse if (intentos >= 14) decision = 'fallo'; // ~14 consultas x 12 s: unos 3 minutos\nif (decision !== 'esperar') delete sd.hf[id];\nreturn { json: { decision, status: j.status, url: decision === 'listo' ? url : null, intentos } };"
+      },
+      "id": "c0c0c0c0-0000-4000-8000-000000000016",
+      "name": "Higgsfield - Evaluar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2900,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "r1",
+                    "leftValue": "={{ $json.decision }}",
+                    "rightValue": "listo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "listo"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "r2",
+                    "leftValue": "={{ $json.decision }}",
+                    "rightValue": "esperar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "esperar"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "fallo"
+        }
+      },
+      "id": "c0c0c0c0-0000-4000-8000-000000000017",
+      "name": "Higgsfield - Resultado",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        3120,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "authentication": "none",
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "id": "c0c0c0c0-0000-4000-8000-000000000018",
+      "name": "Higgsfield - Descargar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3340,
+        420
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000019",
+      "name": "OpenAI - Imagen respaldo",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput",
+      "position": [
+        3120,
+        700
+      ],
+      "parameters": {
+        "resource": "image",
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-image-1-mini"
+        },
+        "prompt": "=Editorial photography evoking vintage newsprint and offset printing, for a financial news portal cover. The whole image is printed in a rich duotone of charcoal black and warm grey, with a visible halftone dot pattern, coarse paper fibre and grain clearly visible in raking light, and slight ink misregistration. Deep shadow, high contrast, tactile analogue imperfection, dust and fibre detail. Photorealistic, specific and recognizable real-world scene. Keep the lower-left corner of the frame uncluttered and in shadow. Subject: {{ $('Parsear clasificacion').first().json.prompt_imagen }}. No printed words, no headlines, no columns of type. Absolutely no text, no letters, no numbers, no typography, no logos, no brand names, no real human faces, no flags.",
+        "options": {
+          "quality": "low",
+          "size": "1536x1024"
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "MCllGOOMXeswQUEW",
+          "name": "OpenAI account 2"
+        }
+      }
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000020",
+      "name": "Optimizar imagen",
+      "type": "n8n-nodes-base.editImage",
+      "typeVersion": 1.1,
+      "onError": "continueErrorOutput",
+      "position": [
+        3560,
+        420
+      ],
+      "parameters": {
+        "operation": "resize",
+        "width": 1536,
+        "height": 1024,
+        "resizeOption": "ignoreAspectRatio",
+        "options": {
+          "destinationKey": "data",
+          "format": "webp"
+        }
+      }
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000021",
+      "name": "Subir a Storage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        3780,
+        420
+      ],
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "method": "POST",
+        "url": "=https://pudzvatuubywmwdmboiq.supabase.co/storage/v1/object/post-images/{{ $('Decidir').first().json.archivo_portada }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "image/webp"
+            },
+            {
+              "name": "x-upsert",
+              "value": "true"
+            },
+            {
+              "name": "cache-control",
+              "value": "max-age=31536000"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000022",
+      "name": "Guardar portada",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        4000,
+        420
+      ],
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "method": "PATCH",
+        "url": "=https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts?id=eq.{{ $('Decidir').first().json.post_id }}&cover_image_url=is.null",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"cover_image_url\": \"https://pudzvatuubywmwdmboiq.supabase.co/storage/v1/object/public/post-images/{{ $('Decidir').first().json.archivo_portada }}\" }",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000023",
+      "name": "Marcar fallo portada",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3560,
+        700
+      ],
+      "parameters": {
+        "jsCode": "const it = $input.first().json || {};\nconst raw = it.error ?? it.message ?? '';\nlet msg = typeof raw === 'string' ? raw : (raw && (raw.message || raw.description)) || '';\nif (!msg && raw && typeof raw === 'object') { try { msg = JSON.stringify(raw).slice(0, 300); } catch (e) { msg = ''; } }\nreturn [{ json: { error: msg || 'Fallo la generacion o el guardado de la portada.' } }];"
+      }
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000024",
+      "name": "Falta categoria",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4220,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $('Decidir').first().json.falta_categoria && $('Parsear clasificacion').first().json.category_id !== null }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000025",
+      "name": "Guardar categoria",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        4440,
+        -200
+      ],
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "method": "PATCH",
+        "url": "=https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts?id=eq.{{ $('Decidir').first().json.post_id }}&category_id=is.null",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"category_id\": {{ $('Parsear clasificacion').first().json.category_id }} }",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000026",
+      "name": "Falta traduccion",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4920,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $('Decidir').first().json.falta_traduccion }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000027",
+      "name": "GPT · Traducir",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "onError": "continueErrorOutput",
+      "position": [
+        5140,
+        0
+      ],
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-4o-mini"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Eres un traductor editorial especializado en prensa financiera. Recibes un articulo ya maquetado en HTML y lo traduces al idioma opuesto. Devuelves SIEMPRE un JSON valido y estricto, sin markdown y sin bloques de codigo, con estas claves exactas: title, slug, content_html, meta_title, meta_description. REGLAS OBLIGATORIAS: 1. Preserva la estructura HTML EXACTA: los mismos tags, en el mismo orden, con los mismos atributos y el mismo anidamiento. Solo cambia el texto que hay entre los tags. No anadas, no elimines y no reordenes etiquetas. 2. NO traduzcas nombres propios, tickers, nombres de empresas ni nombres de productos financieros. Los nombres de instituciones usan su denominacion habitual en el idioma destino cuando esa denominacion existe (Reserva Federal <-> Federal Reserve) y se dejan en el original cuando no existe. 3. Regenera el slug en el idioma destino: kebab-case, minusculas, sin tildes ni caracteres especiales, derivado del title traducido. 4. Las citas dentro de <blockquote> se traducen, y al final de la cita traducida se anade entre parentesis la nota de que es una traduccion: \"(traduccion)\" si el idioma destino es espanol, \"(translated)\" si el idioma destino es ingles. 5. meta_description traducida: maximo 160 caracteres. 6. No resumas, no amplies y no corrijas el contenido: traduces, no reescribes. 7. EXCEPCION a la regla 1: dentro de <figure>, traduce tambien el atributo alt de <img> y el texto de <figcaption>; no cambies src, width ni height. Responde SOLO con el JSON."
+            },
+            {
+              "content": "=Traduce este articulo del idioma \"{{ $('Decidir').first().json.original_locale }}\" al idioma \"{{ $('Decidir').first().json.opuesto }}\".\n\nARTICULO ORIGEN (JSON):\n{{ JSON.stringify($('Decidir').first().json.origen) }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "MCllGOOMXeswQUEW",
+          "name": "OpenAI account 2"
+        }
+      }
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000028",
+      "name": "Parsear traduccion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5360,
+        0
+      ],
+      "parameters": {
+        "jsCode": "let data = $json.output?.[0]?.content?.[0]?.text ?? $json.choices?.[0]?.message?.content ?? $json.message?.content ?? $json.text;\nif (typeof data === 'string') {\n  data = data.trim().replace(/^```json\\s*/i, '').replace(/```\\s*$/, '');\n  data = JSON.parse(data);\n}\nif (!data || typeof data !== 'object') throw new Error('La traduccion no devolvio un JSON interpretable.');\nconst d = $('Decidir').first().json;\nconst slugify = (s) => (s == null ? '' : String(s)).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')\n  .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80).replace(/-+$/g, '');\nconst title = String(data.title || d.origen.title).trim().slice(0, 200);\nconst content_html = typeof data.content_html === 'string' ? data.content_html.trim() : '';\nif (!content_html) throw new Error('La traduccion no devolvio content_html.');\nreturn [{ json: {\n  post_id: d.post_id, locale_original: d.original_locale, locale_opuesto: d.opuesto,\n  traducida: {\n    title,\n    slug_base: slugify(data.slug || title) || String(d.origen.slug || 'articulo').slice(0, 70) + '-' + d.opuesto,\n    content_html,\n    meta_title: String(data.meta_title || title).trim().slice(0, 200),\n    meta_description: String(data.meta_description || title).trim().slice(0, 160)\n  }\n} }];"
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000029",
+      "name": "Slugs en uso · locale opuesto",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "onError": "continueErrorOutput",
+      "position": [
+        5580,
+        0
+      ],
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "url": "=https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts_translations?select=slug&limit=200&locale=eq.{{ $json.locale_opuesto }}&slug=like.{{ encodeURIComponent($json.traducida.slug_base) }}*",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      }
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000030",
+      "name": "Resolver slug traducido",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput",
+      "position": [
+        5800,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// UNIQUE(locale, slug): el slug traducido solo tiene que estar libre DENTRO de su locale.\n// Que coincida con el slug del original en el otro idioma es legal y deseable.\nconst t = $('Parsear traduccion').first().json;\nconst usados = new Set();\nfor (const r of ($('Slugs en uso · locale opuesto').first().json.body || [])) if (r && r.slug) usados.add(r.slug);\nconst base = t.traducida.slug_base;\nlet slug = base;\nfor (let i = 2; usados.has(slug) && i <= 60; i++) slug = base + '-' + i;\nif (usados.has(slug)) slug = base + '-' + Date.now().toString(36);\nreturn [{ json: { ...t, traducida: { ...t.traducida, slug }, slug_traducido_colisiono: slug !== base } }];"
+      }
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000031",
+      "name": "Insertar traduccion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        6020,
+        0
+      ],
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "method": "POST",
+        "url": "=https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts_translations?on_conflict=post_id,locale",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=ignore-duplicates,return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"post_id\": {{ JSON.stringify($('Resolver slug traducido').first().json.post_id) }},\n  \"locale\": {{ JSON.stringify($('Resolver slug traducido').first().json.locale_opuesto) }},\n  \"title\": {{ JSON.stringify($('Resolver slug traducido').first().json.traducida.title) }},\n  \"slug\": {{ JSON.stringify($('Resolver slug traducido').first().json.traducida.slug) }},\n  \"content_html\": {{ JSON.stringify($('Resolver slug traducido').first().json.traducida.content_html) }},\n  \"meta_title\": {{ JSON.stringify($('Resolver slug traducido').first().json.traducida.meta_title) }},\n  \"meta_description\": {{ JSON.stringify($('Resolver slug traducido').first().json.traducida.meta_description) }}\n}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000032",
+      "name": "Marcar fallo traduccion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5580,
+        260
+      ],
+      "parameters": {
+        "jsCode": "const it = $input.first().json || {};\nconst raw = it.error ?? it.message ?? '';\nlet msg = typeof raw === 'string' ? raw : (raw && (raw.message || raw.description)) || '';\nif (!msg && raw && typeof raw === 'object') { try { msg = JSON.stringify(raw).slice(0, 300); } catch (e) { msg = ''; } }\nreturn [{ json: { error: msg || 'Fallo la traduccion.' } }];"
+      }
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000033",
+      "name": "Armar resultado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6300,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const d = $('Decidir').first().json;\nconst leer = (n) => { try { return $(n).first().json; } catch (e) { return null; } };\nconst fp = leer('Marcar fallo portada');\nconst ft = leer('Marcar fallo traduccion');\nconst hecho = {\n  portada: d.falta_portada && !!leer('Guardar portada') && !fp,\n  categoria: d.falta_categoria && !!leer('Guardar categoria') && !!(leer('Parsear clasificacion') || {}).category_id,\n  traduccion: d.falta_traduccion && !!leer('Insertar traduccion') && !ft\n};\nconst pendientes = [];\nif (d.falta_portada && !hecho.portada) pendientes.push('portada');\nif (d.falta_traduccion && !hecho.traduccion) pendientes.push('traduccion');\nconst errores = {};\nif (fp && d.falta_portada) errores.portada = fp.error;\nif (ft && d.falta_traduccion) errores.traduccion = ft.error;\nreturn [{ json: { ok: pendientes.length === 0, post_id: d.post_id, titulo: d.titulo, hecho, pendientes, errores, solicitado_por: d.solicitado_por } }];"
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3000/api/revalidate",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"scope\":\"posts\"}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "c0c0c0c0-0000-4000-8000-000000000034",
+      "name": "Revalidar sitio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        6520,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "coverApiCred0001",
+          "name": "Pipeline API portadas"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000035",
+      "name": "Log ejecucion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        6740,
+        0
+      ],
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "method": "POST",
+        "url": "=https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/pipeline_logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"timestamp\": {{ JSON.stringify($now.toISO()) }},\n  \"fuente\": {{ JSON.stringify('CMS completar · ' + ($('Armar resultado').first().json.solicitado_por || 'editor')) }},\n  \"titulo\": {{ JSON.stringify($('Armar resultado').first().json.titulo) }},\n  \"status\": {{ JSON.stringify($('Armar resultado').first().json.ok ? 'success' : 'error') }},\n  \"error_message\": {{ JSON.stringify($('Armar resultado').first().json.ok ? null : JSON.stringify($('Armar resultado').first().json.errores).slice(0, 500)) }}\n}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000036",
+      "name": "Responder OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        6960,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($('Armar resultado').first().json) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000037",
+      "name": "Nota entrada",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -140
+      ],
+      "parameters": {
+        "content": "## 1 · Leer y decidir\nRecibe solo el id del artículo. Lee la base y calcula qué le falta: portada, categoría o traducción. El texto del editor **no se toca nunca**.",
+        "width": 1360,
+        "height": 520,
+        "color": 7
+      }
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000038",
+      "name": "Nota clasificar",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        -140
+      ],
+      "parameters": {
+        "content": "## 2 · Clasificar\nUna sola llamada a GPT: categoría y escena de la portada. Solo si falta alguna de las dos.",
+        "width": 1000,
+        "height": 340,
+        "color": 3
+      }
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000039",
+      "name": "Nota portada",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2160,
+        330
+      ],
+      "parameters": {
+        "content": "## 3 · Portada\nHiggsfield (≈ $0.006) con respaldo de OpenAI en calidad baja. Solo se guarda si el artículo sigue sin portada.",
+        "width": 2100,
+        "height": 520,
+        "color": 6
+      }
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000040",
+      "name": "Nota categoria",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        4160,
+        -300
+      ],
+      "parameters": {
+        "content": "## 4 · Categoría\nSe asigna solo si estaba vacía.",
+        "width": 620,
+        "height": 520,
+        "color": 2
+      }
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000041",
+      "name": "Nota traduccion",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        4860,
+        -140
+      ],
+      "parameters": {
+        "content": "## 5 · Traducción\nSolo si falta la versión del idioma opuesto. Si el editor la creó mientras tanto, no se sobrescribe.",
+        "width": 1360,
+        "height": 520,
+        "color": 5
+      }
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000042",
+      "name": "Nota cierre",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        6240,
+        -140
+      ],
+      "parameters": {
+        "content": "## 6 · Cierre\nRevalida el sitio, deja registro y responde qué se hizo y qué quedó pendiente.",
+        "width": 1100,
+        "height": 340,
+        "color": 4
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Completar": {
+      "main": [
+        [
+          {
+            "node": "Validar entrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar entrada": {
+      "main": [
+        [
+          {
+            "node": "Entrada valida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entrada valida": {
+      "main": [
+        [
+          {
+            "node": "Leer post",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder 400",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leer post": {
+      "main": [
+        [
+          {
+            "node": "Decidir",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error lectura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decidir": {
+      "main": [
+        [
+          {
+            "node": "Falta portada o categoria",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error lectura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error lectura": {
+      "main": [
+        [
+          {
+            "node": "Responder error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Falta portada o categoria": {
+      "main": [
+        [
+          {
+            "node": "GPT · Clasificar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Falta portada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT · Clasificar": {
+      "main": [
+        [
+          {
+            "node": "Parsear clasificacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear clasificacion": {
+      "main": [
+        [
+          {
+            "node": "Falta portada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Falta portada": {
+      "main": [
+        [
+          {
+            "node": "Higgsfield - Enviar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Falta categoria",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Higgsfield - Enviar": {
+      "main": [
+        [
+          {
+            "node": "Higgsfield - Esperar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OpenAI - Imagen respaldo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Higgsfield - Esperar": {
+      "main": [
+        [
+          {
+            "node": "Higgsfield - Estado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Higgsfield - Estado": {
+      "main": [
+        [
+          {
+            "node": "Higgsfield - Evaluar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OpenAI - Imagen respaldo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Higgsfield - Evaluar": {
+      "main": [
+        [
+          {
+            "node": "Higgsfield - Resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Higgsfield - Resultado": {
+      "main": [
+        [
+          {
+            "node": "Higgsfield - Descargar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Higgsfield - Esperar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OpenAI - Imagen respaldo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Higgsfield - Descargar": {
+      "main": [
+        [
+          {
+            "node": "Optimizar imagen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OpenAI - Imagen respaldo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI - Imagen respaldo": {
+      "main": [
+        [
+          {
+            "node": "Optimizar imagen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marcar fallo portada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Optimizar imagen": {
+      "main": [
+        [
+          {
+            "node": "Subir a Storage",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marcar fallo portada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Subir a Storage": {
+      "main": [
+        [
+          {
+            "node": "Guardar portada",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marcar fallo portada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar portada": {
+      "main": [
+        [
+          {
+            "node": "Falta categoria",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marcar fallo portada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar fallo portada": {
+      "main": [
+        [
+          {
+            "node": "Falta categoria",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Falta categoria": {
+      "main": [
+        [
+          {
+            "node": "Guardar categoria",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Falta traduccion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar categoria": {
+      "main": [
+        [
+          {
+            "node": "Falta traduccion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Falta traduccion": {
+      "main": [
+        [
+          {
+            "node": "GPT · Traducir",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Armar resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT · Traducir": {
+      "main": [
+        [
+          {
+            "node": "Parsear traduccion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marcar fallo traduccion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear traduccion": {
+      "main": [
+        [
+          {
+            "node": "Slugs en uso · locale opuesto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marcar fallo traduccion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slugs en uso · locale opuesto": {
+      "main": [
+        [
+          {
+            "node": "Resolver slug traducido",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marcar fallo traduccion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolver slug traducido": {
+      "main": [
+        [
+          {
+            "node": "Insertar traduccion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marcar fallo traduccion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insertar traduccion": {
+      "main": [
+        [
+          {
+            "node": "Armar resultado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marcar fallo traduccion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar fallo traduccion": {
+      "main": [
+        [
+          {
+            "node": "Armar resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar resultado": {
+      "main": [
+        [
+          {
+            "node": "Revalidar sitio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Revalidar sitio": {
+      "main": [
+        [
+          {
+            "node": "Log ejecucion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log ejecucion": {
+      "main": [
+        [
+          {
+            "node": "Responder OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

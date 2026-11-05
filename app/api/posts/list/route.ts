@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireEditor } from '@/lib/auth'
+import { calcularFaltantes } from '@/lib/completar'
 import { createEditorClient } from '@/lib/supabase/admin'
 
 export async function GET() {
@@ -12,6 +13,7 @@ export async function GET() {
       .from('posts')
       .select(`
         id, title, slug, status, sentiment, view_count, published_at, created_at, is_featured,
+        cover_image_url, category_id, original_locale,
         pipeline_error, pipeline_attempts,
         category:categorias(name, slug),
         author:perfiles_autores(full_name),
@@ -43,6 +45,13 @@ export async function GET() {
         ? p.tags.map((t: Record<string, unknown>) => (t as { tag: Record<string, unknown> }).tag).filter(Boolean)
         : [],
       translations: Array.isArray(p.translations) ? p.translations : [],
+      // Qué le falta al artículo (el CMS ofrece completarlo)
+      faltantes: calcularFaltantes({
+        cover_image_url: (p.cover_image_url as string | null) ?? null,
+        category_id: (p.category_id as number | null) ?? null,
+        original_locale: (p.original_locale as string | null) ?? null,
+        locales: Array.isArray(p.translations) ? (p.translations as { locale: string }[]).map((t) => t.locale) : [],
+      }),
       pipeline_error: p.pipeline_error ?? null,
       pipeline_attempts: p.pipeline_attempts ?? null,
     }))

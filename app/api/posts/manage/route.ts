@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { revalidatePosts } from '@/lib/cache'
+import { programarCompletado } from '@/lib/completar'
 import { requireEditor } from '@/lib/auth'
 import { createEditorClient } from '@/lib/supabase/admin'
 import { sanitizeArticleHtml, htmlToText } from '@/lib/sanitize'
@@ -119,7 +120,9 @@ export async function PATCH(request: Request) {
   }
 
   revalidatePosts()
-  return NextResponse.json({ success: true, message: 'Artículo actualizado' })
+  // Publicar un borrador desde la lista también completa lo que le falte
+  const completando = status === 'published' ? await programarCompletado(supabase, id, auth.user.email) : null
+  return NextResponse.json({ success: true, message: 'Artículo actualizado', data: { completando } })
 }
 
 // Full edit: post fields, the translation for the submitted locale (updated or created), and the
@@ -150,7 +153,7 @@ export async function PUT(request: Request) {
 
   const { data: current, error: currentError } = await supabase
     .from('posts')
-    .select('published_at')
+    .select('published_at, cover_image_url, category_id')
     .eq('id', input.id)
     .maybeSingle()
   if (currentError || !current) {
@@ -161,13 +164,15 @@ export async function PUT(request: Request) {
     // `slug` intentionally not touched here: it is the internal/legacy field, the translation's own
     // slug (below) is what /articulos/[slug] actually resolves.
     sentiment: input.sentiment ?? null,
-    cover_image_url: input.cover_image_url,
+    // Un campo vacío del formulario no borra lo que ya hay: el formulario se abrió antes de que el flujo pusiera la portada
+    // o la categoría, y guardar con él la pisaría. Si falta, se vuelve a completar.
+    cover_image_url: input.cover_image_url ?? current.cover_image_url,
     og_image_url: input.og_image_url,
     source_url: input.source_url,
     source_id: input.source_id,
     status: input.status,
     scheduled_at: input.scheduled_at,
-    category_id: input.category_id,
+    category_id: input.category_id ?? current.category_id,
     is_featured: input.is_featured,
     format: htmlToText(contentHtml).length < BRIEF_TEXT_THRESHOLD ? 'brief' : 'article',
     reading_time_minutes: Math.max(1, Math.ceil(htmlToText(contentHtml).split(' ').length / 200)),
@@ -230,9 +235,11 @@ export async function PUT(request: Request) {
 
   revalidatePosts()
 
+  const completando = input.status === 'published' ? await programarCompletado(supabase, input.id, auth.user.email) : null
+
   return NextResponse.json({
     success: true,
-    data: { id: input.id, slug: input.slug },
+    data: { id: input.id, slug: input.slug, completando },
     message: input.status === 'published' ? 'Artículo actualizado y publicado' : 'Cambios guardados',
   })
 }
