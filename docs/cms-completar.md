@@ -16,10 +16,20 @@ Antes de este cambio, un artículo manual se guardaba tal cual: sin portada, sin
    - **Portada:** una llamada a GPT (categoría y escena) + Higgsfield (≈ 0,006 $), con respaldo de OpenAI en calidad baja. Se guarda solo si el artículo sigue sin portada.
    - **Categoría:** la de GPT entre las cuatro existentes; solo si estaba vacía.
    - **Traducción:** el mismo traductor del modo Asistido; solo si falta el idioma opuesto, y sin sobrescribir una que el editor haya creado mientras tanto.
-4. Revalida el sitio, deja registro en `pipeline_logs` y responde `{ ok, hecho, pendientes, errores }`.
+4. Revalida el sitio y **anuncia el artículo en Discord** (ver abajo), deja registro en `pipeline_logs` y responde `{ ok, hecho, pendientes, errores }`.
 5. El CMS muestra en la lista un aviso **«Le falta: portada · traducción»** con un botón **Completar**, y refresca la lista solo mientras se completa (máx. 6 min).
 
 El **texto del editor no se toca nunca**. Tampoco se pisan portada ni categoría al guardar el formulario: un campo vacío no borra lo que el flujo ya puso (el formulario pudo abrirse antes).
+
+## Anuncio en Discord
+Los artículos del CMS (manuales y asistidos) se anuncian en Discord como los del pipeline: **titular en negrita y enlace a nuestro artículo**, versión en español.
+- Va **al final**, después de la portada y de revalidar el sitio, para que la vista previa ya tenga la imagen y el enlace no dé 404.
+- **Una sola vez por artículo:** la columna `posts.anunciado_discord_at` (migración `0010`) es un candado. El flujo la rellena con un `UPDATE … where anunciado_discord_at is null and origen = 'cms' and status = 'published'` y solo publica si ese UPDATE cambió una fila. Guardar varias veces, o dos ejecuciones a la vez, no lo repite.
+- Los artículos que ya existían quedan marcados como anunciados por la migración: nunca se reenvía nada viejo.
+- Un borrador del modo Asistido se anuncia cuando se **publica**, no antes.
+- Un artículo publicado y sin anunciar activa el flujo aunque no le falte nada (por eso se calcula `anuncio` en `lib/completar.ts`).
+- Límite: si Discord falla justo después de reclamar el candado, ese artículo no se reenvía solo (se prefiere perder un aviso a duplicarlo).
+- El webhook de Discord (`DISCORD_WEBHOOK_URL`) es el mismo del pipeline, en el `.env` de n8n.
 
 ## Rutas
 - `POST /api/posts/completar` `{ id }` → lanza el completado (202 si falta algo, 200 si no).

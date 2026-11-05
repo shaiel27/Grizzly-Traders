@@ -132,7 +132,7 @@
         0
       ],
       "parameters": {
-        "jsCode": "// Que le falta al articulo. Solo se completa lo que falta: el texto del editor no se toca nunca.\nconst entrada = $('Validar entrada').first().json;\nconst filas = $json.body;\nconst post = Array.isArray(filas) ? filas[0] : null;\nif (!post) throw new Error('No existe el articulo ' + entrada.post_id + '.');\nconst trads = Array.isArray(post.posts_translations) ? post.posts_translations : [];\nconst locales = trads.map((t) => t.locale);\nconst original_locale = locales.includes(post.original_locale) ? post.original_locale : (locales[0] || 'es');\nconst origen = trads.find((t) => t.locale === original_locale) || trads[0];\nif (!origen) throw new Error('El articulo no tiene ninguna version escrita.');\nconst opuesto = original_locale === 'es' ? 'en' : 'es';\nconst falta_portada = !post.cover_image_url;\nconst falta_categoria = post.category_id === null || post.category_id === undefined;\nconst falta_traduccion = !locales.includes(opuesto);\nconst texto = String(origen.content_html || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\\s+/g, ' ').trim();\nconst slugArchivo = String(origen.slug || 'articulo').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80).replace(/-+$/g, '') || 'articulo';\nreturn [{ json: {\n  post_id: post.id, status: post.status, titulo: origen.title, texto: texto.slice(0, 3000),\n  original_locale, opuesto,\n  origen: { title: origen.title, slug: origen.slug, content_html: origen.content_html, meta_title: origen.meta_title, meta_description: origen.meta_description },\n  archivo_portada: slugArchivo + '-' + String(post.id).slice(0, 8) + '.webp',\n  falta_portada, falta_categoria, falta_traduccion,\n  solicitado_por: entrada.solicitado_por\n} }];"
+        "jsCode": "// Que le falta al articulo. Solo se completa lo que falta: el texto del editor no se toca nunca.\nconst entrada = $('Validar entrada').first().json;\nconst filas = $json.body;\nconst post = Array.isArray(filas) ? filas[0] : null;\nif (!post) throw new Error('No existe el articulo ' + entrada.post_id + '.');\nconst trads = Array.isArray(post.posts_translations) ? post.posts_translations : [];\nconst locales = trads.map((t) => t.locale);\nconst original_locale = locales.includes(post.original_locale) ? post.original_locale : (locales[0] || 'es');\nconst origen = trads.find((t) => t.locale === original_locale) || trads[0];\nif (!origen) throw new Error('El articulo no tiene ninguna version escrita.');\nconst opuesto = original_locale === 'es' ? 'en' : 'es';\nconst falta_portada = !post.cover_image_url;\nconst falta_categoria = post.category_id === null || post.category_id === undefined;\nconst falta_traduccion = !locales.includes(opuesto);\nconst es = trads.find((t) => t.locale === 'es');\nconst texto = String(origen.content_html || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\\s+/g, ' ').trim();\nconst slugArchivo = String(origen.slug || 'articulo').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80).replace(/-+$/g, '') || 'articulo';\nreturn [{ json: {\n  post_id: post.id, status: post.status, titulo: origen.title, texto: texto.slice(0, 3000),\n  original_locale, opuesto,\n  origen: { title: origen.title, slug: origen.slug, content_html: origen.content_html, meta_title: origen.meta_title, meta_description: origen.meta_description },\n  archivo_portada: slugArchivo + '-' + String(post.id).slice(0, 8) + '.webp',\n  slug_es: es ? es.slug : null, titulo_es: es ? es.title : null,\n  falta_portada, falta_categoria, falta_traduccion,\n  solicitado_por: entrada.solicitado_por\n} }];"
       },
       "onError": "continueErrorOutput"
     },
@@ -924,7 +924,7 @@
         0
       ],
       "parameters": {
-        "jsCode": "const d = $('Decidir').first().json;\nconst leer = (n) => { try { return $(n).first().json; } catch (e) { return null; } };\nconst fp = leer('Marcar fallo portada');\nconst ft = leer('Marcar fallo traduccion');\nconst hecho = {\n  portada: d.falta_portada && !!leer('Guardar portada') && !fp,\n  categoria: d.falta_categoria && !!leer('Guardar categoria') && !!(leer('Parsear clasificacion') || {}).category_id,\n  traduccion: d.falta_traduccion && !!leer('Insertar traduccion') && !ft\n};\nconst pendientes = [];\nif (d.falta_portada && !hecho.portada) pendientes.push('portada');\nif (d.falta_traduccion && !hecho.traduccion) pendientes.push('traduccion');\nconst errores = {};\nif (fp && d.falta_portada) errores.portada = fp.error;\nif (ft && d.falta_traduccion) errores.traduccion = ft.error;\nreturn [{ json: { ok: pendientes.length === 0, post_id: d.post_id, titulo: d.titulo, hecho, pendientes, errores, solicitado_por: d.solicitado_por } }];"
+        "jsCode": "const d = $('Decidir').first().json;\nconst leer = (n) => { try { return $(n).first().json; } catch (e) { return null; } };\nconst fp = leer('Marcar fallo portada');\nconst ft = leer('Marcar fallo traduccion');\nconst hecho = {\n  portada: d.falta_portada && !!leer('Guardar portada') && !fp,\n  categoria: d.falta_categoria && !!leer('Guardar categoria') && !!(leer('Parsear clasificacion') || {}).category_id,\n  traduccion: d.falta_traduccion && !!leer('Insertar traduccion') && !ft\n};\nconst pendientes = [];\nif (d.falta_portada && !hecho.portada) pendientes.push('portada');\nif (d.falta_traduccion && !hecho.traduccion) pendientes.push('traduccion');\nconst errores = {};\nif (fp && d.falta_portada) errores.portada = fp.error;\nif (ft && d.falta_traduccion) errores.traduccion = ft.error;\n// Lo que se anuncia en Discord: la version en espanol (la comunidad es hispana); si el original esta en ingles y la traduccion se acaba de crear, esa\nconst rt = leer('Resolver slug traducido');\nconst nueva = hecho.traduccion && rt && rt.locale_opuesto === 'es' ? rt.traducida : null;\nconst slug_publico = d.slug_es || (nueva && nueva.slug) || d.origen.slug;\nconst titulo_publico = d.slug_es ? d.titulo_es : (nueva ? nueva.title : d.origen.title);\nreturn [{ json: { ok: pendientes.length === 0, post_id: d.post_id, titulo: d.titulo, hecho, pendientes, errores, slug_publico, titulo_publico, solicitado_por: d.solicitado_por } }];"
       }
     },
     {
@@ -970,11 +970,138 @@
     },
     {
       "id": "c0c0c0c0-0000-4000-8000-000000000035",
-      "name": "Log ejecucion",
+      "name": "Reclamar anuncio",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
       "position": [
         6740,
+        0
+      ],
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "method": "PATCH",
+        "url": "=https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts?id=eq.{{ $('Decidir').first().json.post_id }}&origen=eq.cms&status=eq.published&anunciado_discord_at=is.null",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"anunciado_discord_at\": {{ JSON.stringify($now.toISO()) }} }",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "WZ5kOBX6Ia6HMoQs",
+          "name": "Supabase account 2"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000036",
+      "name": "Hay que anunciar",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        6960,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ Array.isArray($json.body) && $json.body.length > 0 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000037",
+      "name": "Armar mensaje Discord",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7180,
+        -200
+      ],
+      "parameters": {
+        "jsCode": "// Mismo mensaje que el pipeline: SOLO el titular y el enlace a NUESTRO articulo. Va despues de la portada y de revalidar el sitio,\n// asi la vista previa de Discord ya tiene la imagen y el enlace no da 404.\nconst leer = (f) => { try { return f(); } catch (e) { return undefined; } };\nconst SITE = String(leer(() => $env.SITE_URL) || leer(() => $vars.SITE_URL) || 'https://grizzlytraders.com').replace(/\\/+$/, '');\nconst r = $('Armar resultado').first().json;\nconst url = SITE + '/articulos/' + r.slug_publico;\nconst titulo = String(r.titulo_publico || '').replace(/\\s+/g, ' ').trim().slice(0, 300);\nconst BS = String.fromCharCode(92);\nconst escMd = (s) => s.split('').map((ch) => ((BS + '*_~`|>#').includes(ch) ? BS + ch : ch)).join('');\nreturn { json: { url, titulo, discord: { username: 'Grizzly Traders', avatar_url: SITE + '/logo.png', content: '**' + escMd(titulo) + '**\\n' + url, allowed_mentions: { parse: [] } } } };"
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DISCORD_WEBHOOK_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Armar mensaje Discord').first().json.discord) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "c0c0c0c0-0000-4000-8000-000000000038",
+      "name": "Discord - Difundir",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        7400,
+        -200
+      ],
+      "disabled": false,
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "c0c0c0c0-0000-4000-8000-000000000039",
+      "name": "Log ejecucion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        7620,
         0
       ],
       "parameters": {
@@ -1011,12 +1138,12 @@
       "onError": "continueRegularOutput"
     },
     {
-      "id": "c0c0c0c0-0000-4000-8000-000000000036",
+      "id": "c0c0c0c0-0000-4000-8000-000000000040",
       "name": "Responder OK",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        6960,
+        7840,
         0
       ],
       "parameters": {
@@ -1026,7 +1153,7 @@
       }
     },
     {
-      "id": "c0c0c0c0-0000-4000-8000-000000000037",
+      "id": "c0c0c0c0-0000-4000-8000-000000000041",
       "name": "Nota entrada",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
@@ -1042,7 +1169,7 @@
       }
     },
     {
-      "id": "c0c0c0c0-0000-4000-8000-000000000038",
+      "id": "c0c0c0c0-0000-4000-8000-000000000042",
       "name": "Nota clasificar",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
@@ -1058,7 +1185,7 @@
       }
     },
     {
-      "id": "c0c0c0c0-0000-4000-8000-000000000039",
+      "id": "c0c0c0c0-0000-4000-8000-000000000043",
       "name": "Nota portada",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
@@ -1074,7 +1201,7 @@
       }
     },
     {
-      "id": "c0c0c0c0-0000-4000-8000-000000000040",
+      "id": "c0c0c0c0-0000-4000-8000-000000000044",
       "name": "Nota categoria",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
@@ -1090,7 +1217,7 @@
       }
     },
     {
-      "id": "c0c0c0c0-0000-4000-8000-000000000041",
+      "id": "c0c0c0c0-0000-4000-8000-000000000045",
       "name": "Nota traduccion",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
@@ -1106,18 +1233,18 @@
       }
     },
     {
-      "id": "c0c0c0c0-0000-4000-8000-000000000042",
+      "id": "c0c0c0c0-0000-4000-8000-000000000046",
       "name": "Nota cierre",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
         6240,
-        -140
+        -300
       ],
       "parameters": {
-        "content": "## 6 · Cierre\nRevalida el sitio, deja registro y responde qué se hizo y qué quedó pendiente.",
-        "width": 1100,
-        "height": 340,
+        "content": "## 6 · Cierre y Discord\nRevalida el sitio y anuncia el artículo en Discord **una sola vez** (candado `anunciado_discord_at`). Deja registro y responde qué se hizo y qué quedó pendiente.",
+        "width": 1800,
+        "height": 580,
         "color": 4
       }
     }
@@ -1612,6 +1739,57 @@
       ]
     },
     "Revalidar sitio": {
+      "main": [
+        [
+          {
+            "node": "Reclamar anuncio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reclamar anuncio": {
+      "main": [
+        [
+          {
+            "node": "Hay que anunciar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hay que anunciar": {
+      "main": [
+        [
+          {
+            "node": "Armar mensaje Discord",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log ejecucion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armar mensaje Discord": {
+      "main": [
+        [
+          {
+            "node": "Discord - Difundir",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discord - Difundir": {
       "main": [
         [
           {
