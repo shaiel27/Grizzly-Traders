@@ -11,7 +11,7 @@ n8n import:workflow --input=n8n/pipeline-noticias.json
 n8n publish:workflow --id=xvENLqv9HYCbOVcj
 ```
 
-Probar una vuelta sin esperar al siguiente ciclo (cada 45 min): `n8n execute --id=xvENLqv9HYCbOVcj` (arranca desde el nodo "Prueba manual"; si n8n ya está corriendo, usar otro `N8N_RUNNERS_BROKER_PORT`).
+Probar una vuelta: `n8n execute --id=xvENLqv9HYCbOVcj` arranca por el disparador programado, así que la compuerta de 45 min la frena si no es la hora (verificado en nov-2026). Para forzar una vuelta, ejecutar desde el editor con el nodo "Prueba manual", o esperar al ciclo (minutos del día múltiplos de 45). Si n8n ya está corriendo, usar otro `N8N_RUNNERS_BROKER_PORT`.
 
 Antes de desplegar en el VPS: el nodo "Componer portada" apunta a `http://localhost:3000`; cambiarlo a la dirección del sitio. Detalles en `docs/portadas.md`.
 
