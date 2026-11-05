@@ -78,8 +78,9 @@ describe('portada: Higgsfield con respaldo en OpenAI', () => {
     expect(cuerpo).toContain("$('Parsear JSON').item.json.prompt_imagen")
     // Soul 2 no tiene prompt negativo e ignora las prohibiciones: con vocabulario de imprenta dibuja titulares y marcas ilegibles.
     // El prompt pide una foto "sin palabras" y no menciona periódico, imprenta ni tinta.
-    expect(cuerpo).toContain('wordless')
-    expect(cuerpo).not.toMatch(/newsprint|newspaper|offset|printed|printing|ink|headline/i)
+    expect(cuerpo).toContain('One continuous scene fills the whole frame')
+    expect(cuerpo).toContain('no signs, no labels, no screens, no lettering')
+    expect(cuerpo).not.toMatch(/newsprint|newspaper|offset|printed|printing|ink|headline|blank/i)
   })
 })
 
@@ -111,5 +112,18 @@ describe('Higgsfield - Evaluar (lógica de decisión)', () => {
     for (let i = 1; i < 14; i++) expect(evaluar({ status: 'in_progress' }, e, 'A').decision).toBe('esperar')
     expect(evaluar({ status: 'in_progress' }, e, 'A').decision).toBe('fallo')
     expect(evaluar({ status: 'in_progress' }, e, 'B').intentos).toBe(1) // otra nota empieza de cero
+  })
+})
+
+describe('escena de portada que redacta GPT (prompt de análisis)', () => {
+  const sistema = (nodo('OpenAI - Analisis GPT').parameters as unknown as { responses: { values: { content: string }[] } }).responses.values[0].content
+  it('para una empresa describe su negocio y nunca la nombra: el generador dibujaría el nombre como texto', () => {
+    expect(sistema).toContain('NUNCA escribas su nombre')
+    expect(sistema).toContain('cohete de acero inoxidable')
+  })
+  it('evita los objetos que el generador llena de texto sin sentido y pide una sola foto continua', () => {
+    expect(sistema).toContain('EVITA los objetos que suelen llevar escritura')
+    for (const objeto of ['pantallas', 'carteles', 'letreros', 'cajas o envases con etiquetas']) expect(sistema).toContain(objeto)
+    expect(sistema).toContain('una sola fotografia continua')
   })
 })
