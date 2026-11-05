@@ -8,6 +8,7 @@ import { clsx } from 'clsx'
 import { permiteAnuncios } from '@/lib/ads-zonas'
 import { LiveTicker } from './LiveTicker'
 import { Button } from './Button'
+import { DiscordIcon } from './DiscordIcon'
 import { LocaleSwitcher } from './LocaleSwitcher'
 import { useDictionary } from '@/lib/i18n/LocaleProvider'
 import type { TickerSnapshot } from '@/lib/ticker'
@@ -47,6 +48,9 @@ const NAV_ICONS: Record<string, string> = {
   __learn: 'menu_book',
   __markets: 'candlestick_chart',
 }
+
+// Invitación a la comunidad de Discord (NEXT_PUBLIC_*: se fija al compilar). Sin ella, el botón no se muestra.
+const DISCORD_URL = process.env.NEXT_PUBLIC_DISCORD_URL
 
 // Respaldo si la base de datos no devuelve categorías: mismas cuatro, con el nombre del idioma activo (dict.header.categoryNav)
 const FALLBACK_SLUGS = ['forex', 'criptomonedas', 'materias-primas', 'acciones'] as const
@@ -400,14 +404,14 @@ export function Header({ categories = [], initialTicker }: HeaderProps) {
 
             <LocaleSwitcher className="mr-0.5" />
 
-            <Button variant="ghost" size="sm" className="hidden gap-2 xl:inline-flex" asChild>
-              <Link href="/#vip" aria-label={dict.header.communityAria}>
-                <span className="material-symbols-outlined text-[16px] text-accent-blue" aria-hidden="true">
-                  send
-                </span>
-                <span>{dict.header.telegramDiscord}</span>
-              </Link>
-            </Button>
+            {DISCORD_URL && (
+              <Button variant="ghost" size="sm" className="hidden gap-2 xl:inline-flex" asChild>
+                <a href={DISCORD_URL} target="_blank" rel="noopener noreferrer" aria-label={dict.header.communityAria}>
+                  <DiscordIcon className="size-4 text-accent-blue" />
+                  <span>{dict.header.discord}</span>
+                </a>
+              </Button>
+            )}
           </div>
         </nav>
       </div>

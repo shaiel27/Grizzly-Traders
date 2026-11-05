@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { clsx } from 'clsx'
 import { NewsletterForm } from '@/components/ui'
+import { DiscordIcon } from '@/components/ui/DiscordIcon'
 import { getDictionary, type Locale } from '@/lib/i18n/get-dictionary'
 
 // Lineas de ejemplo para la "consola" de alertas — simbolos/numeros, no prosa, mismo criterio
@@ -126,15 +127,15 @@ const BENEFICIOS_CORREO = (dict: ReturnType<typeof getDictionary>) => [
 interface VipShowcaseProps {
   locale: Locale
   vipUrl?: string
-  telegramUrl?: string
+  discordUrl?: string
   // Titulares reales de hoy para la vista previa del correo
   resumen?: ResumenPreviewItem[]
 }
 
-export function VipShowcase({ locale, vipUrl, telegramUrl, resumen = [] }: VipShowcaseProps) {
+export function VipShowcase({ locale, vipUrl, discordUrl, resumen = [] }: VipShowcaseProps) {
   const dict = getDictionary(locale)
-  // Sin enlaces del VIP la tarjeta ofrece solo la suscripción por correo, con lo que esta incluye de verdad
-  const modoCorreo = !vipUrl && !telegramUrl
+  // Sin enlace del VIP la tarjeta ofrece la suscripción por correo, con lo que esta incluye de verdad (y, si hay, la invitación a Discord)
+  const modoCorreo = !vipUrl
   const sectionRef = useRef<HTMLDivElement>(null)
   const [visible, setVisible] = useState(false)
 
@@ -198,7 +199,14 @@ export function VipShowcase({ locale, vipUrl, telegramUrl, resumen = [] }: VipSh
               ))}
             </ul>
 
-            {(vipUrl || telegramUrl) && (
+            {/* Sin NEXT_PUBLIC_VIP_URL la tarjeta se quedaba sin ninguna accion (plan 009 B10): se ofrece el newsletter
+                como alternativa en vez de un bloque sin salida. */}
+            {modoCorreo && (
+              <div className="mt-6">
+                <NewsletterForm />
+              </div>
+            )}
+            {(vipUrl || discordUrl) && (
               <div className="mt-6 flex flex-wrap gap-3">
                 {vipUrl && (
                   <a
@@ -213,27 +221,17 @@ export function VipShowcase({ locale, vipUrl, telegramUrl, resumen = [] }: VipSh
                     </span>
                   </a>
                 )}
-                {telegramUrl && (
+                {discordUrl && (
                   <a
-                    href={telegramUrl}
+                    href={discordUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 rounded-full border border-hairline bg-white/[0.04] px-5 py-2.5 text-sm font-medium text-ink transition-colors hover:border-hairline hover:bg-white/[0.08]"
                   >
-                    <span className="material-symbols-outlined text-[16px] text-accent-blue" aria-hidden="true">
-                      send
-                    </span>
-                    {dict.home.vipTelegramJoin}
+                    <DiscordIcon className="size-4 text-accent-blue" />
+                    {dict.home.vipDiscordJoin}
                   </a>
                 )}
-              </div>
-            )}
-            {/* Sin NEXT_PUBLIC_VIP_URL ni NEXT_PUBLIC_TELEGRAM_URL configuradas, la tarjeta se
-                quedaba sin ninguna accion (plan 009 B10) — se ofrece el newsletter como
-                alternativa en vez de un bloque sin salida. */}
-            {modoCorreo && (
-              <div className="mt-6">
-                <NewsletterForm />
               </div>
             )}
           </div>

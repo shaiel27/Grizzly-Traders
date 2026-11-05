@@ -25,7 +25,7 @@ const schema = z.object({
   N8N_WORKFLOW_ID: optionalText,
   N8N_API_KEY: optionalText,
   NEXT_PUBLIC_VIP_URL: z.url().optional(),
-  NEXT_PUBLIC_TELEGRAM_URL: z.url().optional(),
+  NEXT_PUBLIC_DISCORD_URL: z.url().optional(),
   // Boletín por correo. Todo opcional: sin RESEND_API_KEY se usa el proveedor simulado (solo fuera de producción)
   RESEND_API_KEY: optionalText,
   EMAIL_FROM: optionalText,
