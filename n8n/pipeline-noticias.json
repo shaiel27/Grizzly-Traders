@@ -1295,7 +1295,7 @@
     },
     {
       "parameters": {
-        "content": "## 5 · Publicacion\nSube la imagen, comprueba el slug, inserta el post y sus traducciones, lo publica y registra la ejecucion. Despues avisa al sitio y arma el mensaje para Telegram y Discord (nodos apagados hasta el despliegue; ver docs/comunidades.md).",
+        "content": "## 5 · Publicacion\nSube la imagen, comprueba el slug, inserta el post y sus traducciones, lo publica y registra la ejecucion. Despues avisa al sitio y envia a Discord (y a Telegram cuando se configure) el titular y el enlace al articulo; ver docs/comunidades.md.",
         "height": 440,
         "width": 2370,
         "color": 2
@@ -1446,7 +1446,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "// Mensajes de Telegram y Discord para un articulo recien publicado: titular, extracto, portada y ENLACE A NUESTRO ARTICULO\n// (no a la fuente original). SITE_URL, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID y DISCORD_WEBHOOK_URL son variables de entorno de n8n.\n// Variable de entorno (n8n del VPS) o variable de n8n (instalacion con licencia); si ninguna existe, el dominio\nconst leer = (f) => { try { return f(); } catch (e) { return undefined; } };\nconst SITE = String(leer(() => $env.SITE_URL) || leer(() => $vars.SITE_URL) || 'https://grizzlytraders.com').replace(/\\/+$/, '');\nconst p = $('Parsear JSON').item.json;\nconst id8 = String($('Reservar URL').item.json.body[0].id).slice(0, 8);\nconst url = SITE + '/articulos/' + p.slug;\nconst portada = 'https://pudzvatuubywmwdmboiq.supabase.co/storage/v1/object/public/post-images/' + p.slug + '-' + id8 + '.webp';\n// Telegram no siempre acepta WebP como foto: se le da la misma portada en JPEG desde el sitio\nconst portadaJpeg = SITE + '/api/cover/jpeg?u=' + encodeURIComponent(portada);\n\nconst texto = String(p.content_html || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\\s+/g, ' ').trim();\nconst resumen = texto.length > 220 ? texto.slice(0, Math.max(texto.lastIndexOf(' ', 220), 120)) + '…' : texto;\nconst CATEGORIAS = { 1: 'Criptomonedas', 2: 'Forex', 3: 'Materias primas', 4: 'Acciones' };\nconst SENTIMIENTOS = { bullish: 'Alcista', bearish: 'Bajista', neutral: 'Neutral' };\nconst categoria = CATEGORIAS[p.category_id] || 'Mercados';\nconst sentimiento = SENTIMIENTOS[p.sentiment] || 'Neutral';\nconst fuente = p.fuente && p.fuente !== 'RSS' ? p.fuente : '';\nconst esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst colores = { bullish: 0x22c55e, bearish: 0xef4444, neutral: 0x0099ff };\n\nconst lineaMeta = categoria + ' · ' + sentimiento + (fuente ? ' · Fuente: ' + fuente : '');\nconst caption = '<b>' + esc(p.title) + '</b>\\n\\n' + esc(resumen) + '\\n\\n' + esc(lineaMeta);\n\nreturn { json: {\n  url, portada, portadaJpeg, caption,\n  telegram: {\n    photo: portadaJpeg,\n    caption,\n    parse_mode: 'HTML',\n    reply_markup: { inline_keyboard: [[{ text: 'Leer artículo', url }]] },\n  },\n  telegramTexto: {\n    text: caption + '\\n\\n' + url,\n    parse_mode: 'HTML',\n    link_preview_options: { url, prefer_large_media: true },\n  },\n  discord: {\n    username: 'Grizzly Traders',\n    avatar_url: SITE + '/logo.png',\n    embeds: [{\n      title: String(p.title).slice(0, 256),\n      url,\n      description: resumen,\n      color: colores[p.sentiment] || colores.neutral,\n      image: { url: portada },\n      footer: { text: 'Grizzly Traders · ' + lineaMeta },\n      timestamp: new Date().toISOString(),\n    }],\n  },\n} };"
+        "jsCode": "// Mensaje para Telegram y Discord de un articulo recien publicado: SOLO el titular y el ENLACE A NUESTRO ARTICULO (no a la fuente original).\n// SITE_URL, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID y DISCORD_WEBHOOK_URL son variables de entorno de n8n.\n// Variable de entorno (n8n del VPS) o variable de n8n (instalacion con licencia); si ninguna existe, el dominio\nconst leer = (f) => { try { return f(); } catch (e) { return undefined; } };\nconst SITE = String(leer(() => $env.SITE_URL) || leer(() => $vars.SITE_URL) || 'https://grizzlytraders.com').replace(/\\/+$/, '');\nconst p = $('Parsear JSON').item.json;\nconst url = SITE + '/articulos/' + p.slug;\nconst titulo = String(p.title || '').replace(/\\s+/g, ' ').trim().slice(0, 300);\nconst escHtml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n// Discord interpreta Markdown: se escapa para que un titular con * _ ~ ` | > # no cambie el formato\nconst BS = String.fromCharCode(92);\nconst escMd = (s) => s.split('').map((ch) => ((BS + '*_~`|>#').includes(ch) ? BS + ch : ch)).join('');\nreturn { json: {\n  url,\n  titulo,\n  telegram: {\n    text: '<b>' + escHtml(titulo) + '</b>\\n' + url,\n    parse_mode: 'HTML',\n    link_preview_options: { url, prefer_large_media: true },\n  },\n  discord: {\n    username: 'Grizzly Traders',\n    avatar_url: SITE + '/logo.png',\n    content: '**' + escMd(titulo) + '**\\n' + url,\n    allowed_mentions: { parse: [] }, // un titular nunca debe poder mencionar a @everyone ni a nadie\n  },\n} };"
       },
       "id": "c0a1b2c3-d4e5-4f60-9a7b-1c2d3e4f5a99",
       "name": "Armar mensaje comunidades",
@@ -1460,7 +1460,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ 'https://api.telegram.org/bot' + $env.TELEGRAM_BOT_TOKEN + '/sendPhoto' }}",
+        "url": "={{ 'https://api.telegram.org/bot' + $env.TELEGRAM_BOT_TOKEN + '/sendMessage' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -1486,41 +1486,10 @@
         2380
       ],
       "disabled": true,
-      "onError": "continueErrorOutput",
+      "onError": "continueRegularOutput",
       "retryOnFail": true,
       "maxTries": 2,
       "waitBetweenTries": 3000
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ 'https://api.telegram.org/bot' + $env.TELEGRAM_BOT_TOKEN + '/sendMessage' }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ chat_id: $env.TELEGRAM_CHAT_ID, ...$('Armar mensaje comunidades').item.json.telegramTexto }) }}",
-        "options": {
-          "timeout": 20000
-        }
-      },
-      "id": "c2a1b2c3-d4e5-4f60-9a7b-1c2d3e4f5a02",
-      "name": "Telegram - Respaldo texto",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.5,
-      "position": [
-        2840,
-        2530
-      ],
-      "disabled": true,
-      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -1550,7 +1519,7 @@
         3070,
         2380
       ],
-      "disabled": true,
+      "disabled": false,
       "onError": "continueRegularOutput",
       "retryOnFail": true,
       "maxTries": 2,
@@ -2454,24 +2423,6 @@
       ]
     },
     "Telegram - Difundir": {
-      "main": [
-        [
-          {
-            "node": "Discord - Difundir",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Telegram - Respaldo texto",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Telegram - Respaldo texto": {
       "main": [
         [
           {
