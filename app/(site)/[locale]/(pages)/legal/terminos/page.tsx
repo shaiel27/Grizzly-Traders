@@ -138,7 +138,7 @@ export default async function TermsOfServicePage() {
         <h2 id="terceros">8. Enlaces y servicios de terceros</h2>
         <p>
           El Sitio puede incluir enlaces o widgets de terceros (por ejemplo, proveedores de datos de mercado, redes
-          sociales, Telegram/Discord). No controlamos ni somos responsables del contenido ni de las prácticas de
+          sociales, Discord). No controlamos ni somos responsables del contenido ni de las prácticas de
           privacidad de esos terceros.
         </p>
 

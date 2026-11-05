@@ -56,7 +56,7 @@ export async function generateMetadata(): Promise<Metadata> {
 const CATEGORY_SLUGS = ['criptomonedas', 'forex', 'materias-primas', 'acciones']
 
 const VIP_URL = process.env.NEXT_PUBLIC_VIP_URL
-const TELEGRAM_URL = process.env.NEXT_PUBLIC_TELEGRAM_URL
+const DISCORD_URL = process.env.NEXT_PUBLIC_DISCORD_URL
 
 // Rolling last 24h instead of a UTC calendar-day cutoff, so the section doesn't go empty right after midnight UTC
 function last24hIso(): string {
@@ -291,7 +291,7 @@ export default async function HomePage() {
             vez de un parrafo, consola de alertas de ejemplo (tipeando, etiquetada) en vez de la
             tabla "el portal en cifras" (ese "cada 30s" no era verdad: el ticker real consulta
             cada 3s, lib/ticker.ts — B8). */}
-        <VipShowcase locale={locale} vipUrl={VIP_URL} telegramUrl={TELEGRAM_URL} resumen={resumenPreview} />
+        <VipShowcase locale={locale} vipUrl={VIP_URL} discordUrl={DISCORD_URL} resumen={resumenPreview} />
       </main>
 
     </>

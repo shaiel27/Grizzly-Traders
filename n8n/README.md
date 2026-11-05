@@ -15,7 +15,7 @@ Probar una vuelta: `n8n execute --id=xvENLqv9HYCbOVcj` arranca por el disparador
 
 Antes de desplegar en el VPS: el nodo "Componer portada" apunta a `http://localhost:3000`; cambiarlo a la dirección del sitio. Detalles en `docs/portadas.md`.
 
-Telegram y Discord: `docs/comunidades.md` (variables de n8n, formato del mensaje y cómo encenderlos).
+Discord: `docs/comunidades.md` (variable de n8n, formato del mensaje y botón del sitio).
 
 ## Ritmo y portadas (desde nov-2026)
 - **Ritmo:** 3 notas por ciclo, un ciclo cada 45 min (32 al día). El disparador corre cada 15 min y la compuerta `¿Toca ciclo? (cada 45 min)` deja pasar cuando los minutos del día son múltiplos de 45; un intervalo de 45 min del propio disparador daría `*/45` (minutos :00 y :45 de cada hora, 48 al día y desiguales). "Prueba manual" no pasa por la compuerta.
