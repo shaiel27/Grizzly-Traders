@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { revalidatePosts } from '@/lib/cache'
+import { programarCompletado } from '@/lib/completar'
 import { requireEditor } from '@/lib/auth'
 import { createEditorClient } from '@/lib/supabase/admin'
 import { sanitizeArticleHtml, htmlToText } from '@/lib/sanitize'
@@ -122,9 +123,12 @@ export async function POST(request: Request) {
 
   revalidatePosts()
 
+  // El modo Manual solo guarda lo escrito: lo que falte (portada, categoría, traducción) se completa en segundo plano
+  const faltantes = input.status === 'published' ? await programarCompletado(supabase, post.id, auth.user.email) : null
+
   return NextResponse.json({
     success: true,
-    data: { id: post.id, slug: input.slug },
+    data: { id: post.id, slug: input.slug, completando: faltantes },
     message: input.status === 'published' ? 'Artículo publicado' : 'Borrador guardado',
   })
 }

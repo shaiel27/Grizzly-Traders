@@ -1066,6 +1066,7 @@
       "saveChanges": "Save changes",
       "publishNow": "Publish Now",
       "saveDraft": "Save Draft",
+      "completingNote": "completing cover, category and translation in the background",
       "titleAndContentRequired": "✗ Title and content are required",
       "loadPostFailed": "We couldn't load the article"
     },
@@ -1099,6 +1100,12 @@
       "pipelineRan": "✓ Pipeline ran. ID: {id}",
       "naFallback": "N/A",
       "pipelineChecklist": "Rejected by the editorial checklist",
+      "missingLabel": "Missing:",
+      "missingCover": "cover",
+      "missingCategory": "category",
+      "missingTranslation": "translation",
+      "complete": "Complete",
+      "completing": "Completing…",
       "pipelineFailure": "Pipeline technical failure",
       "pipelineAttempts": "Attempts: {n}"
     },

@@ -2,6 +2,8 @@
 
 `cms-editorial.json` es el flujo "CMS Editorial" (webhook del modo Asistido del CMS: análisis, portada, inserción y traducción; id `LsHnIJHOeA3iHrEG`). Recibe `titular`, `cuerpo` e `imagenes` (ver `docs/cms-imagenes.md`).
 
+`cms-completar.json` es el flujo "CMS Completar articulo" (id `cmsCompletar0001`, webhook `cms-completar`): dado el id de un artículo, genera solo lo que le falta (portada, categoría, traducción). Lo llama el sitio al publicar un artículo manual. Ver `docs/cms-completar.md`.
+
 `pipeline-noticias.json` es el flujo "Pipeline Noticias Financieras" (RSS → GPT → portada → Supabase). No contiene llaves: las credenciales se referencian por nombre (`Supabase account 2`, `Pipeline API portadas`, OpenAI, Firecrawl) y hay que crearlas en cada instancia.
 
 Importar y activar (con n8n parado o reiniciándolo después):
