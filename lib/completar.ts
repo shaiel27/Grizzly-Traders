@@ -14,12 +14,18 @@ export interface PostParaCompletar {
   category_id: number | null
   original_locale: string | null
   locales: string[]
+  // Para el anuncio en Discord (solo los artículos del CMS, una sola vez)
+  publicado?: boolean
+  origen?: string | null
+  anunciado_discord_at?: string | null
 }
 
 export interface Faltantes {
   portada: boolean
   categoria: boolean
   traduccion: boolean
+  // Publicado desde el CMS y aún sin anunciar en Discord. No es algo que "falte" en el artículo: solo hace que se llame al flujo.
+  anuncio: boolean
 }
 
 export function calcularFaltantes(post: PostParaCompletar): Faltantes {
@@ -30,10 +36,11 @@ export function calcularFaltantes(post: PostParaCompletar): Faltantes {
     categoria: post.category_id === null || post.category_id === undefined,
     // Sin ninguna versión escrita no hay qué traducir
     traduccion: post.locales.length > 0 && !post.locales.includes(opuesto),
+    anuncio: post.publicado === true && post.origen === 'cms' && !post.anunciado_discord_at,
   }
 }
 
-export const hayFaltantes = (f: Faltantes) => f.portada || f.categoria || f.traduccion
+export const hayFaltantes = (f: Faltantes) => f.portada || f.categoria || f.traduccion || f.anuncio
 
 // La URL del flujo de completar es la del flujo editorial con otro final: así no hace falta otra variable. Se puede fijar
 // aparte con N8N_WEBHOOK_COMPLETAR.
@@ -96,18 +103,21 @@ export async function completarArticulo(postId: string, solicitadoPor?: string):
 
 // Lee lo mínimo para saber qué falta, sin traer el contenido del artículo
 export async function faltantesDe(supabase: SupabaseClient, postId: string): Promise<Faltantes | null> {
-  const { data, error } = await supabase
-    .from('posts')
-    .select('cover_image_url, category_id, original_locale, translations:posts_translations(locale)')
-    .eq('id', postId)
-    .maybeSingle()
+  const base = 'cover_image_url, category_id, original_locale, status, origen, translations:posts_translations(locale)'
+  const leer = (columnas: string) => supabase.from('posts').select(columnas).eq('id', postId).maybeSingle<Record<string, unknown>>()
+  let { data, error } = await leer(`${base}, anunciado_discord_at`)
+  // Sin la columna del anuncio (migración 0010 aún sin aplicar) se sigue completando; solo no se anuncia
+  if (error) ({ data, error } = await leer(base))
   if (error || !data) return null
   const traducciones = (data.translations ?? []) as { locale: string }[]
   return calcularFaltantes({
-    cover_image_url: data.cover_image_url,
-    category_id: data.category_id,
-    original_locale: data.original_locale,
+    cover_image_url: (data.cover_image_url as string | null) ?? null,
+    category_id: (data.category_id as number | null) ?? null,
+    original_locale: (data.original_locale as string | null) ?? null,
     locales: traducciones.map((t) => t.locale),
+    publicado: data.status === 'published',
+    origen: (data.origen as string | null) ?? null,
+    anunciado_discord_at: (data.anunciado_discord_at as string | null) ?? null,
   })
 }
 

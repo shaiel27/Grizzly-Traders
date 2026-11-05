@@ -9,14 +9,24 @@ const completo = { cover_image_url: 'https://x/y.webp', category_id: 4, original
 describe('calcularFaltantes', () => {
   it('un artículo completo no necesita nada', () => {
     const f = calcularFaltantes(completo)
-    expect(f).toEqual({ portada: false, categoria: false, traduccion: false })
+    expect(f).toEqual({ portada: false, categoria: false, traduccion: false, anuncio: false })
     expect(hayFaltantes(f)).toBe(false)
   })
 
   it('el caso de un artículo escrito a mano: sin portada, sin categoría y sin traducción', () => {
     const f = calcularFaltantes({ cover_image_url: null, category_id: null, original_locale: 'es', locales: ['es'] })
-    expect(f).toEqual({ portada: true, categoria: true, traduccion: true })
+    expect(f).toMatchObject({ portada: true, categoria: true, traduccion: true })
     expect(hayFaltantes(f)).toBe(true)
+  })
+
+  it('un artículo del CMS publicado y sin anunciar activa el flujo aunque no le falte nada; los demás casos no', () => {
+    const cms = { ...completo, publicado: true, origen: 'cms', anunciado_discord_at: null }
+    expect(calcularFaltantes(cms).anuncio).toBe(true)
+    expect(hayFaltantes(calcularFaltantes(cms))).toBe(true)
+    expect(calcularFaltantes({ ...cms, anunciado_discord_at: '2026-11-05T23:00:00Z' }).anuncio).toBe(false)
+    expect(calcularFaltantes({ ...cms, publicado: false }).anuncio).toBe(false)
+    // el pipeline ya anuncia lo suyo: nunca se anuncia dos veces
+    expect(calcularFaltantes({ ...cms, origen: 'rss' }).anuncio).toBe(false)
   })
 
   it('una portada vacía cuenta como falta; la categoría 0 no (solo null)', () => {

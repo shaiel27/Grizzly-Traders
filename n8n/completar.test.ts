@@ -23,9 +23,9 @@ function correr(nombre: string, json: unknown, otros: Record<string, unknown> = 
     if (!(n in otros)) throw new Error(`Node '${n}' hasn't been executed`)
     return { first: () => ({ json: otros[n] }) }
   }
-  const fn = new Function('$json', '$', '$input', '$now', nodo(nombre).parameters.jsCode)
-  const salida = fn(json, dolar, { first: () => ({ json }) }, { toFormat: () => '20260101000000' })
-  return (salida as { json: Ctx }[])[0].json
+  const fn = new Function('$json', '$', '$input', '$now', '$env', '$vars', nodo(nombre).parameters.jsCode)
+  const salida = fn(json, dolar, { first: () => ({ json }) }, { toFormat: () => '20260101000000' }, {}, {})
+  return (Array.isArray(salida) ? salida[0] : salida).json as Ctx
 }
 
 const ID = 'be1f67f1-5e1a-4fa4-ad12-ad727059cca2'
@@ -132,12 +132,57 @@ describe('flujo CMS Completar articulo: lógica de los nodos', () => {
   })
 
   it('Armar resultado: informa qué se hizo y qué quedó pendiente', () => {
-    const decidir = { post_id: ID, titulo: 'Ueno', falta_portada: true, falta_categoria: true, falta_traduccion: true, solicitado_por: 'm' }
+    const decidir = { post_id: ID, titulo: 'Ueno', slug_es: null, origen: { slug: 'ueno', title: 'Ueno' }, original_locale: 'es', falta_portada: true, falta_categoria: true, falta_traduccion: true, solicitado_por: 'm' }
     const todo = correr('Armar resultado', {}, { Decidir: decidir, 'Guardar portada': {}, 'Guardar categoria': {}, 'Parsear clasificacion': { category_id: 4 }, 'Insertar traduccion': {} })
     expect(todo).toMatchObject({ ok: true, pendientes: [], hecho: { portada: true, categoria: true, traduccion: true } })
     const sinPortada = correr('Armar resultado', {}, { Decidir: decidir, 'Marcar fallo portada': { error: 'sin saldo' }, 'Parsear clasificacion': { category_id: 4 }, 'Guardar categoria': {}, 'Insertar traduccion': {} })
     expect(sinPortada).toMatchObject({ ok: false, pendientes: ['portada'], errores: { portada: 'sin saldo' } })
     const nada = correr('Armar resultado', {}, { Decidir: { ...decidir, falta_portada: false, falta_categoria: false, falta_traduccion: false } })
     expect(nada).toMatchObject({ ok: true, pendientes: [] })
+  })
+})
+
+describe('flujo CMS Completar articulo: anuncio en Discord', () => {
+  const dec = { post_id: ID, titulo: 'Ueno Bank', slug_es: 'ueno-bank-es', titulo_es: 'Ueno Bank: el riesgo', origen: { slug: 'ueno-bank-es', title: 'Ueno Bank: el riesgo' }, original_locale: 'es', falta_portada: false, falta_categoria: false, falta_traduccion: false, solicitado_por: 'm' }
+
+  it('se anuncia después de la portada y de revalidar el sitio, no antes', () => {
+    expect(destinos('Revalidar sitio')).toEqual(['Reclamar anuncio'])
+    expect(destinos('Reclamar anuncio')).toEqual(['Hay que anunciar'])
+    expect(destinos('Hay que anunciar', 0)).toEqual(['Armar mensaje Discord'])
+    expect(destinos('Hay que anunciar', 1)).toEqual(['Log ejecucion'])
+    expect(destinos('Discord - Difundir')).toEqual(['Log ejecucion'])
+  })
+
+  it('el candado: solo anuncia si el UPDATE condicionado cambió una fila (una vez por artículo, solo del CMS y publicado)', () => {
+    const url = String(nodo('Reclamar anuncio').parameters.url)
+    expect(url).toContain('anunciado_discord_at=is.null')
+    expect(url).toContain('origen=eq.cms')
+    expect(url).toContain('status=eq.published')
+    expect(nodo('Reclamar anuncio').parameters.headerParameters.parameters.find((h: { name: string }) => h.name === 'Prefer').value).toBe('return=representation')
+    expect(String(nodo('Hay que anunciar').parameters.conditions.conditions[0].leftValue)).toContain('body.length > 0')
+  })
+
+  it('el mensaje es solo el titular y el enlace a nuestro artículo, sin menciones y con el Markdown escapado', () => {
+    const armar = (titulo: string, extra: Ctx = {}) =>
+      correr('Armar mensaje Discord', {}, { 'Armar resultado': { slug_publico: 'ueno-bank-es', titulo_publico: titulo, ...extra } }) as { discord: { content: string; allowed_mentions: unknown; username: string }; url: string }
+    const m = armar('El *riesgo* @everyone')
+    expect(m.url).toBe('https://grizzlytraders.com/articulos/ueno-bank-es')
+    expect(m.discord.content).toBe('**El \\*riesgo\\* @everyone**\nhttps://grizzlytraders.com/articulos/ueno-bank-es')
+    expect(m.discord.allowed_mentions).toEqual({ parse: [] })
+    expect(m.discord.username).toBe('Grizzly Traders')
+  })
+
+  it('el webhook sale de la variable de entorno de n8n, nunca escrito en el flujo', () => {
+    expect(String(nodo('Discord - Difundir').parameters.url)).toContain('$env.DISCORD_WEBHOOK_URL')
+    expect(texto).not.toMatch(/discord\.com\/api\/webhooks\/\d/)
+    expect(nodo('Discord - Difundir').onError).toBe('continueRegularOutput')
+  })
+
+  it('Armar resultado elige qué anunciar: la versión en español, o la recién traducida si el original es inglés', () => {
+    expect(correr('Armar resultado', {}, { Decidir: dec })).toMatchObject({ slug_publico: 'ueno-bank-es', titulo_publico: 'Ueno Bank: el riesgo' })
+    const enOriginal = { ...dec, original_locale: 'en', slug_es: null, titulo_es: null, falta_traduccion: true, origen: { slug: 'ueno-en', title: 'Ueno EN' } }
+    const traducida = { 'Resolver slug traducido': { locale_opuesto: 'es', traducida: { slug: 'ueno-es-nueva', title: 'Ueno ES nueva' } }, 'Insertar traduccion': {} }
+    expect(correr('Armar resultado', {}, { Decidir: enOriginal, ...traducida })).toMatchObject({ slug_publico: 'ueno-es-nueva', titulo_publico: 'Ueno ES nueva' })
+    expect(correr('Armar resultado', {}, { Decidir: enOriginal })).toMatchObject({ slug_publico: 'ueno-en' })
   })
 })
