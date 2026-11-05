@@ -1,0 +1,11 @@
+# /etc/systemd/system/grizzly-digest.timer — una vez al día, 8:00 de Nueva York (la misma zona que DIGEST_TIMEZONE)
+[Unit]
+Description=Resumen diario de Grizzly Traders: 8:00 America/New_York
+
+[Timer]
+OnCalendar=*-*-* 08:00:00 America/New_York
+# Si el servidor estaba apagado a esa hora, se envía al volver (el endpoint no repite el mismo día e idioma)
+Persistent=true
+
+[Install]
+WantedBy=timers.target

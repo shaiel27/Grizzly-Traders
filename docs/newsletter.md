@@ -40,6 +40,20 @@ curl -X POST https://tudominio.com/api/newsletter/digest -H "Authorization: Bear
 
 Cuerpo opcional: `{"locale":"es"}` o `{"locale":"en"}` para un solo idioma.
 
+**En el VPS (Hostinger)** se dispara con un temporizador de systemd, 8:00 de Nueva York (la misma zona que `DIGEST_TIMEZONE`). Archivos en `deploy/`:
+
+```bash
+cd /srv/grizzly/web
+sudo install -m 755 deploy/enviar-resumen.sh /usr/local/bin/grizzly-enviar-resumen
+sudo install -m 644 deploy/grizzly-digest.service deploy/grizzly-digest.timer /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now grizzly-digest.timer
+DIGEST_DRY_RUN=1 grizzly-enviar-resumen      # prueba sin enviar
+systemctl list-timers grizzly-digest.timer   # próxima ejecución
+journalctl -u grizzly-digest.service -n 20   # resultado de los envíos
+```
+
+Si no hay envío un día, mirar primero `journalctl -u grizzly-digest.service` y la tabla `newsletter_digests`: si no hay fila de ese día, nadie disparó el endpoint (así pasó del 31-oct al 5-nov: el resumen funcionaba, pero no había ningún disparador programado).
+
 ## Ver el correo sin enviarlo
 
 ```

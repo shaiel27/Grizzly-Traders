@@ -1,0 +1,11 @@
+# /etc/systemd/system/grizzly-digest.service — dispara el resumen diario; lo lanza grizzly-digest.timer
+# El script se instala con: sudo install -m 755 deploy/enviar-resumen.sh /usr/local/bin/grizzly-enviar-resumen
+[Unit]
+Description=Resumen diario de Grizzly Traders (newsletter)
+After=grizzly-web.service
+Wants=grizzly-web.service
+
+[Service]
+Type=oneshot
+User=grizzly
+ExecStart=/usr/local/bin/grizzly-enviar-resumen
