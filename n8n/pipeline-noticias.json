@@ -751,7 +751,7 @@
         255
       ],
       "parameters": {
-        "jsCode": "// Antes: solo las N más recientes. Ahora: una plaza reservada para la fuente oficial más reciente\n// (Reserva Federal o SEC) y el resto por fecha. Sin esto, los comunicados oficiales, que llegan\n// menos veces, quedaban siempre debajo de los titulares de medios.\nconst N = 5;\nconst OFICIALES = ['Reserva Federal', 'SEC', 'CFTC'];\nconst items = $input.all().map((it, i) => ({ it, i, t: Date.parse($('Normalizar Item').itemMatching(i).json.pubDate) || 0 }));\nitems.sort((a, b) => b.t - a.t);\nconst elegidos = [];\nconst oficial = items.find((x) => OFICIALES.includes(x.it.json.fuente));\nif (oficial) elegidos.push(oficial);\nfor (const x of items) {\n  if (elegidos.length >= N) break;\n  if (!elegidos.includes(x)) elegidos.push(x);\n}\nreturn elegidos.map(({ it, i }) => ({ json: it.json, pairedItem: { item: i } }));"
+        "jsCode": "// Antes: solo las N más recientes. Ahora: una plaza reservada para la fuente oficial más reciente\n// (Reserva Federal o SEC) y el resto por fecha. Sin esto, los comunicados oficiales, que llegan\n// menos veces, quedaban siempre debajo de los titulares de medios.\nconst N = 3;\nconst OFICIALES = ['Reserva Federal', 'SEC', 'CFTC'];\nconst items = $input.all().map((it, i) => ({ it, i, t: Date.parse($('Normalizar Item').itemMatching(i).json.pubDate) || 0 }));\nitems.sort((a, b) => b.t - a.t);\nconst elegidos = [];\nconst oficial = items.find((x) => OFICIALES.includes(x.it.json.fuente));\nif (oficial) elegidos.push(oficial);\nfor (const x of items) {\n  if (elegidos.length >= N) break;\n  if (!elegidos.includes(x)) elegidos.push(x);\n}\nreturn elegidos.map(({ it, i }) => ({ json: it.json, pairedItem: { item: i } }));"
       }
     },
     {
@@ -1215,7 +1215,7 @@
     },
     {
       "parameters": {
-        "content": "# Pipeline de noticias financieras\nCada 15 min: lee las fuentes, elige las 5 notas mas recientes (una puede ser oficial), descarta duplicados, las analiza con GPT, genera portada y traduccion, y publica en Supabase.\n\n**Pruebas:** `n8n execute --id=<id del flujo>` (arranca desde *Prueba manual*).",
+        "content": "# Pipeline de noticias financieras\nCada 45 min: lee las fuentes, elige las 3 notas mas recientes (una puede ser oficial), descarta duplicados, las analiza con GPT, genera portada y traduccion, y publica en Supabase.\n\n**Pruebas:** `n8n execute --id=<id del flujo>` (arranca desde *Prueba manual*).",
         "height": 190,
         "width": 1500,
         "color": 7
@@ -1231,7 +1231,7 @@
     },
     {
       "parameters": {
-        "content": "## 1 · Disparo, fuentes y seleccion\nFuentes: CFTC, Investing.com, Reserva Federal y SEC. Las oficiales tienen ventana de 7 dias y una plaza reservada. Se queda con N=5 por vuelta.",
+        "content": "## 1 · Disparo, fuentes y seleccion\nFuentes: CFTC, Investing.com, Reserva Federal y SEC. Las oficiales tienen ventana de 7 dias y una plaza reservada. Se queda con N=3 por vuelta; el disparador corre cada 15 min y la compuerta deja pasar 1 de cada 3 (cada 45 min exactos).",
         "height": 760,
         "width": 2350,
         "color": 4
@@ -1279,7 +1279,7 @@
     },
     {
       "parameters": {
-        "content": "## 4 · Portada\nGPT dibuja la escena; el sitio le pone banderas y logos de activos (`/api/cover/compose`). Si el sitio no responde, se usa la imagen sin insignias.",
+        "content": "## 4 · Portada\nHiggsfield (Soul 2, 1080p) dibuja la escena y, si falla o tarda, la dibuja OpenAI; el sitio le pone banderas y logos de activos (`/api/cover/compose`). Si el sitio no responde, se usa la imagen sin insignias.",
         "height": 440,
         "width": 1010,
         "color": 5
@@ -1555,6 +1555,223 @@
       "retryOnFail": true,
       "maxTries": 2,
       "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c45",
+              "leftValue": "={{ ($now.hour * 60 + $now.minute) % 45 }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e5a1b2c3-d4e5-4f60-9a7b-1c2d3e4f5a45",
+      "name": "¿Toca ciclo? (cada 45 min)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        200,
+        330
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.higgsfield.ai/higgsfield-ai/soul/v2/standard",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $execution.id + '-' + $('Parsear JSON').item.json.slug }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ prompt: \"Editorial photography evoking vintage newsprint and offset printing, for a financial news portal cover. The whole image is printed in a rich duotone of charcoal black and warm grey, with a visible halftone dot pattern, coarse paper fibre and grain clearly visible in raking light, and slight ink misregistration. Deep shadow, high contrast, tactile analogue imperfection, dust and fibre detail. Photorealistic, specific and recognizable real-world scene. Keep the lower-left corner of the frame uncluttered and in shadow. Subject: \" + $('Parsear JSON').item.json.prompt_imagen + \". No printed words, no headlines, no columns of type. Absolutely no text, no letters, no numbers, no typography, no logos, no brand names, no real human faces, no flags.\", resolution: '1080p', aspect_ratio: '3:2', enhance_prompt: false, batch_size: 1 }) }}"
+      },
+      "id": "f1a1b2c3-d4e5-4f60-9a7b-1c2d3e4f5a01",
+      "name": "Higgsfield - Enviar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        3220
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "higgsfieldCred0001",
+          "name": "Higgsfield API"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 12,
+        "unit": "seconds"
+      },
+      "id": "f2a1b2c3-d4e5-4f60-9a7b-1c2d3e4f5a02",
+      "name": "Higgsfield - Esperar",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        3220
+      ],
+      "webhookId": "f2a1b2c3-d4e5-4f60-9a7b-1c2d3e4f5a12"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Higgsfield - Enviar').item.json.status_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "f3a1b2c3-d4e5-4f60-9a7b-1c2d3e4f5a03",
+      "name": "Higgsfield - Estado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        3220
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "higgsfieldCred0001",
+          "name": "Higgsfield API"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Decide qué hacer con la respuesta de Higgsfield: listo, seguir esperando o pasar al respaldo (OpenAI).\n// El contador de intentos se guarda por solicitud (no por nodo) para que no se acumule entre las notas de una misma vuelta.\nconst j = $json;\nconst id = $('Higgsfield - Enviar').item.json.request_id || 'sin-id';\nconst sd = $getWorkflowStaticData('global');\nsd.hf = sd.hf || {};\nif (Object.keys(sd.hf).length > 50) sd.hf = {};\nsd.hf[id] = (sd.hf[id] || 0) + 1;\nconst intentos = sd.hf[id];\nconst url = j.images && j.images[0] && j.images[0].url;\nlet decision = 'esperar';\nif (j.status === 'completed' && url) decision = 'listo';\nelse if (['failed', 'nsfw', 'canceled', 'completed'].includes(j.status)) decision = 'fallo';\nelse if (intentos >= 14) decision = 'fallo'; // ~14 consultas x 12 s: unos 3 minutos\nif (decision !== 'esperar') delete sd.hf[id];\nreturn { json: { decision, status: j.status, url: decision === 'listo' ? url : null, intentos } };"
+      },
+      "id": "f4a1b2c3-d4e5-4f60-9a7b-1c2d3e4f5a04",
+      "name": "Higgsfield - Evaluar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        780,
+        3220
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "r1",
+                    "leftValue": "={{ $json.decision }}",
+                    "rightValue": "listo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "listo"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "r2",
+                    "leftValue": "={{ $json.decision }}",
+                    "rightValue": "esperar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "esperar"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "fallo"
+        }
+      },
+      "id": "f5a1b2c3-d4e5-4f60-9a7b-1c2d3e4f5a05",
+      "name": "Higgsfield - Resultado",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1040,
+        3220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "authentication": "none",
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "id": "f6a1b2c3-d4e5-4f60-9a7b-1c2d3e4f5a06",
+      "name": "Higgsfield - Descargar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        3100
+      ],
+      "onError": "continueErrorOutput"
     }
   ],
   "connections": {
@@ -1562,7 +1779,7 @@
       "main": [
         [
           {
-            "node": "Publicados recientes",
+            "node": "¿Toca ciclo? (cada 45 min)",
             "type": "main",
             "index": 0
           }
@@ -1835,7 +2052,7 @@
       "main": [
         [
           {
-            "node": "OpenAI - Imagen GPT",
+            "node": "Higgsfield - Enviar",
             "type": "main",
             "index": 0
           }
@@ -2259,6 +2476,119 @@
         [
           {
             "node": "Discord - Difundir",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Toca ciclo? (cada 45 min)": {
+      "main": [
+        [
+          {
+            "node": "Publicados recientes",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Higgsfield - Enviar": {
+      "main": [
+        [
+          {
+            "node": "Higgsfield - Esperar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OpenAI - Imagen GPT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Higgsfield - Esperar": {
+      "main": [
+        [
+          {
+            "node": "Higgsfield - Estado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Higgsfield - Estado": {
+      "main": [
+        [
+          {
+            "node": "Higgsfield - Evaluar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OpenAI - Imagen GPT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Higgsfield - Evaluar": {
+      "main": [
+        [
+          {
+            "node": "Higgsfield - Resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Higgsfield - Resultado": {
+      "main": [
+        [
+          {
+            "node": "Higgsfield - Descargar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Higgsfield - Esperar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OpenAI - Imagen GPT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Higgsfield - Descargar": {
+      "main": [
+        [
+          {
+            "node": "Optimizar imagen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OpenAI - Imagen GPT",
             "type": "main",
             "index": 0
           }

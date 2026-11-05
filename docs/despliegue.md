@@ -34,6 +34,7 @@ En `/srv/grizzly/n8n`: `docker-compose.yml` (de `deploy/docker-compose.n8n.yml`)
 `ssh -L 5678:127.0.0.1:5678 -i ~/.ssh/id_ed25519 grizzly@IP` y abrir `http://localhost:5678`.
 
 - **Credenciales:** se exportan cifradas del n8n anterior (`export:credentials --all`) y se importan con la **misma `N8N_ENCRYPTION_KEY`**, así nunca viajan en texto plano. Flujos: `import:workflow` de `n8n/*.json`, luego `publish:workflow` y reiniciar el contenedor.
+- **Credencial Higgsfield** (portadas): crear `Higgsfield API` (Header Auth, `Authorization: Key <ID>:<SECRET>`, id `higgsfieldCred0001`) antes de publicar el flujo; sin ella, las portadas caen en el respaldo de OpenAI.
 - **Nodo Firecrawl** (comunidad): `docker compose exec n8n sh -c "cd /home/node/.n8n/nodes && npm i --omit=dev --omit=peer --ignore-scripts @mendable/n8n-nodes-firecrawl@2.2.0"` y reiniciar (la imagen no trae compilador, por eso `--ignore-scripts`).
 - **Variables:** las *Variables* de n8n son de pago; los flujos leen variables de entorno (`$env`), que define el compose.
 - **Un solo n8n activo:** si el de otra máquina sigue encendido, el pipeline publicaría por duplicado. Detener el anterior al traspasar.
