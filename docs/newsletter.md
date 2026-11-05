@@ -40,6 +40,11 @@ curl -X POST https://tudominio.com/api/newsletter/digest -H "Authorization: Bear
 
 Cuerpo opcional: `{"locale":"es"}` o `{"locale":"en"}` para un solo idioma.
 
+**Disparo en producción (n8n del VPS):** el flujo `Resumen diario (newsletter)` (`n8n/resumen-diario.json`) lo llama **todos los días a las 16:30 de Nueva York** (30 min después del cierre de Wall Street): 16:30 en Miami; en Venezuela (UTC−4 fijo) 17:30 en invierno y 16:30 en verano. El horario de verano de EE. UU. lo maneja la zona del flujo (`America/New_York`). Credencial `Resumen diario (secreto)`: Header Auth `Authorization: Bearer <DIGEST_CRON_SECRET>`, creada en el propio VPS. Si el sitio rechaza el envío o algún idioma falla, la ejecución sale con error en n8n.
+- **No ejecutar ese flujo con `n8n execute`:** arranca por el disparador y enviaría de verdad.
+- Ver el correo sin enviar: la simulación `dryRun` de arriba.
+- Diagnóstico si un día no llega: mirar `newsletter_digests` (si no hay fila de ese día, nadie disparó el endpoint; así pasó del 31-oct al 5-nov) y las ejecuciones del flujo en n8n.
+
 ## Ver el correo sin enviarlo
 
 ```
