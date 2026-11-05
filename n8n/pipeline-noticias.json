@@ -1608,7 +1608,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ prompt: \"Editorial photography evoking vintage newsprint and offset printing, for a financial news portal cover. The whole image is printed in a rich duotone of charcoal black and warm grey, with a visible halftone dot pattern, coarse paper fibre and grain clearly visible in raking light, and slight ink misregistration. Deep shadow, high contrast, tactile analogue imperfection, dust and fibre detail. Photorealistic, specific and recognizable real-world scene. Keep the lower-left corner of the frame uncluttered and in shadow. Subject: \" + $('Parsear JSON').item.json.prompt_imagen + \". No printed words, no headlines, no columns of type. Absolutely no text, no letters, no numbers, no typography, no logos, no brand names, no real human faces, no flags.\", resolution: '1080p', aspect_ratio: '3:2', enhance_prompt: false, batch_size: 1 }) }}"
+        "jsonBody": "={{ JSON.stringify({ prompt: \"Grainy black-and-white duotone photograph, charcoal and warm grey, halftone texture, dramatic shadows. \" + $('Parsear JSON').item.json.prompt_imagen + \". Everything is wordless and blank: blank screens, blank paper, unmarked walls and clothing. Shot from behind or in silhouette. Dark lower-left corner.\", resolution: '1080p', aspect_ratio: '3:2', enhance_prompt: false, batch_size: 1 }) }}"
       },
       "id": "f1a1b2c3-d4e5-4f60-9a7b-1c2d3e4f5a01",
       "name": "Higgsfield - Enviar",

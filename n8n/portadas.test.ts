@@ -71,12 +71,15 @@ describe('portada: Higgsfield con respaldo en OpenAI', () => {
     expect(texto).not.toMatch(/[0-9a-f]{8}-[0-9a-f-]{27}:[0-9a-f]{40,}/)
   })
 
-  it('pide 3:2 a 1080p con el mismo prompt de portada del pipeline', () => {
+  it('pide 3:2 a 1080p con la escena de cada nota y un prompt sin vocabulario de imprenta', () => {
     const cuerpo = (nodo('Higgsfield - Enviar').parameters as unknown as { jsonBody: string }).jsonBody
     expect(cuerpo).toContain("resolution: '1080p'")
     expect(cuerpo).toContain("aspect_ratio: '3:2'")
     expect(cuerpo).toContain("$('Parsear JSON').item.json.prompt_imagen")
-    expect(cuerpo).toContain('Absolutely no text')
+    // Soul 2 no tiene prompt negativo e ignora las prohibiciones: con vocabulario de imprenta dibuja titulares y marcas ilegibles.
+    // El prompt pide una foto "sin palabras" y no menciona periódico, imprenta ni tinta.
+    expect(cuerpo).toContain('wordless')
+    expect(cuerpo).not.toMatch(/newsprint|newspaper|offset|printed|printing|ink|headline/i)
   })
 })
 
