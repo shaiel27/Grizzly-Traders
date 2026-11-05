@@ -1,0 +1,115 @@
+[
+  {
+    "id": "resumenDiarioNews01",
+    "name": "Resumen diario (newsletter)",
+    "active": false,
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "30 16 * * *"
+              }
+            ]
+          }
+        },
+        "id": "a1b2c3d4-0001-4a00-8000-000000000001",
+        "name": "Todos los dias 16:30 (hora de Nueva York)",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          0,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "http://127.0.0.1:3000/api/newsletter/digest",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "{}",
+          "options": {
+            "timeout": 180000
+          }
+        },
+        "id": "a1b2c3d4-0002-4a00-8000-000000000002",
+        "name": "Enviar resumen",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          300,
+          0
+        ],
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "digestCronCred0001",
+            "name": "Resumen diario (secreto)"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "mode": "runOnceForEachItem",
+          "jsCode": "// Falla en voz alta si el servidor rechaza el resumen o si algún idioma falla: así aparece como ejecución con error en n8n.\nconst r = $json;\nif (!r.success) throw new Error('El servidor rechazó el resumen: ' + JSON.stringify(r).slice(0, 300));\nconst resultados = r.results || {};\n// 'skipped' por pocas notas o ya enviado es normal; por falta de dirección postal es un error de configuración\nconst malos = Object.entries(resultados).filter(([, x]) => ['failed', 'error'].includes(x.status) || x.reason === 'missing_postal_address');\nif (malos.length) throw new Error('Falló el resumen en: ' + malos.map(([l, x]) => l + ' (' + (x.error || x.status) + ')').join(', '));\nreturn { json: { resumen: Object.fromEntries(Object.entries(resultados).map(([l, x]) => [l, { status: x.status, articulos: x.count, motivo: x.reason }])) } };"
+        },
+        "id": "a1b2c3d4-0003-4a00-8000-000000000003",
+        "name": "Verificar resultado",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          600,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "content": "## Resumen diario de la newsletter\nTodos los días a las **16:30 de Nueva York** (30 min después del cierre de Wall Street; 17:30 en Venezuela en invierno, 16:30 en verano) llama a `POST /api/newsletter/digest` del propio sitio (misma máquina). El sitio arma el resumen con las notas de las últimas 24 h y crea una difusión por idioma en Resend; no envía con menos de 3 notas ni dos veces el mismo día e idioma.\n\n**No ejecutar con `n8n execute`**: arrancaría por el disparador y enviaría de verdad. Para ver el correo sin enviar: `DIGEST_DRY_RUN=1 bash deploy/enviar-resumen.sh` o `dryRun:true` en el endpoint (ver docs/newsletter.md).\n\nCredencial `Resumen diario (secreto)`: Header Auth, `Authorization: Bearer <DIGEST_CRON_SECRET>`.",
+          "height": 300,
+          "width": 560
+        },
+        "id": "a1b2c3d4-0004-4a00-8000-000000000004",
+        "name": "Nota",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [
+          0,
+          160
+        ]
+      }
+    ],
+    "connections": {
+      "Todos los dias 16:30 (hora de Nueva York)": {
+        "main": [
+          [
+            {
+              "node": "Enviar resumen",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Enviar resumen": {
+        "main": [
+          [
+            {
+              "node": "Verificar resultado",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1",
+      "timezone": "America/New_York",
+      "executionTimeout": 300
+    }
+  }
+]
