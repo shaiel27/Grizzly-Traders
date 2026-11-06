@@ -24,6 +24,7 @@ const schema = z.object({
   N8N_MCP_URL: z.url().optional(),
   N8N_WORKFLOW_ID: optionalText,
   N8N_API_KEY: optionalText,
+  N8N_BASE_URL: z.url().optional(),
   NEXT_PUBLIC_VIP_URL: z.url().optional(),
   NEXT_PUBLIC_DISCORD_URL: z.url().optional(),
   // Google Analytics 4: ID de medición (G-XXXXXXXXXX). Sin él la analítica queda apagada y no se muestra el aviso de cookies.

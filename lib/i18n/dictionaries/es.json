@@ -1125,10 +1125,10 @@
     "posts": {
       "automationHeading": "Automatización de publicación",
       "automationLoading": "Consultando estado...",
-      "automationNotConnected": "No conectada: falta configurar N8N_API_KEY para controlarla desde acá.",
+      "automationNotConnected": "No conectada: el administrador aún debe conectarla para controlarla desde acá.",
       "automationActive": "Activa: publica artículos nuevos automáticamente.",
       "automationPaused": "Pausada: no va a publicar nada hasta que la reanudes.",
-      "automationConfigureTitle": "Configura N8N_API_KEY para habilitar este control",
+      "automationConfigureTitle": "El administrador debe conectar la automatización para habilitar este control",
       "automationApplying": "Aplicando...",
       "automationPause": "Pausar",
       "automationResume": "Reanudar",

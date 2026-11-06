@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireEditor } from '@/lib/auth'
+import { N8N_API_KEY, n8nUrl } from '@/lib/n8n'
 
-const N8N_BASE_URL = 'https://shai27.app.n8n.cloud'
-const N8N_WORKFLOW_ID = 'xvENLqv9HYCbOVcj'
-const N8N_API_KEY = process.env.N8N_API_KEY ?? ''
 
 // Turns the publishing pipeline on or off. This is a system-wide switch (every scheduled run),
 // not a per-article action, so it lives in its own route rather than beside /trigger-pipeline.
@@ -21,12 +19,12 @@ export async function POST(request: Request) {
   }
 
   try {
-    const response = await fetch(`${N8N_BASE_URL}/api/v1/workflows/${N8N_WORKFLOW_ID}/${active ? 'activate' : 'deactivate'}`, {
+    const response = await fetch(n8nUrl(active ? '/activate' : '/deactivate'), {
       method: 'POST',
       headers: { 'X-N8N-API-KEY': N8N_API_KEY },
       signal: AbortSignal.timeout(15_000),
     })
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    if (!response.ok) throw new Error(`n8n respondió HTTP ${response.status}`)
     const data = await response.json()
     return NextResponse.json({ success: true, active: Boolean(data.active) })
   } catch (error) {
