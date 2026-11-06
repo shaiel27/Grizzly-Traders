@@ -17,6 +17,10 @@ services:
       # Las "Variables" de n8n son de pago: los flujos leen estas como variables de entorno ($env)
       SITE_URL: https://grizzlytraders.com
       DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+      # Identificacion ante la SEC (EDGAR exige nombre y correo en el User-Agent). Opcional: hay un valor por defecto en el flujo.
+      SEC_USER_AGENT: ${SEC_USER_AGENT:-}
+      # Noticias de Massive (solo comunicados de GlobeNewswire): apagado por defecto. Requiere la credencial "Massive API" en n8n.
+      MASSIVE_NEWS_ACTIVO: ${MASSIVE_NEWS_ACTIVO:-false}
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
     volumes:
       - n8n_data:/home/node/.n8n

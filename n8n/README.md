@@ -17,6 +17,8 @@ Probar una vuelta: `n8n execute --id=xvENLqv9HYCbOVcj` arranca por el disparador
 
 Antes de desplegar en el VPS: el nodo "Componer portada" apunta a `http://localhost:3000`; cambiarlo a la dirección del sitio. Detalles en `docs/portadas.md`.
 
+Fuentes (oficiales, EDGAR, Investing.com y Massive con interruptor; análisis de términos de cada una, riesgos aceptados y cómo añadir otra): `docs/fuentes.md`.
+
 Discord: `docs/comunidades.md` (variable de n8n, formato del mensaje y botón del sitio).
 
 ## Ritmo y portadas (desde nov-2026)
