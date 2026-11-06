@@ -42,6 +42,9 @@ export const publishSchema = z.object({
 // Full edit: same shape as creation, plus the id of the post being updated
 export const updatePostSchema = publishSchema.extend({
   id: z.string().uuid(),
+  // `updated_at` que tenía la traducción de este idioma cuando se abrió el artículo: si cambió desde entonces (otra persona o el flujo
+  // automático), guardar encima la pisaría y se responde 409 (ver lib/historial.ts)
+  expected_translation_updated_at: z.string().max(64).nullish(),
 })
 
 export const patchPostSchema = z

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { revalidatePosts } from '@/lib/cache'
 import { programarCompletado } from '@/lib/completar'
+import { evaluarGuardado } from '@/lib/historial'
+import { guardarVersion } from '@/lib/historial-db'
 import { requireEditor } from '@/lib/auth'
 import { createEditorClient } from '@/lib/supabase/admin'
 import { sanitizeArticleHtml, htmlToText } from '@/lib/sanitize'
@@ -24,8 +26,9 @@ export async function GET(request: Request) {
     .from('posts')
     .select(`
       id, sentiment, cover_image_url, og_image_url, source_url, source_id, status, scheduled_at,
-      category_id, is_featured,
-      translations:posts_translations(locale, title, slug, content_html, meta_title, meta_description),
+      category_id, is_featured, origen, updated_at,
+      source:fuentes(name),
+      translations:posts_translations(locale, title, slug, content_html, meta_title, meta_description, updated_at),
       assets:post_activos(asset_id),
       tags:post_tags(tag_id)
     `)
@@ -160,6 +163,30 @@ export async function PUT(request: Request) {
     return NextResponse.json({ success: false, error: 'Artículo no encontrado' }, { status: 404 })
   }
 
+  // ¿Alguien cambió este texto mientras se editaba? Se comprueba ANTES de escribir nada: ante un conflicto no se guarda ni un campo
+  const { data: existente } = await supabase
+    .from('posts_translations')
+    .select('title, content_html, meta_title, meta_description, updated_at')
+    .eq('post_id', input.id)
+    .eq('locale', input.locale)
+    .maybeSingle()
+  const evaluacion = evaluarGuardado(
+    existente,
+    input.expected_translation_updated_at,
+    { title: input.title, content_html: contentHtml, meta_title: input.meta_title ?? null, meta_description: input.meta_description ?? null }
+  )
+  if (evaluacion.conflicto) {
+    return NextResponse.json(
+      {
+        success: false,
+        code: 'conflicto',
+        error: 'Este artículo cambió mientras lo editabas (otra persona o el flujo automático). No se guardó nada para no pisar ese cambio: carga la versión actual y vuelve a aplicar tus cambios.',
+        translation_updated_at: existente?.updated_at ?? null,
+      },
+      { status: 409 }
+    )
+  }
+
   const postUpdate: Record<string, unknown> = {
     // `slug` intentionally not touched here: it is the internal/legacy field, the translation's own
     // slug (below) is what /articulos/[slug] actually resolves.
@@ -189,7 +216,12 @@ export async function PUT(request: Request) {
     )
   }
 
-  const { error: translationError } = await supabase
+  // La versión anterior se guarda antes de sustituirla (el historial nunca bloquea el guardado: si falla, solo queda en el log)
+  if (existente && evaluacion.guardarVersionAnterior) {
+    await guardarVersion(supabase, { postId: input.id, locale: input.locale, version: existente, editor: auth.user.email ?? null, motivo: 'edicion' })
+  }
+
+  const { data: traduccionGuardada, error: translationError } = await supabase
     .from('posts_translations')
     .upsert(
       {
@@ -203,6 +235,8 @@ export async function PUT(request: Request) {
       },
       { onConflict: 'post_id,locale' }
     )
+    .select('updated_at')
+    .maybeSingle()
   if (translationError) {
     console.error('Update translation error:', translationError)
     const duplicate = translationError.code === '23505'
@@ -239,7 +273,7 @@ export async function PUT(request: Request) {
 
   return NextResponse.json({
     success: true,
-    data: { id: input.id, slug: input.slug, completando },
+    data: { id: input.id, slug: input.slug, completando, translation_updated_at: traduccionGuardada?.updated_at ?? null },
     message: input.status === 'published' ? 'Artículo actualizado y publicado' : 'Cambios guardados',
   })
 }

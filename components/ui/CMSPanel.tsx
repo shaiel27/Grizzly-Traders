@@ -11,6 +11,8 @@ import { ConfirmDialog, Notice } from './ConfirmDialog'
 import { SubscribersPanel } from './SubscribersPanel'
 import { ArticulosPanel } from '@/components/cms/ArticulosPanel'
 import { hayFalta, type ArticuloLista } from '@/lib/cms-articulos'
+import { HistorialDialog } from '@/components/cms/HistorialDialog'
+import { antiguedad, claveBorrador, ESPERA_AUTOGUARDADO_MS, esRestaurable, estaCaducado, huella, leerBorrador, serializarBorrador } from '@/lib/borrador-local'
 import { useDictionary } from '@/lib/i18n/LocaleProvider'
 import type { Category, Tag, Asset, AssetType, Source } from '@/lib/types'
 
@@ -193,9 +195,9 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
   // La lista vive en ArticulosPanel; esto solo le pide que se recargue (`quiet`: sin esqueleto, para el seguimiento de «completando»)
   const [versionLista, setVersionLista] = useState({ n: 0, quiet: false })
   // Confirmaciones y avisos dentro de la página (en vez de confirm()/alert() del navegador)
-  const [dialog, setDialog] = useState<{ message: string; resolve: (ok: boolean) => void } | null>(null)
+  const [dialog, setDialog] = useState<{ message: string; title?: string; confirmLabel?: string; cancelLabel?: string; resolve: (ok: boolean) => void } | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-  const askConfirm = (message: string) => new Promise<boolean>((resolve) => setDialog({ message, resolve }))
+  const askConfirm = (message: string, opciones?: { title?: string; confirmLabel?: string; cancelLabel?: string }) => new Promise<boolean>((resolve) => setDialog({ message, ...opciones, resolve }))
   const closeDialog = (ok: boolean) => {
     dialog?.resolve(ok)
     setDialog(null)
@@ -227,6 +229,75 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
   const [sources, setSources] = useState(initialSources)
 
   const current = translations[postData.locale]
+
+  // ---- Edición segura: cambios sin guardar, borrador local, conflictos e historial
+  type EstadoForm = { postData: typeof postData; translations: typeof translations }
+  const [meta, setMeta] = useState<{ origen: string | null; fuente: string | null; actualizado: Record<Locale, string | null> }>({ origen: null, fuente: null, actualizado: { es: null, en: null } })
+  // El idioma activo no cuenta como «cambio»: cambiar de pestaña ES/EN no ensucia el formulario
+  const huellaForm = (d: typeof postData, tr: typeof translations) => huella({ postData: { ...d, locale: '' }, translations: tr })
+  const huellaActual = huellaForm(postData, translations)
+  const [base, setBase] = useState(() => huellaForm(EMPTY_POST_DATA, EMPTY_TRANSLATIONS))
+  const dirty = huellaActual !== base
+  const [conflicto, setConflicto] = useState(false)
+  const [borrador, setBorrador] = useState<{ datos: EstadoForm; cuando: string } | null>(null)
+  const [historialAbierto, setHistorialAbierto] = useState(false)
+  const ed = dict.edicion
+
+  const cuandoTexto = (guardadoEn: string) => {
+    const a = antiguedad(guardadoEn)
+    return a.unidad === 'ahora' ? ed.agoNow : t(a.unidad === 'min' ? ed.agoMin : a.unidad === 'h' ? ed.agoHour : ed.agoDay, { n: a.n })
+  }
+  const borrarBorrador = (id: string | null) => {
+    try {
+      localStorage.removeItem(claveBorrador(id))
+    } catch {}
+  }
+  // ¿Hay en este navegador un borrador sin guardar distinto de lo que se acaba de abrir? Si sí, se ofrece restaurarlo
+  const ofrecerBorrador = (id: string | null, abierto: EstadoForm) => {
+    let crudo: string | null = null
+    try {
+      crudo = localStorage.getItem(claveBorrador(id))
+    } catch {}
+    const b = leerBorrador<EstadoForm>(crudo)
+    if (b && estaCaducado(b.guardadoEn)) {
+      borrarBorrador(id)
+      setBorrador(null)
+      return
+    }
+    setBorrador(b && esRestaurable(b, abierto) ? { datos: b.datos, cuando: cuandoTexto(b.guardadoEn) } : null)
+  }
+  const confirmarSalida = async () => {
+    if (!dirty) return true
+    const ok = await askConfirm(ed.discardBody, { title: ed.discardTitle, confirmLabel: ed.discardContinue, cancelLabel: ed.discardKeep })
+    if (ok) borrarBorrador(editingId)
+    return ok
+  }
+
+  // Autoguardado local (solo escribe cuando hay cambios; se borra al guardar o descartar)
+  useEffect(() => {
+    if (!dirty) return
+    const espera = window.setTimeout(() => {
+      try {
+        localStorage.setItem(claveBorrador(editingId), serializarBorrador({ postData, translations }))
+      } catch {}
+    }, ESPERA_AUTOGUARDADO_MS)
+    return () => window.clearTimeout(espera)
+  }, [dirty, huellaActual, editingId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Cerrar o recargar la pestaña con cambios sin guardar: aviso del navegador (el texto no es personalizable)
+  useEffect(() => {
+    if (!dirty) return
+    const avisar = (ev: BeforeUnloadEvent) => ev.preventDefault()
+    window.addEventListener('beforeunload', avisar)
+    return () => window.removeEventListener('beforeunload', avisar)
+  }, [dirty])
+
+  // Borrador del artículo nuevo, al abrir el CMS
+  useEffect(() => {
+    // Lee localStorage (solo existe en el navegador), por eso va después del primer pintado
+    const t0 = window.setTimeout(() => ofrecerBorrador(null, { postData: EMPTY_POST_DATA, translations: EMPTY_TRANSLATIONS }), 0)
+    return () => window.clearTimeout(t0)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const assistDict = dict.assist
   // Un Record (no un array con .find) para que TypeScript obligue a tener las 5 etiquetas: si el
   // backend añade un Stage nuevo algun dia, falta aqui es un error de tipo, no un hueco en runtime.
@@ -304,7 +375,8 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
     }
   }
 
-  const selectTab = (tab: 'editor' | 'posts' | 'subscribers' | 'settings') => {
+  const selectTab = async (tab: 'editor' | 'posts' | 'subscribers' | 'settings') => {
+    if (activeTab === 'editor' && tab !== 'editor' && !(await confirmarSalida())) return
     setActiveTab(tab)
     if (tab === 'posts') loadPosts()
   }
@@ -360,6 +432,11 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
   }
 
   const resetForm = () => {
+    borrarBorrador(editingId)
+    setBase(huellaForm(EMPTY_POST_DATA, EMPTY_TRANSLATIONS))
+    setMeta({ origen: null, fuente: null, actualizado: { es: null, en: null } })
+    setConflicto(false)
+    setBorrador(null)
     setPostData(EMPTY_POST_DATA)
     setTranslations(EMPTY_TRANSLATIONS)
     setEditingId(null)
@@ -415,7 +492,8 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
   // Load a post's full data into the editor for editing. `preferLocale` matters for assisted
   // drafts: the original is the language the author actually wrote in, and that is the version
   // worth reviewing first — the other one is a machine translation of it.
-  const handleEditPost = async (id: string, preferLocale?: Locale) => {
+  const handleEditPost = async (id: string, preferLocale?: Locale, sinConfirmar = false) => {
+    if (!sinConfirmar && !(await confirmarSalida())) return
     setLoadingEdit(true)
     setSaveMsg('')
     try {
@@ -440,9 +518,11 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
         scheduled_at: string | null
         category_id: number | null
         is_featured: boolean
+        origen?: string | null
+        source?: { name: string } | { name: string }[] | null
         asset_ids: number[]
         tag_ids: number[]
-        translations: { locale: Locale; title: string; slug: string; content_html: string; meta_title: string | null; meta_description: string | null }[]
+        translations: { updated_at?: string | null; locale: Locale; title: string; slug: string; content_html: string; meta_title: string | null; meta_description: string | null }[]
       }
 
       const nextTranslations: Record<Locale, TranslationDraft> = { es: { ...EMPTY_TRANSLATION }, en: { ...EMPTY_TRANSLATION } }
@@ -459,8 +539,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
       const availableLocale =
         preferred ?? (post.translations.find((t) => t.locale === 'es') ? 'es' : (post.translations[0]?.locale ?? 'es'))
 
-      setTranslations(nextTranslations)
-      setPostData({
+      const abierto = {
         locale: availableLocale,
         sentiment: (post.sentiment as 'bullish' | 'bearish' | 'neutral') ?? 'neutral',
         cover_image_url: post.cover_image_url ?? '',
@@ -473,7 +552,21 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
         asset_ids: post.asset_ids.map(String),
         tag_ids: post.tag_ids.map(String),
         is_featured: post.is_featured,
+      }
+      setTranslations(nextTranslations)
+      setPostData(abierto)
+      setBase(huellaForm(abierto, nextTranslations))
+      const fuente = Array.isArray(post.source) ? post.source[0] : post.source
+      setMeta({
+        origen: post.origen ?? null,
+        fuente: fuente?.name ?? null,
+        actualizado: {
+          es: post.translations.find((x) => x.locale === 'es')?.updated_at ?? null,
+          en: post.translations.find((x) => x.locale === 'en')?.updated_at ?? null,
+        },
       })
+      setConflicto(false)
+      ofrecerBorrador(id, { postData: abierto, translations: nextTranslations })
       setEditingId(id)
       setActiveTab('editor')
       window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -573,7 +666,8 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
       const payload = { ...postData, ...current }
       const url = editingId ? '/api/posts/manage' : '/api/posts/publish'
       const method = editingId ? 'PUT' : 'POST'
-      const body = editingId ? { ...payload, id: editingId } : payload
+      const body = editingId ? { ...payload, id: editingId, expected_translation_updated_at: meta.actualizado[postData.locale] } : payload
+      const huellaEnviada = huellaActual
 
       const res = await fetch(url, {
         method,
@@ -587,7 +681,22 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
         const completar = hayFalta(data.data?.completando) && data.data?.id
         setSaveMsg(`✓ ${data.message}${completar ? ` · ${dict.editor.completingNote}` : ''}`)
         if (completar) iniciarSeguimiento(data.data.id)
-        if (!editingId && postData.status === 'published') resetForm()
+        setConflicto(false)
+        if (!editingId && postData.status === 'published') {
+          resetForm()
+        } else {
+          // Lo guardado pasa a ser la nueva base: ya no hay cambios pendientes ni borrador local que ofrecer
+          setBase(huellaEnviada)
+          borrarBorrador(editingId)
+          if (editingId && data.data?.translation_updated_at) {
+            const nueva = data.data.translation_updated_at as string
+            setMeta((m) => ({ ...m, actualizado: { ...m.actualizado, [postData.locale]: nueva } }))
+          }
+        }
+      } else if (res.status === 409 && data.code === 'conflicto') {
+        // Nada se guardó: el texto cambió mientras se editaba. El trabajo sigue a salvo en el borrador local.
+        setConflicto(true)
+        setSaveMsg('')
       } else {
         setSaveMsg(`✗ ${data.error}`)
       }
@@ -797,15 +906,78 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                     <span className="material-symbols-outlined text-[16px] text-accent-blue" aria-hidden="true">edit_note</span>
                     {dict.editor.editingExisting}
                   </span>
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className={clsx('rounded-md text-body-sm font-bold text-accent-blue hover:underline', focusRing)}
-                  >
-                    {dict.editor.cancelNew}
-                  </button>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {dirty && (
+                      <span className="flex items-center gap-1.5 rounded-full border border-semantic-warning/30 bg-semantic-warning/10 px-2.5 py-0.5 text-[12px] font-bold text-semantic-warning">
+                        <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
+                        {ed.dirty}
+                      </span>
+                    )}
+                    <button type="button" onClick={() => setHistorialAbierto(true)} className={clsx('rounded-md text-body-sm font-bold text-accent-blue hover:underline', focusRing)}>
+                      {ed.historyButton}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (await confirmarSalida()) resetForm()
+                      }}
+                      className={clsx('rounded-md text-body-sm font-bold text-accent-blue hover:underline', focusRing)}
+                    >
+                      {dict.editor.cancelNew}
+                    </button>
+                  </div>
                 </div>
               ) : null}
+
+              {editingId && !generatedDraft && (meta.origen === 'rss' || postData.status === 'published') && (
+                <p className="rounded-lg border border-semantic-warning/30 bg-semantic-warning/[0.07] px-4 py-2.5 text-[13px] leading-relaxed text-ink-muted">
+                  {meta.origen === 'rss' && <span className="block">{t(ed.autoBanner, { fuente: meta.fuente ? t(ed.sourceFrom, { name: meta.fuente }) : '' })}</span>}
+                  {postData.status === 'published' && <span className="block">{ed.publishedBanner}</span>}
+                </p>
+              )}
+
+              {conflicto && (
+                <div role="alert" className="flex flex-col gap-3 rounded-xl border border-semantic-danger/40 bg-semantic-danger/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-ink">{ed.conflictTitle}</p>
+                    <p className="mt-0.5 text-[13px] leading-relaxed text-ink-muted">{ed.conflictBody}</p>
+                  </div>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => editingId && handleEditPost(editingId, postData.locale, true)} className="shrink-0 self-start">
+                    {ed.reloadCurrent}
+                  </Button>
+                </div>
+              )}
+
+              {borrador && !generatedDraft && (
+                <div role="status" className="flex flex-col gap-3 rounded-xl border border-accent-blue/30 bg-accent-blue/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-[13px] leading-relaxed text-ink">{t(ed.localDraft, { cuando: borrador.cuando })}</p>
+                  <div className="flex shrink-0 gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        setPostData(borrador.datos.postData)
+                        setTranslations(borrador.datos.translations)
+                        if (!editingId) setMode('manual')
+                        setBorrador(null)
+                      }}
+                    >
+                      {ed.restore}
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        borrarBorrador(editingId)
+                        setBorrador(null)
+                      }}
+                      className={clsx('rounded-md px-2 text-body-sm font-bold text-ink-muted hover:underline', focusRing)}
+                    >
+                      {ed.discard}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Mode switch: only for a NEW article — editing an existing one is always manual,
                   there is nothing left to generate (comment on `mode`'s declaration above). */}
@@ -1551,12 +1723,24 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
 
       <Footer />
 
+      {editingId && (
+        <HistorialDialog
+          open={historialAbierto}
+          postId={editingId}
+          locale={postData.locale}
+          hayCambiosSinGuardar={dirty}
+          onClose={() => setHistorialAbierto(false)}
+          onRestaurada={() => handleEditPost(editingId, postData.locale, true)}
+          askConfirm={askConfirm}
+          notify={notify}
+        />
+      )}
       <ConfirmDialog
         open={dialog !== null}
-        title={dict.dialog.deleteTitle}
+        title={dialog?.title ?? dict.dialog.deleteTitle}
         message={dialog?.message ?? ''}
-        confirmLabel={dict.dialog.confirmDelete}
-        cancelLabel={dict.dialog.cancel}
+        confirmLabel={dialog?.confirmLabel ?? dict.dialog.confirmDelete}
+        cancelLabel={dialog?.cancelLabel ?? dict.dialog.cancel}
         onConfirm={() => closeDialog(true)}
         onCancel={() => closeDialog(false)}
       />
