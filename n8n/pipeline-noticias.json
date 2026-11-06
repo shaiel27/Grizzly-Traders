@@ -65,10 +65,10 @@
       "alwaysOutputData": true,
       "position": [
         800,
-        275
+        560
       ],
       "parameters": {
-        "numberInputs": 7
+        "numberInputs": 12
       }
     },
     {
@@ -81,7 +81,7 @@
         255
       ],
       "parameters": {
-        "jsCode": "// Del BCE solo los comunicados (/press/pr/): discursos, entrevistas y blog llevan nombre de autor y sus terminos piden permiso escrito\nconst PERMITIDO = (link) => !/ecb\\.europa\\.eu/i.test(link) || /ecb\\.europa\\.eu\\/+press\\/pr\\//i.test(link);\nreturn $input.all().filter((item) => PERMITIDO((item.json || {}).link || '')).map(item => {\n  const j = item.json || {};\n  const raw = j.contentSnippet || j.content || j.description || j.summary || j.title || '';\n  const contentSnippet = String(raw).replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\n  const pubDate = j.isoDate || j.pubDate || j.pubdate || j.date || '';\n  const link = j.link || '';\n  // R1 -- ninguno de los nodos RSS etiquetaba su fuente,\n  // asi que las dos llegaban como 'RSS' generico y la atribucion visible que exige la\n  // auditoria legal no podia decir CUAL fuente. Se deriva del dominio del propio link, sin\n  // anadir un nodo nuevo al canvas.\n  let fuente = j.fuente || '';\n  if (!fuente) {\n    if (/cftc\\.gov/i.test(link)) fuente = 'CFTC';\n    else if (/investing\\.com/i.test(link)) fuente = 'Investing.com';\n    else if (/federalreserve\\.gov/i.test(link)) fuente = 'Reserva Federal';\n    else if (/sec\\.gov/i.test(link)) fuente = 'SEC';\n    else if (/ecb\\.europa\\.eu/i.test(link)) fuente = 'BCE';\n    else if (/eia\\.gov/i.test(link)) fuente = 'EIA';\n    else if (/bea\\.gov/i.test(link)) fuente = 'BEA';\n  }\n  return { json: {\n    title: String(j.title || '').trim(),\n    link: link,\n    contentSnippet: contentSnippet,\n    pubDate: pubDate,\n    fuente: fuente\n  }};\n});"
+        "jsCode": "// Del BCE solo los comunicados (/press/pr/): discursos, entrevistas y blog llevan nombre de autor y sus terminos piden permiso escrito\nconst PERMITIDO = (link) => !/ecb\\.europa\\.eu/i.test(link) || /ecb\\.europa\\.eu\\/+press\\/pr\\//i.test(link);\nreturn $input.all().filter((item) => PERMITIDO((item.json || {}).link || '')).map(item => {\n  const j = item.json || {};\n  const raw = j.contentSnippet || j.content || j.description || j.summary || j.title || '';\n  const contentSnippet = String(raw).replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\n  const pubDate = j.isoDate || j.pubDate || j.pubdate || j.date || '';\n  const link = j.link || '';\n  // R1 -- ninguno de los nodos RSS etiquetaba su fuente,\n  // asi que las dos llegaban como 'RSS' generico y la atribucion visible que exige la\n  // auditoria legal no podia decir CUAL fuente. Se deriva del dominio del propio link, sin\n  // anadir un nodo nuevo al canvas.\n  let fuente = j.fuente || '';\n  if (!fuente) {\n    if (/cftc\\.gov/i.test(link)) fuente = 'CFTC';\n    else if (/investing\\.com/i.test(link)) fuente = 'Investing.com';\n    else if (/federalreserve\\.gov/i.test(link)) fuente = 'Reserva Federal';\n    else if (/sec\\.gov\\/Archives\\/edgar\\//i.test(link)) fuente = 'EDGAR';\n    else if (/sec\\.gov/i.test(link)) fuente = 'SEC';\n    else if (/occ\\.gov/i.test(link)) fuente = 'OCC';\n    else if (/fdic\\.gov/i.test(link)) fuente = 'FDIC';\n    else if (/globenewswire\\.com/i.test(link)) fuente = 'GlobeNewswire';\n    else if (/ecb\\.europa\\.eu/i.test(link)) fuente = 'BCE';\n    else if (/eia\\.gov/i.test(link)) fuente = 'EIA';\n    else if (/bea\\.gov/i.test(link)) fuente = 'BEA';\n  }\n  return { json: {\n    title: String(j.title || '').trim(),\n    link: link,\n    contentSnippet: contentSnippet,\n    pubDate: pubDate,\n    fuente: fuente\n  }};\n});"
       }
     },
     {
@@ -113,7 +113,7 @@
             },
             {
               "id": "reciente",
-              "leftValue": "={{ !$('Normalizar Item').item.json.pubDate || Date.parse($('Normalizar Item').item.json.pubDate) > $now.minus({ hours: ['Reserva Federal', 'SEC', 'CFTC', 'BCE', 'EIA', 'BEA'].includes($('Normalizar Item').item.json.fuente) ? 168 : 24 }).toMillis() }}",
+              "leftValue": "={{ !$('Normalizar Item').item.json.pubDate || Date.parse($('Normalizar Item').item.json.pubDate) > $now.minus({ hours: ['Reserva Federal', 'SEC', 'CFTC', 'BCE', 'EIA', 'BEA', 'EDGAR', 'OCC', 'FDIC'].includes($('Normalizar Item').item.json.fuente) ? 168 : 24 }).toMillis() }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -137,7 +137,7 @@
       "onError": "continueErrorOutput",
       "position": [
         460,
-        1560
+        2080
       ],
       "parameters": {
         "modelId": {
@@ -180,10 +180,10 @@
       "onError": "continueErrorOutput",
       "position": [
         690,
-        1560
+        2080
       ],
       "parameters": {
-        "jsCode": "let data = $json.output?.[0]?.content?.[0]?.text ?? $json.choices?.[0]?.message?.content ?? $json.message?.content ?? $json.text;\nif (typeof data === 'string') {\n  data = data.trim().replace(/^```json\\s*/i, '').replace(/```\\s*$/, '');\n  data = JSON.parse(data);\n}\nif (!data || typeof data !== 'object') {\n  data = {};\n}\nconst feed = $('Normalizar Item').item.json || {};\nconst title = data.title || 'Sin titulo';\nconst slug = (data.slug || title).toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');\nconst sentimentMap = { 'Bullish': 'bullish', 'Bearish': 'bearish', 'Neutro': 'neutral', 'bullish': 'bullish', 'bearish': 'bearish', 'neutral': 'neutral' };\nconst sentiment = sentimentMap[data.sentiment] || 'neutral';\nconst categoryMap = { 'criptomonedas': 1, 'forex': 2, 'materias-primas': 3, 'acciones': 4 };\nconst categoryId = categoryMap[data.category] || 1;\nconst originalLocale = data.original_locale === 'en' ? 'en' : 'es';\n// F3.1 -- GPT se pasa a menudo del maximo (salieron 872 y 923 sobre 750): en vez de mandar a borrador\n// un articulo valido, se quitan bloques completos del final (nunca se corta a mitad de frase). Si un\n// solo bloque ya supera el limite, se deja tal cual y el checklist lo rechazara.\nconst LIMITE = 750;\nconst textoDe = (html) => html.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\nconst recortarHtml = (html) => {\n  if (textoDe(html).length <= LIMITE) return html;\n  const bloques = html.match(/<(p|h2|h3|blockquote|ul|ol)\\b[^>]*>[\\s\\S]*?<\\/\\1>/gi);\n  if (!bloques || bloques.length < 2) return html;\n  while (bloques.length > 1 && textoDe(bloques.join('')).length > LIMITE) bloques.pop();\n  while (bloques.length > 1 && /^<h[23]\\b/i.test(bloques[bloques.length - 1])) bloques.pop();\n  return bloques.join('');\n};\n\nconst contentHtml = recortarHtml(data.content_html || '<p>Sin contenido</p>');\nconst plainText = contentHtml.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\nconst format = plainText.length < 350 ? 'brief' : 'article';\nconst wordCount = plainText.length > 0 ? plainText.split(' ').filter(Boolean).length : 0;\nconst readingTimeMinutes = Math.max(1, Math.ceil(wordCount / 200));\n// R1 -- source_id mapea el nombre de fuente al id real de la tabla fuentes (ver la migracion 0011). null si la fuente no esta en el registro, para no romper\n// el insert con un id inventado.\nconst sourceIdMap = { 'CFTC': 11, 'Investing.com': 4, 'Reserva Federal': 9, 'SEC': 10, 'BCE': 12, 'EIA': 13, 'BEA': 14 };\n// Banderas y activos de la portada: solo lo que la plantilla sabe dibujar (si GPT inventa otro codigo, se descarta)\nconst BANDERAS_OK = new Set('US EU GB JP CN DE FR IT ES CA AU NZ CH MX BR AR CL CO PE VE IN ID KR TW HK SG TH MY PH VN TR RU UA PL SE NO DK NL BE PT IE AT GR ZA NG EG SA AE IL IR IQ QA KW PK BD CZ HU RO FI SY LY'.split(' '));\nconst ACTIVOS_OK = new Set('BTC ETH SOL XRP ADA DOGE BNB DOT AVAX LINK LTC UNI ATOM POL USDT USDC TRX XLM BCH ETC XAUUSD XAGUSD PLATINUM PALLADIUM COPPER WTI BRENT NG CORN WHEAT SUGAR COFFEE EURUSD GBPUSD USDJPY USDCHF USDCAD AUDUSD NZDUSD EURGBP EURJPY GBPJPY SPX NDX DJI DXY VIX US10Y DAX CAC40 FTSE NIKKEI HSI ESTX50'.split(' '));\nconst limpiarLista = (valor, permitidos, max) => {\n  const lista = Array.isArray(valor) ? valor : typeof valor === 'string' ? valor.split(',') : [];\n  const salida = [];\n  for (const item of lista) {\n    const codigo = String(item || '').trim().toUpperCase();\n    if (permitidos.has(codigo) && !salida.includes(codigo)) salida.push(codigo);\n    if (salida.length >= max) break;\n  }\n  return salida;\n};\nreturn [{ json: {\n  original_locale: originalLocale,\n  title: title,\n  slug: slug,\n  content_html: contentHtml,\n  format: format,\n  reading_time_minutes: readingTimeMinutes,\n  sentiment: sentiment,\n  category_id: categoryId,\n  meta_description: data.meta_description || title,\n  cover_flags: limpiarLista(data.cover_flags, BANDERAS_OK, 2),\n  cover_assets: limpiarLista(data.cover_assets, ACTIVOS_OK, 2),\n  prompt_imagen: data.prompt_imagen || '3D corporate financial illustration with candlestick charts and city skyline, dark background',\n  source_url: feed.link || '',\n  source_title: feed.title || '',\n  source_id: sourceIdMap[feed.fuente] || null,\n  fuente: feed.fuente || 'RSS'\n}}];"
+        "jsCode": "let data = $json.output?.[0]?.content?.[0]?.text ?? $json.choices?.[0]?.message?.content ?? $json.message?.content ?? $json.text;\nif (typeof data === 'string') {\n  data = data.trim().replace(/^```json\\s*/i, '').replace(/```\\s*$/, '');\n  data = JSON.parse(data);\n}\nif (!data || typeof data !== 'object') {\n  data = {};\n}\nconst feed = $('Normalizar Item').item.json || {};\nconst title = data.title || 'Sin titulo';\nconst slug = (data.slug || title).toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');\nconst sentimentMap = { 'Bullish': 'bullish', 'Bearish': 'bearish', 'Neutro': 'neutral', 'bullish': 'bullish', 'bearish': 'bearish', 'neutral': 'neutral' };\nconst sentiment = sentimentMap[data.sentiment] || 'neutral';\nconst categoryMap = { 'criptomonedas': 1, 'forex': 2, 'materias-primas': 3, 'acciones': 4 };\nconst categoryId = categoryMap[data.category] || 1;\nconst originalLocale = data.original_locale === 'en' ? 'en' : 'es';\n// F3.1 -- GPT se pasa a menudo del maximo (salieron 872 y 923 sobre 750): en vez de mandar a borrador\n// un articulo valido, se quitan bloques completos del final (nunca se corta a mitad de frase). Si un\n// solo bloque ya supera el limite, se deja tal cual y el checklist lo rechazara.\nconst LIMITE = 750;\nconst textoDe = (html) => html.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\nconst recortarHtml = (html) => {\n  if (textoDe(html).length <= LIMITE) return html;\n  const bloques = html.match(/<(p|h2|h3|blockquote|ul|ol)\\b[^>]*>[\\s\\S]*?<\\/\\1>/gi);\n  if (!bloques || bloques.length < 2) return html;\n  while (bloques.length > 1 && textoDe(bloques.join('')).length > LIMITE) bloques.pop();\n  while (bloques.length > 1 && /^<h[23]\\b/i.test(bloques[bloques.length - 1])) bloques.pop();\n  return bloques.join('');\n};\n\nconst contentHtml = recortarHtml(data.content_html || '<p>Sin contenido</p>');\nconst plainText = contentHtml.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\nconst format = plainText.length < 350 ? 'brief' : 'article';\nconst wordCount = plainText.length > 0 ? plainText.split(' ').filter(Boolean).length : 0;\nconst readingTimeMinutes = Math.max(1, Math.ceil(wordCount / 200));\n// R1 -- source_id mapea el nombre de fuente al id real de la tabla fuentes (ver la migracion 0011). null si la fuente no esta en el registro, para no romper\n// el insert con un id inventado.\nconst sourceIdMap = { 'CFTC': 11, 'Investing.com': 4, 'Reserva Federal': 9, 'SEC': 10, 'BCE': 12, 'EIA': 13, 'BEA': 14, 'EDGAR': 15, 'OCC': 16, 'FDIC': 17, 'GlobeNewswire': 18 };\n// Banderas y activos de la portada: solo lo que la plantilla sabe dibujar (si GPT inventa otro codigo, se descarta)\nconst BANDERAS_OK = new Set('US EU GB JP CN DE FR IT ES CA AU NZ CH MX BR AR CL CO PE VE IN ID KR TW HK SG TH MY PH VN TR RU UA PL SE NO DK NL BE PT IE AT GR ZA NG EG SA AE IL IR IQ QA KW PK BD CZ HU RO FI SY LY'.split(' '));\nconst ACTIVOS_OK = new Set('BTC ETH SOL XRP ADA DOGE BNB DOT AVAX LINK LTC UNI ATOM POL USDT USDC TRX XLM BCH ETC XAUUSD XAGUSD PLATINUM PALLADIUM COPPER WTI BRENT NG CORN WHEAT SUGAR COFFEE EURUSD GBPUSD USDJPY USDCHF USDCAD AUDUSD NZDUSD EURGBP EURJPY GBPJPY SPX NDX DJI DXY VIX US10Y DAX CAC40 FTSE NIKKEI HSI ESTX50'.split(' '));\nconst limpiarLista = (valor, permitidos, max) => {\n  const lista = Array.isArray(valor) ? valor : typeof valor === 'string' ? valor.split(',') : [];\n  const salida = [];\n  for (const item of lista) {\n    const codigo = String(item || '').trim().toUpperCase();\n    if (permitidos.has(codigo) && !salida.includes(codigo)) salida.push(codigo);\n    if (salida.length >= max) break;\n  }\n  return salida;\n};\nreturn [{ json: {\n  original_locale: originalLocale,\n  title: title,\n  slug: slug,\n  content_html: contentHtml,\n  format: format,\n  reading_time_minutes: readingTimeMinutes,\n  sentiment: sentiment,\n  category_id: categoryId,\n  meta_description: data.meta_description || title,\n  cover_flags: limpiarLista(data.cover_flags, BANDERAS_OK, 2),\n  cover_assets: limpiarLista(data.cover_assets, ACTIVOS_OK, 2),\n  prompt_imagen: data.prompt_imagen || '3D corporate financial illustration with candlestick charts and city skyline, dark background',\n  source_url: feed.link || '',\n  source_title: feed.title || '',\n  source_id: sourceIdMap[feed.fuente] || null,\n  fuente: feed.fuente || 'RSS'\n}}];"
       }
     },
     {
@@ -197,7 +197,7 @@
       "onError": "continueErrorOutput",
       "position": [
         920,
-        2420
+        2940
       ],
       "parameters": {
         "resource": "image",
@@ -230,7 +230,7 @@
       "onError": "continueErrorOutput",
       "position": [
         2290,
-        2230
+        2750
       ],
       "parameters": {
         "method": "POST",
@@ -274,7 +274,7 @@
       "onError": "continueErrorOutput",
       "position": [
         2750,
-        2230
+        2750
       ],
       "parameters": {
         "method": "PATCH",
@@ -317,7 +317,7 @@
       "onError": "continueErrorOutput",
       "position": [
         3440,
-        2230
+        2750
       ],
       "parameters": {
         "method": "POST",
@@ -363,7 +363,7 @@
       "onError": "continueRegularOutput",
       "position": [
         3900,
-        2230
+        2750
       ],
       "parameters": {
         "method": "POST",
@@ -403,7 +403,7 @@
       "onError": "continueRegularOutput",
       "position": [
         0,
-        1560
+        2080
       ],
       "parameters": {
         "operation": "scrape",
@@ -437,7 +437,7 @@
       "onError": "continueErrorOutput",
       "position": [
         230,
-        1560
+        2080
       ],
       "parameters": {
         "jsCode": "const input = $input.first().json;\nconst scraped = (input.data && (input.data.markdown || input.data.content)) || input.markdown || '';\nconst feed = $('Normalizar Item').item.json || {};\nconst MAX_CHARS = 4000;\n\n// F2.6 -- aun con onlyMainContent, Firecrawl trae ruido (publicidad, autor, fecha, titulo repetido,\n// enlaces de comentarios, tickers de precios, imagenes) que se pagaba en tokens y podia empujar el\n// final del articulo fuera del limite.\nconst vistas = new Set();\nconst lineas = String(scraped)\n  .replace(/!\\[[^\\]]*\\]\\([^)]*\\)/g, '')\n  .replace(/\\[([^\\]]*)\\]\\([^)]*\\)/g, '$1')\n  .split('\\n')\n  .map((l) => l.trim())\n  .filter((l) => {\n    if (!l) return true;\n    const b = l.toLowerCase().replace(/^#+\\s*/, '');\n    if (/^(advertisement|publicidad|anuncio)$/.test(b)) return false;\n    if (/^(view all comments|ver todos los comentarios|comments|comentarios)\\b/.test(b)) return false;\n    if (/^(author|autor|by |por |published|publicado|updated|actualizado)\\b/.test(b)) return false;\n    if (/^(escrito por|revisado por|written by|reviewed by|edited by)\\b/.test(b)) return false;\n    if (/publicado\\s*\\d|published\\s*\\w{3,9}\\.? \\d/.test(b)) return false;\n    if (/^(copiar enlace|copy link)/.test(b) || /^(share|compartir)\\b/.test(b)) return false;\n    if (/^(in this article|en este articulo|en este artículo):?$/.test(b)) return false;\n    if (/^(stock markets|últimas noticias|ultimas noticias|cryptocurrency news|economy news|economy|forex news|commodities news|company news|earnings|market news|stock market news)$/.test(b)) return false;\n    if (/^©/.test(b)) return false;\n    if (/^[a-z0-9]{2,8}\\$[\\d.,]+/i.test(l)) return false;\n    if (/^[A-Za-z0-9.&:_\\\\]{1,16}[+-]\\d+(\\.\\d+)?%$/.test(l)) return false;\n    if (/^[\\d\\s.,]+$/.test(b)) return false;\n    if (vistas.has(b)) return false;\n    vistas.add(b);\n    return true;\n  });\nconst clean = lineas.join('\\n').replace(/\\n{3,}/g, '\\n\\n').trim();\nconst fullContent = clean.length > 50 ? clean.slice(0, MAX_CHARS) : (feed.contentSnippet || '');\n\n// F1.8 -- con menos de 200 caracteres de fuente GPT rellena con generalidades inventadas (§11.5).\nif (fullContent.length < 200) {\n  throw new Error('Contenido fuente insuficiente (' + fullContent.length + ' caracteres): Firecrawl fallo y el extracto RSS es demasiado corto.');\n}\nreturn [{ json: {\n  title: feed.title || '',\n  link: feed.link || '',\n  fuente: feed.fuente || '',\n  pubDate: feed.pubDate || '',\n  fullContent: fullContent,\n  contentSnippet: feed.contentSnippet || ''\n}}];\n"
@@ -454,7 +454,7 @@
       "onError": "continueRegularOutput",
       "position": [
         0,
-        930
+        1450
       ],
       "parameters": {
         "url": "https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts?select=title&status=eq.published&order=published_at.desc&limit=20",
@@ -495,7 +495,7 @@
       "onError": "continueRegularOutput",
       "position": [
         690,
-        830
+        1350
       ],
       "parameters": {
         "modelId": {
@@ -537,7 +537,7 @@
       "typeVersion": 2,
       "position": [
         920,
-        830
+        1350
       ],
       "parameters": {
         "jsCode": "// F1.6 -- falla CERRADO: si no hay titulares recientes o la respuesta de GPT no se entiende,\n// el articulo se salta (se reintenta en la corrida siguiente) en vez de darse por nuevo.\nconst titulares = $('Titulares recientes').item.json;\nif (titulares.statusCode !== 200 || !Array.isArray(titulares.body)) {\n  return [{ json: { es_duplicado: true, titulo_similar: null, motivo: 'sin titulares recientes' } }];\n}\nlet raw = $json.output?.[0]?.content?.[0]?.text ?? $json.choices?.[0]?.message?.content ?? $json.message?.content ?? $json.text;\nlet data = null;\ntry {\n  if (typeof raw === 'string') data = JSON.parse(raw);\n  else if (raw && typeof raw === 'object') data = raw;\n} catch (e) {\n  data = null;\n}\nif (!data || typeof data.es_duplicado !== 'boolean') {\n  return [{ json: { es_duplicado: true, titulo_similar: null, motivo: 'veredicto ilegible' } }];\n}\nreturn [{ json: { es_duplicado: data.es_duplicado, titulo_similar: data.titulo_similar || null } }];"
@@ -550,7 +550,7 @@
       "typeVersion": 2.3,
       "position": [
         1150,
-        830
+        1350
       ],
       "parameters": {
         "conditions": {
@@ -585,7 +585,7 @@
       "onError": "continueErrorOutput",
       "position": [
         1380,
-        2230
+        2750
       ],
       "parameters": {
         "operation": "resize",
@@ -622,7 +622,7 @@
       "onError": "continueErrorOutput",
       "position": [
         1150,
-        1560
+        2080
       ],
       "parameters": {
         "modelId": {
@@ -665,7 +665,7 @@
       "onError": "continueErrorOutput",
       "position": [
         1380,
-        1560
+        2080
       ],
       "parameters": {
         "jsCode": "// Lee la salida de GPT - Traducir, valida la traduccion y deja preparadas las DOS\n// filas de posts_translations: la del idioma original y la del idioma opuesto.\nconst base = $('Parsear JSON').item.json;\nlet raw = $json.output?.[0]?.content?.[0]?.text ?? $json.choices?.[0]?.message?.content ?? $json.message?.content ?? $json.text;\nlet t = {};\ntry {\n  if (typeof raw === 'string') {\n    t = JSON.parse(raw.trim().replace(/^\\x60{3}json\\s*/i, \"\").replace(/\\x60{3}\\s*$/, \"\"));\n  } else if (raw && typeof raw === 'object') {\n    t = raw;\n  }\n} catch (e) {\n  t = {};\n}\n\nconst originalLocale = base.original_locale === 'en' ? 'en' : 'es';\nconst targetLocale = originalLocale === 'es' ? 'en' : 'es';\n\nconst slugify = (value) => String(value || '')\n  .toLowerCase()\n  .normalize('NFD')\n  .replace(/[\\u0300-\\u036f]/g, '')\n  .replace(/[^a-z0-9]+/g, '-')\n  .replace(/^-+|-+$/g, '')\n  .slice(0, 80)\n  .replace(/-+$/, '');\n\nconst recortar = (value, max) => {\n  const s = String(value || '').trim();\n  if (s.length <= max) return s;\n  const corte = s.slice(0, max);\n  const esp = corte.lastIndexOf(' ');\n  return (esp > max * 0.6 ? corte.slice(0, esp) : corte).trim();\n};\n\nconst titleT = String(t.title || '').trim();\nconst contentT = String(t.content_html || '').trim();\n\nif (!titleT || contentT.length < 40 || !/<[a-z]/i.test(contentT)) {\n  throw new Error('GPT - Traducir devolvio una traduccion inutilizable (title o content_html vacios o sin HTML). El post NO se inserta y el articulo se reintentara en la siguiente corrida.');\n}\n\nlet slugT = slugify(t.slug) || slugify(titleT);\nif (!slugT || slugT === base.slug) slugT = slugify(base.slug + '-' + targetLocale);\n\n// Control de integridad: mismo multiconjunto de tags en el original y en la traduccion.\nconst tagsDe = (html) => (String(html).match(/<([a-z][a-z0-9]*)(?=[\\s>\\/])/gi) || [])\n  .map((s) => s.slice(1).toLowerCase())\n  .sort()\n  .join(',');\nconst tagsCoinciden = tagsDe(base.content_html) === tagsDe(contentT);\n\nconst original = {\n  locale: originalLocale,\n  title: base.title,\n  slug: base.slug,\n  content_html: base.content_html,\n  meta_title: recortar(base.title, 70),\n  meta_description: recortar(base.meta_description, 160)\n};\n\nconst traducida = {\n  locale: targetLocale,\n  title: titleT,\n  slug: slugT,\n  content_html: contentT,\n  meta_title: recortar(t.meta_title || titleT, 70),\n  meta_description: recortar(t.meta_description || titleT, 160)\n};\n\nreturn [{ json: {\n  original_locale: originalLocale,\n  target_locale: targetLocale,\n  tags_coinciden: tagsCoinciden,\n  original: original,\n  traducida: traducida\n}, pairedItem: { item: 0 } }];"
@@ -682,7 +682,7 @@
       "onError": "continueErrorOutput",
       "position": [
         2980,
-        2230
+        2750
       ],
       "parameters": {
         "url": "={{ 'https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts_translations?select=locale,slug&limit=10&post_id=neq.' + encodeURIComponent($('Insertar post').item.json.id) + '&slug=in.(' + encodeURIComponent($('Preparar traduccion').item.json.original.slug) + ',' + encodeURIComponent($('Preparar traduccion').item.json.traducida.slug) + ')' }}",
@@ -720,7 +720,7 @@
       "onError": "continueErrorOutput",
       "position": [
         3210,
-        2230
+        2750
       ],
       "parameters": {
         "jsCode": "// Resuelve las colisiones contra posts_translations_locale_slug_key UNIQUE (locale, slug)\n// y devuelve las DOS filas listas para el upsert.\nconst prep = $('Preparar traduccion').item.json;\nconst postId = $('Insertar post').item.json.id;\nif (!postId) {\n  throw new Error('Insertar post no devolvio id: no se pueden insertar las traducciones.');\n}\n\nconst existentes = Array.isArray($json.body) ? $json.body : [];\n// Sufijo corto y determinista derivado del uuid del post: estable entre reintentos.\nconst sufijo = '-' + String(postId).replace(/-/g, '').slice(0, 6);\n\nconst resolver = (fila) => {\n  const choca = existentes.some((r) => r && r.locale === fila.locale && r.slug === fila.slug);\n  if (!choca) return { slug: fila.slug, colision: false };\n  const raiz = fila.slug.slice(0, 80 - sufijo.length).replace(/-+$/, '');\n  return { slug: raiz + sufijo, colision: true };\n};\n\nconst ahora = new Date().toISOString();\nconst colisiones = [];\n\nconst filas = [prep.original, prep.traducida].map((f) => {\n  const r = resolver(f);\n  if (r.colision) colisiones.push({ locale: f.locale, slug_pedido: f.slug, slug_final: r.slug });\n  return {\n    post_id: postId,\n    locale: f.locale,\n    title: f.title,\n    slug: r.slug,\n    content_html: f.content_html,\n    meta_title: f.meta_title,\n    meta_description: f.meta_description,\n    updated_at: ahora\n  };\n});\n\nif (filas.length !== 2 || filas[0].locale === filas[1].locale) {\n  throw new Error('Se esperaban dos filas de locales distintos y no es el caso.');\n}\n\nreturn [{ json: {\n  filas: filas,\n  locales: filas.map((f) => f.locale),\n  slugs: filas.map((f) => f.locale + ':' + f.slug),\n  colisiones: colisiones,\n  tags_coinciden: prep.tags_coinciden\n}, pairedItem: { item: 0 } }];"
@@ -735,7 +735,7 @@
       "onError": "continueErrorOutput",
       "position": [
         920,
-        1560
+        2080
       ],
       "parameters": {
         "jsCode": "// P2 (guia de cumplimiento) -- checklist editorial mecanico antes de insertar. Si algo falla,\n// esta linea lanza un Error: la ejecucion de n8n queda marcada como fallida, SIN insertar el\n// post, visible en el historial de ejecuciones para revision humana. No inventa un estado\n// 'pendiente_revision' nuevo en la tabla posts -- usa el mecanismo de error que n8n ya tiene.\n\nconst datos = $('Parsear JSON').item.json;\nconst errores = [];\n\nconst textoPlano = (datos.content_html || '').replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\n\nif (!datos.title || !datos.title.trim()) {\n  errores.push('Falta el titulo.');\n} else if (datos.title.trim().toLowerCase() === String(datos.source_title || '').trim().toLowerCase()) {\n  errores.push('El titulo es una copia literal del titular de la fuente.');\n}\n\nif (!textoPlano) {\n  errores.push('Falta el contenido.');\n} else if (textoPlano.length > 750) {\n  errores.push('El contenido supera los 750 caracteres (tiene ' + textoPlano.length + ').');\n}\n\nif (!datos.source_url) {\n  errores.push('Falta el enlace a la fuente original (source_url).');\n}\nif (datos.source_id == null) {\n  errores.push('Falta el source_id (atribucion estructurada a la fuente).');\n}\n\nconst senales = [\n  /comprar\\s+ahora/i, /vender\\s+ahora/i, /se[nñ]al\\s+de\\s+(compra|venta)/i,\n  /zona\\s+de\\s+entrada/i, /take[\\s-]?profit/i, /stop[\\s-]?loss/i,\n  /precio\\s+objetivo/i, /target\\s+price/i, /\\brecomendamos\\b/i,\n  /\\bdebes?\\s+(comprar|vender)\\b/i, /\\b(buy|sell)\\s+now\\b/i\n];\nconst textoCompleto = (datos.title || '') + ' ' + textoPlano;\nfor (const patron of senales) {\n  if (patron.test(textoCompleto)) {\n    errores.push('Lenguaje de senal/recomendacion de inversion detectado.');\n    break;\n  }\n}\n\nif (errores.length > 0) {\n  throw new Error('Checklist editorial P2 (auditoria legal) fallo: ' + errores.join(' | '));\n}\n\nreturn $input.all();"
@@ -751,7 +751,7 @@
         255
       ],
       "parameters": {
-        "jsCode": "// Elige las notas de cada vuelta REPARTIENDO entre fuentes. Antes se tomaban las mas recientes por fecha: una fuente que publica\n// muchas (Investing.com, ~10 por hora) se quedaba con todo y las oficiales, que publican poco, casi nunca entraban.\n// Ahora va primero la fuente que menos ha publicado en las ultimas 24 h (a igualdad, la que tiene la nota mas reciente), una nota\n// por fuente; si sobran plazas, se completan con las mas recientes que queden.\nconst N = 3;\nconst fuenteDe = (link) => {\n  const l = String(link || '');\n  if (/cftc\\.gov/i.test(l)) return 'CFTC';\n  if (/investing\\.com/i.test(l)) return 'Investing.com';\n  if (/federalreserve\\.gov/i.test(l)) return 'Reserva Federal';\n  if (/sec\\.gov/i.test(l)) return 'SEC';\n  if (/ecb\\.europa\\.eu/i.test(l)) return 'BCE';\n  if (/eia\\.gov/i.test(l)) return 'EIA';\n  if (/bea\\.gov/i.test(l)) return 'BEA';\n  return '';\n};\nconst hace24h = Date.now() - 24 * 3600 * 1000;\nconst pub = $('Publicados recientes').first().json;\nconst recientes = {};\nif (pub && pub.statusCode === 200 && Array.isArray(pub.body)) {\n  for (const p of pub.body) {\n    if (Date.parse(p.created_at) >= hace24h) {\n      const f = fuenteDe(p.source_url);\n      if (f) recientes[f] = (recientes[f] || 0) + 1;\n    }\n  }\n}\nconst items = $input.all().map((it, i) => ({ it, i, t: Date.parse($('Normalizar Item').itemMatching(i).json.pubDate) || 0, f: it.json.fuente || '' }));\nitems.sort((a, b) => b.t - a.t);\nconst porFuente = new Map();\nfor (const x of items) {\n  if (!porFuente.has(x.f)) porFuente.set(x.f, []);\n  porFuente.get(x.f).push(x);\n}\nconst orden = [...porFuente.keys()].sort((a, b) => (recientes[a] || 0) - (recientes[b] || 0) || porFuente.get(b)[0].t - porFuente.get(a)[0].t);\nconst elegidos = [];\nfor (const f of orden) {\n  if (elegidos.length >= N) break;\n  elegidos.push(porFuente.get(f)[0]);\n}\nfor (const x of items) {\n  if (elegidos.length >= N) break;\n  if (!elegidos.includes(x)) elegidos.push(x);\n}\nreturn elegidos.map(({ it, i }) => ({ json: it.json, pairedItem: { item: i } }));"
+        "jsCode": "// Elige las notas de cada vuelta REPARTIENDO entre fuentes. Antes se tomaban las mas recientes por fecha: una fuente que publica\n// muchas (Investing.com, ~10 por hora) se quedaba con todo y las oficiales, que publican poco, casi nunca entraban.\n// Ahora va primero la fuente que menos ha publicado en las ultimas 24 h (a igualdad, la que tiene la nota mas reciente), una nota\n// por fuente; si sobran plazas, se completan con las mas recientes que queden.\nconst N = 3;\nconst fuenteDe = (link) => {\n  const l = String(link || '');\n  if (/cftc\\.gov/i.test(l)) return 'CFTC';\n  if (/investing\\.com/i.test(l)) return 'Investing.com';\n  if (/federalreserve\\.gov/i.test(l)) return 'Reserva Federal';\n  if (/sec\\.gov\\/Archives\\/edgar\\//i.test(l)) return 'EDGAR';\n  if (/sec\\.gov/i.test(l)) return 'SEC';\n  if (/occ\\.gov/i.test(l)) return 'OCC';\n  if (/fdic\\.gov/i.test(l)) return 'FDIC';\n  if (/globenewswire\\.com/i.test(l)) return 'GlobeNewswire';\n  if (/ecb\\.europa\\.eu/i.test(l)) return 'BCE';\n  if (/eia\\.gov/i.test(l)) return 'EIA';\n  if (/bea\\.gov/i.test(l)) return 'BEA';\n  return '';\n};\nconst hace24h = Date.now() - 24 * 3600 * 1000;\nconst pub = $('Publicados recientes').first().json;\nconst recientes = {};\nif (pub && pub.statusCode === 200 && Array.isArray(pub.body)) {\n  for (const p of pub.body) {\n    if (Date.parse(p.created_at) >= hace24h) {\n      const f = fuenteDe(p.source_url);\n      if (f) recientes[f] = (recientes[f] || 0) + 1;\n    }\n  }\n}\nconst items = $input.all().map((it, i) => ({ it, i, t: Date.parse($('Normalizar Item').itemMatching(i).json.pubDate) || 0, f: it.json.fuente || '' }));\nitems.sort((a, b) => b.t - a.t);\nconst porFuente = new Map();\nfor (const x of items) {\n  if (!porFuente.has(x.f)) porFuente.set(x.f, []);\n  porFuente.get(x.f).push(x);\n}\nconst orden = [...porFuente.keys()].sort((a, b) => (recientes[a] || 0) - (recientes[b] || 0) || porFuente.get(b)[0].t - porFuente.get(a)[0].t);\nconst elegidos = [];\nfor (const f of orden) {\n  if (elegidos.length >= N) break;\n  elegidos.push(porFuente.get(f)[0]);\n}\nfor (const x of items) {\n  if (elegidos.length >= N) break;\n  if (!elegidos.includes(x)) elegidos.push(x);\n}\nreturn elegidos.map(({ it, i }) => ({ json: it.json, pairedItem: { item: i } }));"
       }
     },
     {
@@ -765,7 +765,7 @@
       "onError": "continueErrorOutput",
       "position": [
         1380,
-        930
+        1450
       ],
       "parameters": {
         "method": "POST",
@@ -783,7 +783,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ p_source_url: $('Normalizar Item').item.json.link, p_title: $('Normalizar Item').item.json.title, p_source_id: ({ 'CFTC': 11, 'Investing.com': 4, 'Reserva Federal': 9, 'SEC': 10, 'BCE': 12, 'EIA': 13, 'BEA': 14 })[$('Normalizar Item').item.json.fuente] ?? null, p_author_id: 5 }) }}",
+        "jsonBody": "={{ JSON.stringify({ p_source_url: $('Normalizar Item').item.json.link, p_title: $('Normalizar Item').item.json.title, p_source_id: ({ 'CFTC': 11, 'Investing.com': 4, 'Reserva Federal': 9, 'SEC': 10, 'BCE': 12, 'EIA': 13, 'BEA': 14, 'EDGAR': 15, 'OCC': 16, 'FDIC': 17, 'GlobeNewswire': 18 })[$('Normalizar Item').item.json.fuente] ?? null, p_author_id: 5 }) }}",
         "options": {
           "response": {
             "response": {
@@ -806,7 +806,7 @@
       "typeVersion": 2.3,
       "position": [
         1610,
-        930
+        1450
       ],
       "parameters": {
         "conditions": {
@@ -844,7 +844,7 @@
       "onError": "continueErrorOutput",
       "position": [
         2520,
-        2230
+        2750
       ],
       "parameters": {
         "url": "={{ 'https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts?select=id&limit=1&slug=eq.' + encodeURIComponent($('Parsear JSON').item.json.slug) + '&id=neq.' + $('Reservar URL').item.json.body[0].id }}",
@@ -885,7 +885,7 @@
       "onError": "continueErrorOutput",
       "position": [
         3670,
-        2230
+        2750
       ],
       "parameters": {
         "method": "PATCH",
@@ -924,7 +924,7 @@
       "typeVersion": 2,
       "position": [
         0,
-        2900
+        3420
       ],
       "parameters": {
         "mode": "runOnceForEachItem",
@@ -939,7 +939,7 @@
       "onError": "continueRegularOutput",
       "position": [
         230,
-        2900
+        3420
       ],
       "parameters": {
         "method": "PATCH",
@@ -979,7 +979,7 @@
       "onError": "continueRegularOutput",
       "position": [
         460,
-        2900
+        3420
       ],
       "parameters": {
         "method": "POST",
@@ -1068,7 +1068,7 @@
       "typeVersion": 2,
       "position": [
         230,
-        930
+        1450
       ],
       "parameters": {
         "mode": "runOnceForEachItem",
@@ -1082,7 +1082,7 @@
       "typeVersion": 2.3,
       "position": [
         460,
-        930
+        1450
       ],
       "parameters": {
         "conditions": {
@@ -1173,7 +1173,7 @@
       "typeVersion": 4.5,
       "position": [
         1610,
-        2230
+        2750
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -1197,7 +1197,7 @@
       "typeVersion": 2,
       "position": [
         1840,
-        2230
+        2750
       ]
     },
     {
@@ -1231,8 +1231,8 @@
     },
     {
       "parameters": {
-        "content": "## 1 · Disparo, fuentes y seleccion\nFuentes: CFTC, Reserva Federal, SEC, BCE (solo comunicados), EIA y BEA (oficiales, ventana de 7 dias) e Investing.com (ventana de 24 h). Cada vuelta elige 3 notas repartidas: primero la fuente que menos publico en las ultimas 24 h.  El disparador corre cada 15 min y la compuerta deja pasar 1 de cada 3 (cada 45 min exactos).",
-        "height": 780,
+        "content": "## 1 · Disparo, fuentes y seleccion\nFuentes: oficiales (CFTC, Reserva Federal, SEC, BCE solo comunicados, EIA, BEA, OCC, FDIC y los filings 8-K de EDGAR), Investing.com y, con interruptor (MASSIVE_NEWS_ACTIVO), los comunicados de GlobeNewswire via Massive. Cada vuelta elige 3 notas repartidas: primero la fuente que menos publico en las ultimas 24 h.  El disparador corre cada 15 min y la compuerta deja pasar 1 de cada 3 (cada 45 min exactos).",
+        "height": 1300,
         "width": 2350,
         "color": 4
       },
@@ -1258,13 +1258,13 @@
       "typeVersion": 1,
       "position": [
         -60,
-        700
+        1220
       ]
     },
     {
       "parameters": {
-        "content": "## 3 · Contenido, analisis y traduccion\nFirecrawl trae el texto completo; GPT redacta (500-650 caracteres), clasifica y sugiere escena, banderas y activos de la portada; el checklist legal revisa antes de traducir.",
-        "height": 440,
+        "content": "## 3 · Contenido, analisis y traduccion\nFirecrawl trae el texto completo; GPT redacta (500-650 caracteres), clasifica y sugiere escena, banderas y activos de la portada; el checklist legal revisa antes de traducir.\n\nLos filings de EDGAR no pasan por Firecrawl: la SEC exige identificarse en cada peticion (User-Agent con nombre y correo) y no admite bots sin clasificar.",
+        "height": 640,
         "width": 1760,
         "color": 3
       },
@@ -1274,7 +1274,7 @@
       "typeVersion": 1,
       "position": [
         -60,
-        1350
+        1870
       ]
     },
     {
@@ -1290,7 +1290,7 @@
       "typeVersion": 1,
       "position": [
         -60,
-        2030
+        2550
       ]
     },
     {
@@ -1306,7 +1306,7 @@
       "typeVersion": 1,
       "position": [
         2240,
-        2030
+        2550
       ]
     },
     {
@@ -1322,7 +1322,7 @@
       "typeVersion": 1,
       "position": [
         -60,
-        2700
+        3220
       ]
     },
     {
@@ -1356,7 +1356,7 @@
       "typeVersion": 2.2,
       "position": [
         1380,
-        740
+        1260
       ]
     },
     {
@@ -1380,7 +1380,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ title: String($('Normalizar Item').item.json.title || 'duplicado').slice(0, 200), slug: 'duplicado-' + [...String($('Normalizar Item').item.json.link)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7).toString(36), content_html: '<p></p>', status: 'draft', origen: 'rss', author_id: 5, source_url: $('Normalizar Item').item.json.link, source_id: ({ 'CFTC': 11, 'Investing.com': 4, 'Reserva Federal': 9, 'SEC': 10, 'BCE': 12, 'EIA': 13, 'BEA': 14 })[$('Normalizar Item').item.json.fuente] ?? null, ai_assisted: true, pipeline_attempts: 2, pipeline_error: 'duplicado: ' + $json.titulo_similar }) }}",
+        "jsonBody": "={{ JSON.stringify({ title: String($('Normalizar Item').item.json.title || 'duplicado').slice(0, 200), slug: 'duplicado-' + [...String($('Normalizar Item').item.json.link)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7).toString(36), content_html: '<p></p>', status: 'draft', origen: 'rss', author_id: 5, source_url: $('Normalizar Item').item.json.link, source_id: ({ 'CFTC': 11, 'Investing.com': 4, 'Reserva Federal': 9, 'SEC': 10, 'BCE': 12, 'EIA': 13, 'BEA': 14, 'EDGAR': 15, 'OCC': 16, 'FDIC': 17, 'GlobeNewswire': 18 })[$('Normalizar Item').item.json.fuente] ?? null, ai_assisted: true, pipeline_attempts: 2, pipeline_error: 'duplicado: ' + $json.titulo_similar }) }}",
         "options": {}
       },
       "id": "a9b8c7d6-e5f4-4a3b-9c2d-1e0f9a8b7c77",
@@ -1389,7 +1389,7 @@
       "typeVersion": 4.5,
       "position": [
         1610,
-        740
+        1260
       ],
       "credentials": {
         "supabaseApi": {
@@ -1430,7 +1430,7 @@
       "typeVersion": 4.5,
       "position": [
         3670,
-        2380
+        2900
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -1454,7 +1454,7 @@
       "typeVersion": 2,
       "position": [
         3900,
-        2380
+        2900
       ]
     },
     {
@@ -1483,7 +1483,7 @@
       "typeVersion": 4.5,
       "position": [
         4360,
-        2380
+        2900
       ],
       "disabled": false,
       "onError": "continueRegularOutput",
@@ -1551,7 +1551,7 @@
       "typeVersion": 4.2,
       "position": [
         0,
-        2230
+        2750
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -1573,7 +1573,7 @@
       "typeVersion": 1.1,
       "position": [
         230,
-        2230
+        2750
       ],
       "webhookId": "f2a1b2c3-d4e5-4f60-9a7b-1c2d3e4f5a12"
     },
@@ -1593,7 +1593,7 @@
       "typeVersion": 4.2,
       "position": [
         460,
-        2230
+        2750
       ],
       "credentials": {
         "httpHeaderAuth": {
@@ -1614,7 +1614,7 @@
       "typeVersion": 2,
       "position": [
         690,
-        2230
+        2750
       ]
     },
     {
@@ -1680,7 +1680,7 @@
       "typeVersion": 3.2,
       "position": [
         920,
-        2230
+        2750
       ]
     },
     {
@@ -1704,7 +1704,7 @@
       "typeVersion": 4.2,
       "position": [
         1150,
-        2230
+        2750
       ],
       "onError": "continueErrorOutput"
     },
@@ -1751,6 +1751,296 @@
       "parameters": {
         "url": "https://www.bea.gov/rss/rss.xml",
         "options": {}
+      }
+    },
+    {
+      "id": "f2f2f2f2-0000-4000-8000-000000000001",
+      "name": "RSS CFTC declaraciones",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "onError": "continueRegularOutput",
+      "position": [
+        520,
+        665
+      ],
+      "parameters": {
+        "url": "https://www.cftc.gov/RSS/RSSST/rssst.xml",
+        "options": {}
+      }
+    },
+    {
+      "id": "f2f2f2f2-0000-4000-8000-000000000002",
+      "name": "RSS OCC",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "onError": "continueRegularOutput",
+      "position": [
+        520,
+        760
+      ],
+      "parameters": {
+        "url": "https://www.occ.gov/rss/occ_news.xml",
+        "options": {}
+      }
+    },
+    {
+      "id": "f2f2f2f2-0000-4000-8000-000000000003",
+      "name": "RSS FDIC",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "onError": "continueRegularOutput",
+      "position": [
+        520,
+        855
+      ],
+      "parameters": {
+        "url": "https://www.fdic.gov/rss.xml",
+        "options": {}
+      }
+    },
+    {
+      "id": "f2f2f2f2-0000-4000-8000-000000000004",
+      "name": "EDGAR 8-K",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        300,
+        950
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=8-K&company=&dateb=&owner=include&start=0&count=100&output=atom",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "={{ $env.SEC_USER_AGENT || 'Grizzly Traders grizzlytraders@gmail.com' }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "f2f2f2f2-0000-4000-8000-000000000005",
+      "name": "EDGAR - Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        530,
+        950
+      ],
+      "parameters": {
+        "jsCode": "// Feed Atom de filings 8-K recientes de EDGAR -> items {title, link, contentSnippet, pubDate, fuente:'EDGAR'}.\n// Solo los apartados que son noticia (resultados, adquisiciones, acuerdos, bancarrota, cambios de directivos...); sin enmiendas (8-K/A).\nconst RELEVANTES = new Set(['1.01', '1.02', '1.03', '2.01', '2.02', '2.05', '2.06', '3.01', '4.02', '5.02', '8.01']);\nconst dec = (s) => String(s || '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '\"').replace(/&#39;/g, \"'\").replace(/&amp;/g, '&');\nconst xml = String($json.data || '');\nconst vistos = new Set();\nconst salida = [];\nfor (const e of xml.match(/<entry>[\\s\\S]*?<\\/entry>/g) || []) {\n  const titulo = dec((e.match(/<title>([\\s\\S]*?)<\\/title>/) || [])[1]).trim();\n  if (/^8-K\\/A/i.test(titulo)) continue;\n  const link = (e.match(/<link[^>]*href=\"([^\"]+)\"/) || [])[1];\n  if (!link || vistos.has(link)) continue;\n  const resumen = dec((e.match(/<summary[^>]*>([\\s\\S]*?)<\\/summary>/) || [])[1]);\n  const apartados = [...resumen.matchAll(/Item\\s+(\\d\\.\\d{2})\\s*:\\s*([^<\\n]+)/g)].map((m) => ({ n: m[1], d: m[2].trim() })).filter((a) => RELEVANTES.has(a.n));\n  if (!apartados.length) continue;\n  const m = titulo.match(/^8-K\\s*-\\s*(.+?)\\s*\\(\\d+\\)\\s*\\((?:Filer|Subject|Reporting)\\)/);\n  const empresa = m ? m[1] : titulo.replace(/^8-K\\s*-\\s*/, '');\n  vistos.add(link);\n  salida.push({ json: {\n    title: empresa + ' - Form 8-K: ' + apartados.map((a) => a.d).join('; '),\n    link,\n    contentSnippet: 'Filing 8-K de ' + empresa + ' presentado ante la SEC. Apartados: ' + apartados.map((a) => 'Item ' + a.n + ' (' + a.d + ')').join('; ') + '.',\n    pubDate: (e.match(/<updated>([^<]+)</) || [])[1] || '',\n    fuente: 'EDGAR'\n  } });\n}\nreturn salida;"
+      }
+    },
+    {
+      "id": "f2f2f2f2-0000-4000-8000-000000000006",
+      "name": "Massive activo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        300,
+        1045
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $env.MASSIVE_NEWS_ACTIVO === 'true' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "f2f2f2f2-0000-4000-8000-000000000007",
+      "name": "Massive - Noticias",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        530,
+        1045
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.massive.com/v2/reference/news?limit=100&order=desc&sort=published_utc",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "massiveCred0001",
+          "name": "Massive API"
+        }
+      }
+    },
+    {
+      "id": "f2f2f2f2-0000-4000-8000-000000000008",
+      "name": "Massive - Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        1045
+      ],
+      "parameters": {
+        "jsCode": "// Noticias de Massive -> items. SOLO los comunicados de las propias empresas distribuidos por GlobeNewswire: los medios que Massive\n// tambien agrega (The Motley Fool, Zacks...) son contenido editorial de terceros y no se reescriben. Se trabaja solo con el resumen que\n// entrega la API; no se raspan las paginas de origen.\nconst PUBLICADORES_PERMITIDOS = ['GlobeNewswire Inc.'];\nconst resultados = Array.isArray($json.results) ? $json.results : [];\nreturn resultados\n  .filter((a) => PUBLICADORES_PERMITIDOS.includes((a.publisher || {}).name) && a.article_url && String(a.description || '').trim().length >= 200)\n  .map((a) => ({ json: {\n    title: String(a.title || '').replace(/\\s+/g, ' ').trim(),\n    link: a.article_url,\n    contentSnippet: String(a.description).replace(/\\s+/g, ' ').trim(),\n    pubDate: a.published_utc,\n    fuente: 'GlobeNewswire'\n  } }));"
+      }
+    },
+    {
+      "id": "f2f2f2f2-0000-4000-8000-000000000009",
+      "name": "Es EDGAR?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        1940
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $('Normalizar Item').item.json.fuente === 'EDGAR' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "f2f2f2f2-0000-4000-8000-000000000010",
+      "name": "EDGAR - Indice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        2230
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Normalizar Item').item.json.link }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "={{ $env.SEC_USER_AGENT || 'Grizzly Traders grizzlytraders@gmail.com' }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "f2f2f2f2-0000-4000-8000-000000000011",
+      "name": "EDGAR - Elegir documento",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        230,
+        2230
+      ],
+      "parameters": {
+        "jsCode": "// En la pagina indice del filing: el comunicado de prensa (EX-99.1) si existe; si no, el documento principal (8-K).\nconst html = String($json.data || '');\nconst docs = [];\nfor (const fila of html.match(/<tr[^>]*>[\\s\\S]*?<\\/tr>/gi) || []) {\n  const celdas = [...fila.matchAll(/<td[^>]*>([\\s\\S]*?)<\\/td>/gi)].map((m) => m[1]);\n  if (celdas.length < 4) continue;\n  const href = (celdas[2].match(/href=\"([^\"]+)\"/) || [])[1];\n  const tipo = celdas[3].replace(/<[^>]*>/g, '').trim();\n  const limpio = href ? href.replace(/^\\/ix\\?doc=/, '') : '';\n  if (limpio && /\\.(htm|html|txt)$/i.test(limpio)) docs.push({ href: limpio, tipo });\n}\nconst elegido = docs.find((d) => /^EX-99\\.1$/i.test(d.tipo)) || docs.find((d) => /^8-K$/i.test(d.tipo)) || docs[0];\nconst url = elegido ? (/^https?:/i.test(elegido.href) ? elegido.href : 'https://www.sec.gov' + elegido.href) : '';\nreturn [{ json: { url, tipo: elegido ? elegido.tipo : '' } }];"
+      }
+    },
+    {
+      "id": "f2f2f2f2-0000-4000-8000-000000000012",
+      "name": "EDGAR - Documento",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        460,
+        2230
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "={{ $env.SEC_USER_AGENT || 'Grizzly Traders grizzlytraders@gmail.com' }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "f2f2f2f2-0000-4000-8000-000000000013",
+      "name": "EDGAR - Texto",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        690,
+        2230
+      ],
+      "parameters": {
+        "jsCode": "// HTML del documento -> texto plano, con la misma forma que devuelve Firecrawl ({ data: { markdown } }) para reutilizar el nodo siguiente.\nconst ENT = { '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '\"', '&#39;': \"'\", '&rsquo;': \"'\", '&lsquo;': \"'\", '&ldquo;': '\"', '&rdquo;': '\"', '&ndash;': '-', '&mdash;': '-', '&#160;': ' ', '&#8217;': \"'\", '&#8220;': '\"', '&#8221;': '\"', '&#8212;': '-', '&#8211;': '-' };\nlet t = String($json.data || '');\nt = t.replace(/<(script|style)[\\s\\S]*?<\\/\\1>/gi, ' ').replace(/<br\\s*\\/?>/gi, '\\n').replace(/<\\/(p|div|tr|li|h\\d|table)>/gi, '\\n').replace(/<[^>]*>/g, ' ');\nt = t.replace(/&#?\\w+;/g, (m) => (m in ENT ? ENT[m] : ' '));\nconst lineas = t.split('\\n').map((l) => l.replace(/\\s+/g, ' ').trim()).filter((l) => l.length > 0);\nreturn [{ json: { data: { markdown: lineas.join('\\n').slice(0, 20000) } } }];"
       }
     }
   ],
@@ -2162,7 +2452,7 @@
       "main": [
         [
           {
-            "node": "Obtener articulo completo",
+            "node": "Es EDGAR?",
             "type": "main",
             "index": 0
           }
@@ -2285,6 +2575,31 @@
           },
           {
             "node": "RSS BEA",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS CFTC declaraciones",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS OCC",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS FDIC",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "EDGAR 8-K",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Massive activo?",
             "type": "main",
             "index": 0
           }
@@ -2593,6 +2908,157 @@
           }
         ]
       ]
+    },
+    "RSS CFTC declaraciones": {
+      "main": [
+        [
+          {
+            "node": "Fuentes Combinadas",
+            "type": "main",
+            "index": 7
+          }
+        ]
+      ]
+    },
+    "RSS OCC": {
+      "main": [
+        [
+          {
+            "node": "Fuentes Combinadas",
+            "type": "main",
+            "index": 8
+          }
+        ]
+      ]
+    },
+    "RSS FDIC": {
+      "main": [
+        [
+          {
+            "node": "Fuentes Combinadas",
+            "type": "main",
+            "index": 9
+          }
+        ]
+      ]
+    },
+    "EDGAR - Items": {
+      "main": [
+        [
+          {
+            "node": "Fuentes Combinadas",
+            "type": "main",
+            "index": 10
+          }
+        ]
+      ]
+    },
+    "Massive - Items": {
+      "main": [
+        [
+          {
+            "node": "Fuentes Combinadas",
+            "type": "main",
+            "index": 11
+          }
+        ]
+      ]
+    },
+    "EDGAR 8-K": {
+      "main": [
+        [
+          {
+            "node": "EDGAR - Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Massive activo?": {
+      "main": [
+        [
+          {
+            "node": "Massive - Noticias",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Massive - Noticias": {
+      "main": [
+        [
+          {
+            "node": "Massive - Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Es EDGAR?": {
+      "main": [
+        [
+          {
+            "node": "EDGAR - Indice",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Obtener articulo completo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "EDGAR - Indice": {
+      "main": [
+        [
+          {
+            "node": "EDGAR - Elegir documento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "EDGAR - Elegir documento": {
+      "main": [
+        [
+          {
+            "node": "EDGAR - Documento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "EDGAR - Documento": {
+      "main": [
+        [
+          {
+            "node": "EDGAR - Texto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "EDGAR - Texto": {
+      "main": [
+        [
+          {
+            "node": "Extraer contenido completo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -2620,7 +3086,7 @@
     {
       "id": "38723968-0e71-481d-b2c9-8b2ee20c4724",
       "name": "Fuentes",
-      "description": "Une en una sola lista las notas de las 7 fuentes: CFTC, Investing.com, Reserva Federal, SEC, BCE (solo comunicados), EIA y BEA.",
+      "description": "Une en una sola lista las notas de todas las fuentes: oficiales, EDGAR, Investing.com y (con interruptor) GlobeNewswire via Massive.",
       "nodeIds": [
         "3e0882dd-f86e-4a5a-aaf1-11c6067f6785"
       ]
