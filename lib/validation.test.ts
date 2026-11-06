@@ -70,6 +70,13 @@ describe('asistirSchema', () => {
     expect(out.success && out.data.imagenes).toEqual([])
   })
 
+  it('destacar es opcional y por defecto no destaca; solo acepta un booleano', () => {
+    const base = { titular: 'T', cuerpo: texto }
+    expect(asistirSchema.parse(base).destacado).toBe(false)
+    expect(asistirSchema.parse({ ...base, destacado: true }).destacado).toBe(true)
+    expect(asistirSchema.safeParse({ ...base, destacado: 'si' }).success).toBe(false)
+  })
+
   it('el mínimo cuenta solo el texto visible, no el HTML ni los marcadores', () => {
     const corto = `<p>${'a'.repeat(120)}</p><p>[[IMG:1]]</p><p><strong>${'b'.repeat(50)}</strong></p>`
     const out = asistirSchema.safeParse({ titular: 'T', cuerpo: corto, imagenes: [imagen] })

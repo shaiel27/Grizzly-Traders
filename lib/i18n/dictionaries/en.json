@@ -943,12 +943,22 @@
     },
     "signOut": "Sign out",
     "connectionError": "Connection error",
+    "dialog": {
+      "deleteTitle": "Confirm deletion",
+      "confirmDelete": "Delete",
+      "cancel": "Cancel",
+      "close": "Dismiss notice"
+    },
     "genericActionError": "We couldn't complete the action",
     "assist": {
       "modeAssisted": "Assisted",
       "modeManual": "Manual",
       "briefTitleLabel": "Headline",
       "briefTitlePlaceholder": "The article's headline...",
+      "settingsHeading": "Settings",
+      "featuredLabel": "Feature this article",
+      "featuredHint": "It will show as the featured article on the site's front page once you publish it.",
+      "featuredFailed": "The draft was generated, but it could not be featured. Mark it as featured from the editor.",
       "briefBodyLabel": "Body",
       "briefBodyPlaceholder": "Paste or write the article's body. Paste or drag images where you want them. The assistant generates the HTML, tags, cover image, and translation.",
       "briefBodyMinChars": "Minimum 200 characters ({count}/200)",

@@ -943,12 +943,22 @@
     },
     "signOut": "Cerrar sesión",
     "connectionError": "Error de conexión",
+    "dialog": {
+      "deleteTitle": "Confirmar eliminación",
+      "confirmDelete": "Eliminar",
+      "cancel": "Cancelar",
+      "close": "Cerrar aviso"
+    },
     "genericActionError": "No se pudo completar la acción",
     "assist": {
       "modeAssisted": "Asistido",
       "modeManual": "Manual",
       "briefTitleLabel": "Titular",
       "briefTitlePlaceholder": "El titular del artículo...",
+      "settingsHeading": "Configuración",
+      "featuredLabel": "Destacar este artículo",
+      "featuredHint": "Se mostrará como artículo destacado en la portada del sitio cuando lo publiques.",
+      "featuredFailed": "El borrador se generó, pero no se pudo destacar. Márcalo como destacado desde el editor.",
       "briefBodyLabel": "Cuerpo",
       "briefBodyPlaceholder": "Pega o escribe el cuerpo del artículo. Pega o arrastra imágenes donde quieras que vayan. El asistente genera el HTML, las etiquetas, la portada y la traducción.",
       "briefBodyMinChars": "Mínimo 200 caracteres ({count}/200)",
