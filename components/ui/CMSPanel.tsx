@@ -9,7 +9,9 @@ import { briefImageCount, briefTextLength, briefToPayload, MAX_BRIEF_IMAGES } fr
 import { RichEditor } from './RichEditor'
 import { ConfirmDialog, Notice } from './ConfirmDialog'
 import { SubscribersPanel } from './SubscribersPanel'
-import { useLocale, useDictionary } from '@/lib/i18n/LocaleProvider'
+import { ArticulosPanel } from '@/components/cms/ArticulosPanel'
+import { hayFalta, type ArticuloLista } from '@/lib/cms-articulos'
+import { useDictionary } from '@/lib/i18n/LocaleProvider'
 import type { Category, Tag, Asset, AssetType, Source } from '@/lib/types'
 
 interface CMSPanelProps {
@@ -18,42 +20,6 @@ interface CMSPanelProps {
   initialAssets: Asset[]
   initialSources: Source[]
   initialAssetTypes: AssetType[]
-}
-
-interface PostListItem {
-  id: string
-  title: string
-  slug: string
-  status: string
-  sentiment: string
-  view_count: number
-  published_at: string
-  created_at: string
-  is_featured: boolean
-  category: { name: string; slug: string } | null
-  author: { full_name: string } | null
-  assets: { symbol: string; name: string }[]
-  tags: { name: string; slug: string }[]
-  translations: { locale: 'es' | 'en'; slug: string }[]
-  // Escritos por el pipeline automatico: por que un borrador no se publico solo. Opcionales para
-  // no romper si la API vieja aun no los manda.
-  pipeline_error?: string | null
-  pipeline_attempts?: number | null
-  // Lo que le falta al artículo (portada, categoría, traducción): el CMS ofrece completarlo
-  faltantes?: { portada: boolean; categoria: boolean; traduccion: boolean }
-}
-
-const hayFalta = (f?: PostListItem['faltantes']) => !!f && (f.portada || f.categoria || f.traduccion)
-
-// `pipeline_error` llega con prefijo: `checklist:` = el checklist editorial lo rechazo (hay que
-// corregir el contenido), `error:` = fallo tecnico (reintentar). Sin prefijo conocido se muestra
-// tal cual como fallo tecnico, que es lo que pide accion del editor en cualquier caso.
-function parsePipelineError(raw: string | null | undefined): { kind: 'checklist' | 'error'; reason: string } | null {
-  const text = raw?.trim()
-  if (!text) return null
-  const match = /^(checklist|error)\s*:\s*/i.exec(text)
-  if (!match) return { kind: 'error', reason: text }
-  return { kind: match[1].toLowerCase() as 'checklist' | 'error', reason: text.slice(match[0].length).trim() }
 }
 
 type Locale = 'es' | 'en'
@@ -212,7 +178,6 @@ function StatusIcon({ kind, className }: { kind: 'error' | 'warning' | 'check'; 
 }
 
 export function CMSPanel({ initialCategories, initialTags, initialAssets, initialSources, initialAssetTypes }: CMSPanelProps) {
-  const { locale } = useLocale()
   const dict = useDictionary().cms
   const [activeTab, setActiveTab] = useState<'editor' | 'posts' | 'subscribers' | 'settings'>('editor')
   const [saving, setSaving] = useState(false)
@@ -225,7 +190,8 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
     loading: true,
     toggling: false,
   })
-  const [postsList, setPostsList] = useState<PostListItem[]>([])
+  // La lista vive en ArticulosPanel; esto solo le pide que se recargue (`quiet`: sin esqueleto, para el seguimiento de «completando»)
+  const [versionLista, setVersionLista] = useState({ n: 0, quiet: false })
   // Confirmaciones y avisos dentro de la página (en vez de confirm()/alert() del navegador)
   const [dialog, setDialog] = useState<{ message: string; resolve: (ok: boolean) => void } | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -237,7 +203,6 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
   const notify = (message: string) => setNotice(message)
   // Artículos que se están completando en segundo plano (id -> cuándo empezó). Mientras haya alguno se consulta la lista.
   const [completando, setCompletando] = useState<Record<string, number>>({})
-  const [loadingPosts, setLoadingPosts] = useState(false)
   const [loadingEdit, setLoadingEdit] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
 
@@ -290,33 +255,19 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
   // assistant just produced is the one loaded in the form.
   const generatedDraft = assist.phase === 'done' && editingId === assist.postId ? assist : null
 
-  // Load posts list
-  const loadPosts = async (quiet = false) => {
-    if (!quiet) setLoadingPosts(true)
-    try {
-      const res = await fetch('/api/posts/list')
-      if (res.status === 401 || res.status === 403) {
-        window.location.assign('/login')
-        return
+  // Pide a la lista que se recargue (la lista vive en ArticulosPanel)
+  const loadPosts = (quiet = false) => setVersionLista((v) => ({ n: v.n + 1, quiet }))
+
+  // El seguimiento de "completando" termina cuando ya no falta nada o pasan 6 minutos
+  const alCargarLista = (items: ArticuloLista[]) => {
+    setCompletando((prev) => {
+      const next = { ...prev }
+      for (const id of Object.keys(prev)) {
+        const post = items.find((p) => p.id === id)
+        if (!post || !hayFalta(post.faltantes) || Date.now() - prev[id] > 6 * 60_000) delete next[id]
       }
-      const data = await res.json()
-      if (data.success) {
-        setPostsList(data.data)
-        // El seguimiento de "completando" termina cuando ya no falta nada o pasan 6 minutos
-        setCompletando((prev) => {
-          const next = { ...prev }
-          for (const id of Object.keys(prev)) {
-            const post = (data.data as PostListItem[]).find((p) => p.id === id)
-            if (!post || !hayFalta(post.faltantes) || Date.now() - prev[id] > 6 * 60_000) delete next[id]
-          }
-          return Object.keys(next).length === Object.keys(prev).length ? prev : next
-        })
-      }
-    } catch (e) {
-      console.error('Failed to load posts:', e)
-    } finally {
-      setLoadingPosts(false)
-    }
+      return Object.keys(next).length === Object.keys(prev).length ? prev : next
+    })
   }
 
   const iniciarSeguimiento = (id: string) => setCompletando((prev) => ({ ...prev, [id]: Date.now() }))
@@ -759,12 +710,6 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
       return false
     }
     return true
-  }
-
-  const previewHref = (post: PostListItem) => {
-    if (post.status !== 'published') return null
-    const slug = post.translations.find((t) => t.locale === 'es')?.slug ?? post.translations[0]?.slug ?? post.slug
-    return `/articulos/${slug}`
   }
 
   return (
@@ -1453,246 +1398,61 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                 </Button>
               </div>
 
-              <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-headline font-bold text-ink">{t(dict.posts.articlesHeading, { n: postsList.length })}</h2>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleTriggerPipeline}
-                    disabled={pipelineRunning}
-                    aria-busy={pipelineRunning || undefined}
-                  >
-                    {pipelineRunning ? (
-                      <Spinner className="size-3.5" />
-                    ) : (
-                      <span className="material-symbols-outlined text-[16px]" aria-hidden="true">play_arrow</span>
-                    )}
-                    {pipelineRunning ? dict.posts.runningPipeline : dict.posts.runPipeline}
-                  </Button>
-                  <Button variant="accent" size="sm" onClick={() => { resetForm(); setActiveTab('editor') }}>
-                    <span className="material-symbols-outlined text-[16px]" aria-hidden="true">add</span>
-                    {dict.posts.newArticle}
-                  </Button>
-                </div>
-              </div>
-              <div
-                role="status"
-                className={clsx(
-                  pipelineMsg
-                    ? 'mb-4 rounded-lg border p-3 text-sm font-medium'
-                    : 'sr-only',
-                  pipelineMsg.startsWith('✓')
-                    ? 'border-semantic-success/30 bg-semantic-success/10 text-semantic-success'
-                    : 'border-semantic-danger/30 bg-semantic-danger/10 text-semantic-danger'
-                )}
-              >
-                {pipelineMsg}
-              </div>
-
-              {loadingPosts ? (
-                <div className="space-y-2" aria-busy="true">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} aria-hidden="true" className="h-[88px] animate-pulse rounded-xl border border-hairline bg-surface-1 motion-reduce:animate-none" />
-                  ))}
-                </div>
-              ) : postsList.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-outline-variant py-16 text-center">
-                  <span className="material-symbols-outlined mb-3 block text-5xl text-ink-subtle" aria-hidden="true">article</span>
-                  <p className="text-body text-ink-muted">{dict.posts.emptyPosts}</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {postsList.map((post) => {
-                    const href = previewHref(post)
-                    return (
-                      <div
-                        key={post.id}
-                        className={clsx(
-                          'flex flex-col gap-3 rounded-xl border bg-surface-1 p-4 transition-colors sm:flex-row sm:items-center sm:gap-4',
-                          editingId === post.id ? 'border-accent-blue/60' : 'border-hairline hover:border-outline-variant'
-                        )}
+              <ArticulosPanel
+                categories={categories}
+                sources={sources}
+                version={versionLista}
+                editingId={editingId}
+                completando={completando}
+                encabezado={
+                  <>
+                  <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+                    <h2 className="text-headline font-bold text-ink">{dict.tabPosts}</h2>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleTriggerPipeline}
+                        disabled={pipelineRunning}
+                        aria-busy={pipelineRunning || undefined}
                       >
-                        <div className="min-w-0 flex-1">
-                          <div className="mb-1.5 flex flex-wrap items-center gap-2">
-                            {/* Pastilla con marca de forma ademas del color: publicado = punto lleno,
-                                programado = anillo, borrador = anillo punteado. */}
-                            <span
-                              className={clsx(
-                                'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-bold',
-                                post.status === 'published'
-                                  ? 'border-semantic-success/30 bg-semantic-success/10 text-semantic-success'
-                                  : post.status === 'draft'
-                                    ? 'border-outline-variant bg-surface-2 text-ink-muted'
-                                    : 'border-accent-blue/30 bg-accent-blue/10 text-accent-blue-hover'
-                              )}
-                            >
-                              <span
-                                aria-hidden="true"
-                                className={clsx(
-                                  'size-1.5 rounded-full',
-                                  post.status === 'published'
-                                    ? 'bg-current'
-                                    : post.status === 'draft'
-                                      ? 'border border-dashed border-current'
-                                      : 'border border-current'
-                                )}
-                              />
-                              {post.status === 'published'
-                                ? dict.editor.statusPublished
-                                : post.status === 'draft'
-                                  ? dict.editor.statusDraft
-                                  : dict.editor.statusScheduled}
-                            </span>
-                            {post.category && <span className="text-[12px] text-ink-muted">{post.category.name}</span>}
-                          </div>
-                          <p className="truncate text-sm font-bold text-ink" title={post.title}>{post.title}</p>
-                          <p className="mt-0.5 text-[12px] tabular-nums text-ink-muted">
-                            {post.published_at
-                              ? new Date(post.published_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'es-AR')
-                              : dict.posts.noDate}{' '}
-                            · {post.view_count} {dict.posts.viewsSuffix}
-                          </p>
-                          {(() => {
-                            // Lo que le falta al artículo: portada, categoría o traducción (el modo Manual solo guarda lo escrito)
-                            const f = post.faltantes
-                            if (!hayFalta(f) || post.status !== 'published') return null
-                            const faltan = [f?.portada && dict.posts.missingCover, f?.categoria && dict.posts.missingCategory, f?.traduccion && dict.posts.missingTranslation].filter(Boolean)
-                            const enCurso = post.id in completando
-                            return (
-                              <div className="mt-2.5 flex flex-wrap items-center gap-2 rounded-lg border border-semantic-warning/30 bg-semantic-warning/[0.07] px-3 py-2 text-[12px] leading-relaxed">
-                                <StatusIcon kind="warning" className="size-3.5 text-semantic-warning" />
-                                <p className="min-w-0 flex-1 text-ink-muted">
-                                  <span className="font-bold text-semantic-warning">{dict.posts.missingLabel}</span> {faltan.join(' · ')}
-                                </p>
-                                <button
-                                  type="button"
-                                  disabled={enCurso}
-                                  onClick={() => handleCompletar(post.id)}
-                                  className={clsx('rounded-md bg-accent-blue/10 px-2.5 py-1 text-xs font-bold text-accent-blue-hover transition-colors hover:bg-accent-blue/20 disabled:cursor-wait disabled:opacity-60', focusRing)}
-                                >
-                                  {enCurso ? dict.posts.completing : dict.posts.complete}
-                                </button>
-                              </div>
-                            )
-                          })()}
-                          {(() => {
-                            // Motivo visible de por que este borrador no salio solo (columna
-                            // pipeline_error). Etiqueta + icono + color: tres canales, no uno.
-                            const failure = post.status === 'draft' ? parsePipelineError(post.pipeline_error) : null
-                            if (!failure) return null
-                            const isChecklist = failure.kind === 'checklist'
-                            return (
-                              <div
-                                className={clsx(
-                                  'mt-2.5 flex items-start gap-2 rounded-lg border px-3 py-2 text-[12px] leading-relaxed',
-                                  isChecklist
-                                    ? 'border-semantic-warning/30 bg-semantic-warning/[0.07]'
-                                    : 'border-semantic-danger/30 bg-semantic-danger/[0.07]'
-                                )}
-                              >
-                                <StatusIcon
-                                  kind={isChecklist ? 'warning' : 'error'}
-                                  className={clsx('mt-0.5 size-3.5', isChecklist ? 'text-semantic-warning' : 'text-semantic-danger')}
-                                />
-                                <p className="min-w-0 text-ink-muted">
-                                  <span className={clsx('font-bold', isChecklist ? 'text-semantic-warning' : 'text-semantic-danger')}>
-                                    {isChecklist ? dict.posts.pipelineChecklist : dict.posts.pipelineFailure}
-                                  </span>
-                                  {post.pipeline_attempts != null && post.pipeline_attempts > 0 && (
-                                    <span className="text-ink-muted"> · {t(dict.posts.pipelineAttempts, { n: post.pipeline_attempts })}</span>
-                                  )}
-                                  {failure.reason && (
-                                    <span className="mt-0.5 line-clamp-2 block break-words" title={failure.reason}>
-                                      {failure.reason}
-                                    </span>
-                                  )}
-                                </p>
-                              </div>
-                            )
-                          })()}
-                        </div>
-
-                        <div className="flex shrink-0 items-center gap-1 self-end sm:self-auto">
-                          {/* Edit is the action taken on almost every row, so it gets real weight instead of matching the others */}
-                          <button
-                            type="button"
-                            onClick={() => handleEditPost(post.id)}
-                            className={clsx('flex items-center gap-1.5 rounded-lg bg-accent-blue/10 px-2.5 py-2 text-accent-blue-hover transition-colors hover:bg-accent-blue/20', focusRing)}
-                          >
-                            <span className="material-symbols-outlined text-[16px]" aria-hidden="true">edit</span>
-                            <span className="text-xs font-bold">{dict.posts.edit}</span>
-                          </button>
-
-                          <span className="mx-1 h-5 w-px bg-hairline" aria-hidden="true" />
-
-                          <button
-                            type="button"
-                            onClick={() => handleToggleFeatured(post.id, post.is_featured)}
-                            aria-pressed={post.is_featured}
-                            aria-label={post.is_featured ? dict.posts.removeFeatured : dict.posts.markFeatured}
-                            title={post.is_featured ? dict.posts.removeFeatured : dict.posts.markFeatured}
-                            className={clsx(
-                              'rounded-lg p-2 transition-colors',
-                              focusRing,
-                              post.is_featured ? 'bg-accent-blue/10 text-accent-blue-hover' : 'text-ink-muted hover:bg-surface-2 hover:text-ink'
-                            )}
-                          >
-                            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">star</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleStatus(post.id, post.status)}
-                            aria-label={post.status === 'published' ? dict.posts.unpublish : dict.posts.publish}
-                            title={post.status === 'published' ? dict.posts.unpublish : dict.posts.publish}
-                            className={clsx('rounded-lg p-2 text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink', focusRing)}
-                          >
-                            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
-                              {post.status === 'published' ? 'unpublished' : 'publish'}
-                            </span>
-                          </button>
-                          {href ? (
-                            <a
-                              href={href}
-                              target="_blank"
-                              rel="noreferrer"
-                              aria-label={dict.posts.viewArticle}
-                              title={dict.posts.viewArticle}
-                              className={clsx('rounded-lg p-2 text-ink-muted transition-colors hover:bg-surface-2 hover:text-accent-blue-hover', focusRing)}
-                            >
-                              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">open_in_new</span>
-                            </a>
-                          ) : (
-                            // Sin destino no hay enlace: el antiguo <a href="#"> era enfocable y no
-                            // hacia nada. Queda el icono atenuado con su explicacion.
-                            <span
-                              role="img"
-                              aria-label={dict.posts.onlyPublishedPreview}
-                              title={dict.posts.onlyPublishedPreview}
-                              className="cursor-not-allowed rounded-lg p-2 text-ink-subtle opacity-60"
-                            >
-                              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">open_in_new</span>
-                            </span>
-                          )}
-
-                          <span className="mx-1 h-5 w-px bg-hairline" aria-hidden="true" />
-
-                          {/* Destructive, so it stays visually apart from the rest and never blends into a row of neutral icons */}
-                          <button
-                            type="button"
-                            onClick={() => handleDeletePost(post.id)}
-                            aria-label={dict.posts.delete}
-                            title={dict.posts.delete}
-                            className={clsx('rounded-lg p-2 text-semantic-danger transition-colors hover:bg-semantic-danger/10', focusRing)}
-                          >
-                            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">delete</span>
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+                        {pipelineRunning ? (
+                          <Spinner className="size-3.5" />
+                        ) : (
+                          <span className="material-symbols-outlined text-[16px]" aria-hidden="true">play_arrow</span>
+                        )}
+                        {pipelineRunning ? dict.posts.runningPipeline : dict.posts.runPipeline}
+                      </Button>
+                      <Button variant="accent" size="sm" onClick={() => { resetForm(); setActiveTab('editor') }}>
+                        <span className="material-symbols-outlined text-[16px]" aria-hidden="true">add</span>
+                        {dict.posts.newArticle}
+                      </Button>
+                    </div>
+                  </div>
+                  <div
+                    role="status"
+                    className={clsx(
+                      pipelineMsg
+                        ? 'mb-4 rounded-lg border p-3 text-sm font-medium'
+                        : 'sr-only',
+                      pipelineMsg.startsWith('✓')
+                        ? 'border-semantic-success/30 bg-semantic-success/10 text-semantic-success'
+                        : 'border-semantic-danger/30 bg-semantic-danger/10 text-semantic-danger'
+                    )}
+                  >
+                    {pipelineMsg}
+                  </div>
+                  </>
+                }
+                onEdit={(id) => handleEditPost(id)}
+                onToggleStatus={handleToggleStatus}
+                onToggleFeatured={handleToggleFeatured}
+                onDelete={handleDeletePost}
+                onCompletar={handleCompletar}
+                onCargada={alCargarLista}
+                askConfirm={askConfirm}
+                notify={notify}
+              />
             </div>
           )}
 
