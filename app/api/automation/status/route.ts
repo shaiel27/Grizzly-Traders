@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireEditor } from '@/lib/auth'
+import { N8N_API_KEY, n8nUrl } from '@/lib/n8n'
 
-// n8n Cloud instance + workflow id are not secrets (they're just addresses); only the API key is.
-const N8N_BASE_URL = 'https://shai27.app.n8n.cloud'
-const N8N_WORKFLOW_ID = 'xvENLqv9HYCbOVcj'
-const N8N_API_KEY = process.env.N8N_API_KEY ?? ''
 
 // Whether the CMS can control the pipeline at all. Until N8N_API_KEY is set, the button stays
 // disabled instead of pretending to reflect a state the server has no way to actually check.
@@ -17,11 +14,12 @@ export async function GET() {
   }
 
   try {
-    const response = await fetch(`${N8N_BASE_URL}/api/v1/workflows/${N8N_WORKFLOW_ID}`, {
+    const response = await fetch(n8nUrl(''), {
       headers: { 'X-N8N-API-KEY': N8N_API_KEY },
       cache: 'no-store',
+      signal: AbortSignal.timeout(10_000),
     })
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    if (!response.ok) throw new Error(`n8n respondió HTTP ${response.status}`)
     const data = await response.json()
     return NextResponse.json({ success: true, configured: true, active: Boolean(data.active) })
   } catch (error) {

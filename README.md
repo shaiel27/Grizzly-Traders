@@ -25,7 +25,7 @@ pnpm dev                     # http://localhost:3000
 | `FINNHUB_API_KEY` | Cotizaciones de acciones e índices. |
 | `COINGECKO_API_KEY` | Opcional, solo servidor. Llave gratuita "Demo" de CoinGecko para cotizaciones y ranking cripto (sin ella, acceso anónimo con menos cupo). |
 | `N8N_MCP_TOKEN`, `N8N_MCP_URL`, `N8N_WORKFLOW_ID` | Pipeline de contenido en n8n (solo servidor). |
-| `N8N_API_KEY` | API REST de n8n (solo servidor). Permite pausar/reanudar la automatización desde el CMS (`/api/automation/*`). Sin definir, esos botones quedan deshabilitados. |
+| `N8N_BASE_URL` / `N8N_API_KEY` | API REST de n8n (solo servidor). `N8N_BASE_URL` por defecto `http://127.0.0.1:5678` (el n8n del mismo servidor); la llave se crea en n8n → Ajustes → n8n API. Permite pausar/reanudar la automatización desde el CMS (`/api/automation/*`). Sin llave, el botón queda deshabilitado. |
 | `NEXT_PUBLIC_VIP_URL`, `NEXT_PUBLIC_TELEGRAM_URL` | Botones de la home (se ocultan si están vacías). |
 
 Al arrancar el servidor, `instrumentation.ts` valida estas variables con `lib/env.ts`: si falta una obligatoria (las dos de Supabase) o alguna tiene un formato inválido, el servidor se detiene con un mensaje que las lista todas. Las variables vacías (`KEY=`) se tratan como no definidas.
