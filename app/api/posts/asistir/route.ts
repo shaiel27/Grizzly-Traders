@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireEditor } from '@/lib/auth'
+import { revalidatePosts } from '@/lib/cache'
+import { createEditorClient } from '@/lib/supabase/admin'
 import { isOwnStorageImage } from '@/lib/sanitize'
 import { asistirSchema, asistirWebhookSchema, firstIssue } from '@/lib/validation'
 
@@ -137,9 +139,21 @@ export async function POST(request: Request) {
       )
     }
 
+    // El flujo de n8n no conoce "destacado": se aplica aquí, sobre el borrador ya creado
+    let destacado = false
+    if (parsed.data.destacado) {
+      const { error } = await (await createEditorClient()).from('posts').update({ is_featured: true }).eq('id', data.post_id)
+      if (error) console.error('Asistir: no se pudo destacar el artículo', error.code)
+      else {
+        destacado = true
+        revalidatePosts()
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: {
+        destacado,
         post_id: data.post_id,
         slug: data.slug ?? null,
         status: data.status ?? null,

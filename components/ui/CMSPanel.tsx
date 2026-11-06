@@ -8,6 +8,7 @@ import { t } from '@/lib/i18n/get-dictionary'
 import { copyFigures, figuresOf } from '@/lib/rich-html'
 import { briefImageCount, briefTextLength, briefToPayload, MAX_BRIEF_IMAGES } from '@/lib/brief'
 import { RichEditor } from './RichEditor'
+import { ConfirmDialog, Notice } from './ConfirmDialog'
 import { SubscribersPanel } from './SubscribersPanel'
 import { useLocale, useDictionary } from '@/lib/i18n/LocaleProvider'
 import type { Category, Tag, Asset, AssetType, Source } from '@/lib/types'
@@ -110,7 +111,7 @@ function progressIndex(elapsedMs: number): number {
 // on screen is the real server limit, not a guess at how long generation usually takes.
 const ASSIST_MAX_MS = 150_000
 const BODY_MIN_CHARS = 200
-const EMPTY_BRIEF = { titular: '', cuerpo: '' }
+const EMPTY_BRIEF = { titular: '', cuerpo: '', destacar: false }
 
 type AssistState =
   | { phase: 'idle' }
@@ -226,6 +227,15 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
     toggling: false,
   })
   const [postsList, setPostsList] = useState<PostListItem[]>([])
+  // Confirmaciones y avisos dentro de la página (en vez de confirm()/alert() del navegador)
+  const [dialog, setDialog] = useState<{ message: string; resolve: (ok: boolean) => void } | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const askConfirm = (message: string) => new Promise<boolean>((resolve) => setDialog({ message, resolve }))
+  const closeDialog = (ok: boolean) => {
+    dialog?.resolve(ok)
+    setDialog(null)
+  }
+  const notify = (message: string) => setNotice(message)
   // Artículos que se están completando en segundo plano (id -> cuándo empezó). Mientras haya alguno se consulta la lista.
   const [completando, setCompletando] = useState<Record<string, number>>({})
   const [loadingPosts, setLoadingPosts] = useState(false)
@@ -334,12 +344,12 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
       }
       const data = await res.json().catch(() => null)
       if (!res.ok || !data?.success) {
-        window.alert(data?.error ?? dict.genericActionError)
+        notify(data?.error ?? dict.genericActionError)
         quitar()
       }
     } catch (e) {
       console.error('Complete post error:', e)
-      window.alert(dict.connectionError)
+      notify(dict.connectionError)
       quitar()
     }
   }
@@ -390,10 +400,10 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
       if (data.success) {
         setAutomation((prev) => ({ ...prev, active: data.active }))
       } else {
-        window.alert(data.error ?? dict.posts.automationToggleFailed)
+        notify(data.error ?? dict.posts.automationToggleFailed)
       }
     } catch {
-      window.alert(dict.connectionError)
+      notify(dict.connectionError)
     } finally {
       setAutomation((prev) => ({ ...prev, toggling: false }))
     }
@@ -466,7 +476,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
       }
       const data = await res.json()
       if (!data.success) {
-        window.alert(data.error ?? dict.editor.loadPostFailed)
+        notify(data.error ?? dict.editor.loadPostFailed)
         return
       }
 
@@ -519,7 +529,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (e) {
       console.error('Failed to load post for edit:', e)
-      window.alert(dict.connectionError)
+      notify(dict.connectionError)
     } finally {
       setLoadingEdit(false)
     }
@@ -540,7 +550,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
       const res = await fetch('/api/posts/asistir', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ titular: brief.titular, ...briefToPayload(brief.cuerpo) }),
+        body: JSON.stringify({ titular: brief.titular, destacado: brief.destacar, ...briefToPayload(brief.cuerpo) }),
       })
       if (res.status === 401 || res.status === 403) {
         window.location.assign('/login')
@@ -574,7 +584,9 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
         slug: string | null
         original_locale: Locale | null
         traducciones: Locale[]
+        destacado?: boolean
       }
+      if (brief.destacar && !result.destacado) notify(assistDict.featuredFailed)
       setAssist({
         phase: 'done',
         postId: result.post_id,
@@ -645,7 +657,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
       }
       const data = await res.json().catch(() => null)
       if (!res.ok || !data?.success) {
-        window.alert(data?.error ?? dict.genericActionError)
+        notify(data?.error ?? dict.genericActionError)
         return
       }
       // Publicar desde la lista también completa lo que falte
@@ -653,12 +665,12 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
       loadPosts()
     } catch (e) {
       console.error('Manage request error:', e)
-      window.alert(dict.connectionError)
+      notify(dict.connectionError)
     }
   }
 
   const handleDeletePost = async (id: string) => {
-    if (!confirm(dict.posts.confirmDeletePost)) return
+    if (!(await askConfirm(dict.posts.confirmDeletePost))) return
     if (editingId === id) resetForm()
     await manageRequest(`/api/posts/manage?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
   }
@@ -721,7 +733,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
     }
     const data = await res.json()
     if (!data.success) {
-      window.alert(data.error ?? dict.settings.createFailed)
+      notify(data.error ?? dict.settings.createFailed)
       return null
     }
     return data.data
@@ -729,7 +741,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
 
   const deleteCatalogItem = async (type: string, id: number, warnAboutUsage: boolean) => {
     const message = warnAboutUsage ? dict.settings.confirmDeleteWithUsage : dict.settings.confirmDeleteSimple
-    if (!confirm(message)) return false
+    if (!(await askConfirm(message))) return false
     const res = await fetch(`/api/catalog?type=${type}&id=${id}`, { method: 'DELETE' })
     if (res.status === 401 || res.status === 403) {
       window.location.assign('/login')
@@ -737,7 +749,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
     }
     const data = await res.json().catch(() => null)
     if (!res.ok || !data?.success) {
-      window.alert(data?.error ?? dict.settings.deleteFailed)
+      notify(data?.error ?? dict.settings.deleteFailed)
       return false
     }
     return true
@@ -947,6 +959,23 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                       </Button>
                     </div>
                   )}
+
+                  {/* Configuración del artículo antes de generarlo: hoy solo "destacar" */}
+                  <fieldset className="space-y-2 border-t border-hairline pt-5" disabled={assistRunning}>
+                    <legend className={labelClass}>{assistDict.settingsHeading}</legend>
+                    <label className="flex cursor-pointer items-start gap-2.5">
+                      <input
+                        type="checkbox"
+                        checked={brief.destacar}
+                        onChange={(e) => setBrief((prev) => ({ ...prev, destacar: e.target.checked }))}
+                        className="mt-0.5 h-4 w-4 rounded border-hairline bg-surface-2 accent-accent-blue"
+                      />
+                      <span>
+                        <span className="block text-body-sm text-ink">{assistDict.featuredLabel}</span>
+                        <span className="block text-[12px] text-ink-muted">{assistDict.featuredHint}</span>
+                      </span>
+                    </label>
+                  </fieldset>
 
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                     {/* Durante la espera el boton NO se deshabilita con `disabled`: eso le quitaria el
@@ -1755,6 +1784,17 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
       </main>
 
       <Footer />
+
+      <ConfirmDialog
+        open={dialog !== null}
+        title={dict.dialog.deleteTitle}
+        message={dialog?.message ?? ''}
+        confirmLabel={dict.dialog.confirmDelete}
+        cancelLabel={dict.dialog.cancel}
+        onConfirm={() => closeDialog(true)}
+        onCancel={() => closeDialog(false)}
+      />
+      {notice && <Notice message={notice} closeLabel={dict.dialog.close} onClose={() => setNotice(null)} />}
     </div>
   )
 }

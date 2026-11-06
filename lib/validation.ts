@@ -76,6 +76,8 @@ export const asistirSchema = z
     titular: z.string().trim().min(1).max(200),
     cuerpo: z.string().trim().max(100_000),
     imagenes: z.array(briefImageSchema).max(MAX_BRIEF_IMAGES).default([]),
+    // Configuración del modo Asistido: destacar el artículo en la portada del sitio
+    destacado: z.boolean().default(false),
   })
   // El mínimo cuenta solo el texto visible: ni etiquetas HTML ni marcadores de imagen
   .refine((value) => briefTextLength(value.cuerpo) >= 200, { message: 'El cuerpo necesita al menos 200 caracteres', path: ['cuerpo'] })
