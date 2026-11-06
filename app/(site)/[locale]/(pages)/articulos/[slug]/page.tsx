@@ -47,7 +47,7 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
     const translation = localizedPostContent(post, locale)
     const title = translation.title
     const description = translation.metaDescription || htmlToText(translation.contentHtml).slice(0, 160)
-    const image = post.og_image_url || post.cover_image_url
+    const image = post.og_image_url || post.cover_image_url || `${SITE_URL}/logo.png`
     const socialTitle = translation.metaTitle || title
 
     return {
@@ -118,7 +118,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   const relatedPosts = await getRelatedPosts(post.id, post.category_id || null, assetIds, 3, locale)
 
   const articleUrl = `${SITE_URL}/articulos/${slug}`
-  const image = post.og_image_url || post.cover_image_url
+  const image = post.og_image_url || post.cover_image_url || `${SITE_URL}/logo.png`
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'NewsArticle',
