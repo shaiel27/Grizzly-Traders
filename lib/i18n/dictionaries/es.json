@@ -898,6 +898,7 @@
     "backToHome": "Volver al inicio",
     "errorInvalidLink": "El enlace no es válido o ya fue usado. Solicita uno nuevo.",
     "errorEmailNotConfirmed": "Tu correo aún no está confirmado. Confírmalo desde el mensaje que envía Supabase para poder entrar.",
+    "errorSignOut": "No se pudo cerrar la sesión. Inténtalo de nuevo.",
     "errorInvalidCredentials": "Correo o contraseña incorrectos.",
     "errorGenericSignIn": "No se pudo iniciar sesión. Inténtalo de nuevo en unos minutos.",
     "errorResendFailed": "No se pudo reenviar el correo de confirmación.",

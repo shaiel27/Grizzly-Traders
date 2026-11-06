@@ -3,7 +3,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { clsx } from 'clsx'
 import { Header, Button, Card, Footer } from '@/components/ui'
-import { createClient } from '@/lib/supabase/client'
 import { t } from '@/lib/i18n/get-dictionary'
 import { copyFigures, figuresOf } from '@/lib/rich-html'
 import { briefImageCount, briefTextLength, briefToPayload, MAX_BRIEF_IMAGES } from '@/lib/brief'
@@ -715,8 +714,15 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
     return arr.includes(item) ? arr.filter((i) => i !== item) : [...arr, item]
   }
 
+  // La sesión se cierra en el servidor: las cookies sb-* son httpOnly y el cliente del navegador no puede ni leerlas ni borrarlas
   const handleSignOut = async () => {
-    await createClient().auth.signOut()
+    try {
+      const res = await fetch('/auth/logout', { method: 'POST' })
+      if (!res.ok) throw new Error(String(res.status))
+    } catch {
+      notify(dict.connectionError)
+      return
+    }
     window.location.assign('/login')
   }
 
