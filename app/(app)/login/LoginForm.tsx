@@ -54,8 +54,15 @@ export function LoginForm({
     setNotice(error ? { tone: 'error', text: dict.errorResendFailed } : { tone: 'info', text: dict.infoResendSuccess })
   }
 
+  // La sesión se cierra en el servidor: las cookies sb-* son httpOnly y el cliente del navegador no puede ni leerlas ni borrarlas
   const handleSignOut = async () => {
-    await createClient().auth.signOut()
+    try {
+      const res = await fetch('/auth/logout', { method: 'POST' })
+      if (!res.ok) throw new Error(String(res.status))
+    } catch {
+      setNotice({ tone: 'error', text: dict.errorSignOut })
+      return
+    }
     window.location.assign('/login')
   }
 

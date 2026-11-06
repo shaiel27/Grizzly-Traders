@@ -898,6 +898,7 @@
     "backToHome": "Back to home",
     "errorInvalidLink": "The link is invalid or has already been used. Request a new one.",
     "errorEmailNotConfirmed": "Your email hasn't been confirmed yet. Confirm it from the message Supabase sent to be able to sign in.",
+    "errorSignOut": "Could not sign out. Please try again.",
     "errorInvalidCredentials": "Incorrect email or password.",
     "errorGenericSignIn": "We couldn't sign you in. Please try again in a few minutes.",
     "errorResendFailed": "We couldn't resend the confirmation email.",
