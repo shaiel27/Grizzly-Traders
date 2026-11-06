@@ -105,13 +105,16 @@ export async function chequear(sitio, { intentos = 3, pausaMs = 10_000 } = {}) {
   return resultados
 }
 
-async function avisar(webhook, fallos, sitio) {
-  if (!webhook) return
+// Envía el aviso al webhook (Discord o compatible) y DICE si salió bien: fetch no lanza error cuando el servidor responde 4xx/5xx,
+// así que hay que mirar el estado. Devuelve { enviado, detalle } y nunca lanza: un aviso fallido no debe ocultar la caída real.
+export async function avisar(webhook, fallos, sitio, pedirFn = fetch) {
+  if (!webhook) return { enviado: false, detalle: 'sin webhook configurado (solo avisa GitHub por correo)' }
   const texto = `🚨 **${sitio}** no pasa el chequeo externo:\n` + fallos.map((f) => `• ${f.nombre}: ${f.detalle}`).join('\n')
   try {
-    await fetch(webhook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: texto, username: 'Monitoreo', allowed_mentions: { parse: [] } }), signal: AbortSignal.timeout(10_000) })
+    const res = await pedirFn(webhook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: texto, username: 'Monitoreo', allowed_mentions: { parse: [] } }), signal: AbortSignal.timeout(10_000) })
+    return res.ok ? { enviado: true, detalle: `webhook respondió ${res.status}` } : { enviado: false, detalle: `el webhook rechazó el aviso (HTTP ${res.status}): revisa el secreto ALERT_WEBHOOK` }
   } catch (e) {
-    console.error('No se pudo enviar el aviso por webhook:', e instanceof Error ? e.message : e)
+    return { enviado: false, detalle: 'no se pudo contactar con el webhook: ' + (e instanceof Error ? e.message : String(e)) }
   }
 }
 
@@ -122,7 +125,8 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   for (const r of resultados) console.log(`${r.ok ? '✅' : '❌'} ${r.nombre}: ${r.detalle}`)
   const fallos = resultados.filter((r) => !r.ok)
   if (fallos.length) {
-    await avisar(process.env.ALERT_WEBHOOK, fallos, sitio)
+    const aviso = await avisar(process.env.ALERT_WEBHOOK, fallos, sitio)
+    console.log(`${aviso.enviado ? '📨' : '⚠️'} aviso por webhook: ${aviso.detalle}`)
     console.error(`\n${fallos.length} comprobación(es) fallida(s)`)
     process.exit(1)
   }

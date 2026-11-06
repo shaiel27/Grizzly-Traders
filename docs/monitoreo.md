@@ -12,7 +12,7 @@ Un flujo de GitHub Actions (`.github/workflows/monitoreo.yml`) ejecuta `scripts/
 | Feed y frescura | `/feed.xml` no responde, o la nota más reciente tiene **más de 4 h** (pipeline parado) |
 | Certificado TLS | caduca en menos de 10 días (Caddy lo renueva solo; esto avisa si no lo hace) |
 
-Si algo falla, la ejecución termina en rojo y **GitHub envía un correo** al dueño del repositorio. Opcionalmente también avisa a un webhook de Discord.
+Si algo falla, la ejecución termina en rojo y **GitHub envía un correo** al dueño del repositorio. Opcionalmente también avisa a un webhook de Discord, y el registro de la ejecución dice si Discord aceptó el aviso (`📨 … webhook respondió 204`) o lo rechazó (`⚠️ … HTTP 404: revisa el secreto ALERT_WEBHOOK`).
 
 ## Activar los avisos (una vez, desde GitHub)
 1. **Correo:** GitHub → tu perfil → *Settings → Notifications → Actions* → marca *Send notifications for failed workflows only* y el correo que quieras. (Por defecto ya avisa al último que tocó el calendario del flujo.)
@@ -23,6 +23,7 @@ Si algo falla, la ejecución termina en rojo y **GitHub envía un correo** al du
 - En local: `node scripts/uptime-check.mjs` (contra producción) o `SITE_URL=https://127.0.0.1:9 CHEQUEO_RAPIDO=1 node scripts/uptime-check.mjs` para simular una caída (sale con código 1).
 
 ## Límites
+- El cron usa los minutos 2, 7, 12… a propósito: los minutos redondos (:00, :05…) son los más saturados y GitHub retrasa o salta ahí los flujos programados.
 - GitHub puede **retrasar** los flujos programados unos minutos en horas de mucha carga; no es un SLA, pero basta para enterarse de una caída en menos de ~10 min.
 - Mientras dure una caída llegará **un correo por cada ejecución fallida** (cada 5 min). Si molesta, sube el intervalo en el `cron` o silencia el hilo.
 - GitHub desactiva los flujos programados tras **60 días sin actividad** en el repositorio; el sitio recibe cambios con regularidad, pero conviene saberlo.
