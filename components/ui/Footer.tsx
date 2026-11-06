@@ -4,6 +4,8 @@ import { NewsletterForm } from './NewsletterForm'
 import { LocaleSwitcher } from './LocaleSwitcher'
 import { COINGECKO_CREDIT_URL } from '@/lib/coingecko'
 import { getDictionary, t, type Dictionary, type Locale } from '@/lib/i18n/get-dictionary'
+import { CookiePreferencesButton } from '@/components/analytics/CookiePreferencesButton'
+import { esIdMedicion } from '@/lib/analytics'
 
 interface CategoryData {
   id: number
@@ -109,6 +111,9 @@ export function Footer({ categories = [], locale = 'es', dictionary }: FooterPro
             <Link href="/legal/cookies" className="text-body-sm font-medium text-ink-muted transition-colors hover:text-ink">
               {dict.footer.navCookies}
             </Link>
+            {esIdMedicion(process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID) && (
+              <CookiePreferencesButton label={dict.cookieConsent.manage} className="text-body-sm font-medium text-ink-muted transition-colors hover:text-ink" />
+            )}
           </nav>
         </div>
       </div>

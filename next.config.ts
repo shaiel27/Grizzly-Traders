@@ -7,6 +7,12 @@ import type { NextConfig } from "next";
 // usan eval en build de producción por defecto).
 const isDev = process.env.NODE_ENV === "development";
 
+// Google Analytics: sus dominios solo entran en la política de seguridad si hay un ID de medición válido (se fija al compilar)
+const gaActivo = /^G-[A-Z0-9]{6,14}$/.test(process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? "");
+const gaScripts = gaActivo ? " https://www.googletagmanager.com" : "";
+const gaConexiones = gaActivo ? " https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com" : "";
+const gaImagenes = gaActivo ? " https://*.google-analytics.com https://*.googletagmanager.com" : "";
+
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
@@ -17,11 +23,11 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      `script-src 'self' 'unsafe-inline' https://s3.tradingview.com${isDev ? " 'unsafe-eval'" : ""}`,
+      `script-src 'self' 'unsafe-inline' https://s3.tradingview.com${gaScripts}${isDev ? " 'unsafe-eval'" : ""}`,
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https://pudzvatuubywmwdmboiq.supabase.co https://coin-images.coingecko.com",
+      `img-src 'self' data: blob: https://pudzvatuubywmwdmboiq.supabase.co https://coin-images.coingecko.com${gaImagenes}`,
       "font-src 'self'",
-      "connect-src 'self' https://pudzvatuubywmwdmboiq.supabase.co https://*.supabase.co wss://*.supabase.co",
+      `connect-src 'self' https://pudzvatuubywmwdmboiq.supabase.co https://*.supabase.co wss://*.supabase.co${gaConexiones}`,
       "worker-src 'self' blob:",
       // Widget Advanced Chart de TradingView (components/ui/TradingViewWidget.tsx): el script oficial
       // viene de s3.tradingview.com (script-src) y crea un iframe de www.tradingview-widget.com.
