@@ -72,7 +72,7 @@ describe('Priorizar y limitar: reparto entre fuentes', () => {
   const ahora = Date.now()
   const hace = (h: number) => new Date(ahora - h * 3_600_000).toISOString()
   const link = (f: string, n: number) =>
-    ({ CFTC: 'https://www.cftc.gov/p/', 'Reserva Federal': 'https://www.federalreserve.gov/p/', SEC: 'https://www.sec.gov/p/', BCE: 'https://www.ecb.europa.eu/press/pr/', EIA: 'https://www.eia.gov/t/', BEA: 'https://www.bea.gov/n/' })[f] + n
+    ({ CFTC: 'https://www.cftc.gov/p/', 'Reserva Federal': 'https://www.federalreserve.gov/p/', SEC: 'https://www.sec.gov/p/', BCE: 'https://www.ecb.europa.eu/press/pr/', EIA: 'https://www.eia.gov/t/', BEA: 'https://www.bea.gov/n/' } as Record<string, string>)[f] + n
 
   function elegir(candidatas: { fuente: string; h: number }[], publicadas24h: Record<string, number> = {}) {
     const items = candidatas.map((c, i) => ({ json: { fuente: c.fuente, title: `${c.fuente}-${i}`, link: link(c.fuente, i), pubDate: hace(c.h) } }))
