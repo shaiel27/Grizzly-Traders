@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-// Opción A: el pipeline lee SOLO fuentes públicas (dominio público o reutilización libre con atribución) y reparte las notas entre
-// ellas. Ver docs/fuentes.md para el análisis de términos de cada fuente.
+// El pipeline lee fuentes oficiales (dominio público o reutilización libre con atribución) e Investing.com (se mantiene por decisión
+// informada del usuario) y reparte las notas entre todas. Ver docs/fuentes.md para el análisis de términos de cada fuente.
 
 interface Nodo {
   name: string
@@ -14,16 +14,16 @@ const flujo = JSON.parse(texto) as { nodes: Nodo[]; connections: Record<string, 
 const nodo = (name: string) => flujo.nodes.find((n) => n.name === name)!
 const rss = flujo.nodes.filter((n) => n.type.endsWith('rssFeedRead'))
 
-const DOMINIOS_PUBLICOS = ['cftc.gov', 'federalreserve.gov', 'sec.gov', 'ecb.europa.eu', 'eia.gov', 'bea.gov']
-const FUENTES = ['CFTC', 'Reserva Federal', 'SEC', 'BCE', 'EIA', 'BEA']
+const DOMINIOS = ['cftc.gov', 'investing.com', 'federalreserve.gov', 'sec.gov', 'ecb.europa.eu', 'eia.gov', 'bea.gov']
+const OFICIALES = ['CFTC', 'Reserva Federal', 'SEC', 'BCE', 'EIA', 'BEA']
 
-describe('fuentes del pipeline: solo públicas', () => {
-  it('cada feed es de un organismo público', () => {
-    expect(rss.map((n) => new URL(n.parameters.url).hostname.replace(/^www\./, '')).sort()).toEqual([...DOMINIOS_PUBLICOS].sort())
+describe('fuentes del pipeline', () => {
+  it('los feeds son los esperados: organismos oficiales e Investing.com', () => {
+    expect(rss.map((n) => new URL(n.parameters.url).hostname.replace(/^www\./, '')).sort()).toEqual([...DOMINIOS].sort())
   })
 
-  it('no queda ninguna fuente comercial cuyos términos prohíben copiar, raspar o reescribir su contenido', () => {
-    expect(texto).not.toMatch(/investing\.com|cointelegraph|coindesk|fxstreet|cnbc|seekingalpha|oilprice/i)
+  it('siguen fuera las demás fuentes comerciales cuyos términos prohíben copiar, raspar o reescribir su contenido', () => {
+    expect(texto).not.toMatch(/cointelegraph|coindesk|fxstreet|cnbc|seekingalpha|oilprice/i)
   })
 
   it('todos los feeds entran al Merge, cada uno en su propia entrada, y el Merge tiene exactamente esas entradas', () => {
@@ -33,9 +33,10 @@ describe('fuentes del pipeline: solo públicas', () => {
     expect(flujo.connections['Publicados recientes'].main[0].map((c) => c.node).sort()).toEqual(rss.map((n) => n.name).sort())
   })
 
-  it('las fuentes oficiales tienen ventana de 7 días', () => {
+  it('las fuentes oficiales tienen ventana de 7 días e Investing.com, la de 24 h', () => {
     const cond = nodo('Filtro Calidad').parameters.conditions.conditions.find((c: { id: string }) => c.id === 'reciente').leftValue as string
-    for (const f of FUENTES) expect(cond).toContain(`'${f}'`)
+    for (const f of OFICIALES) expect(cond).toContain(`'${f}'`)
+    expect(cond).not.toContain('Investing')
   })
 })
 
@@ -53,7 +54,8 @@ describe('Normalizar Item', () => {
       'https://www.eia.gov/todayinenergy/detail.php?id=68424',
       'https://www.bea.gov/news/2026/gdp-advance-estimate-3rd-quarter-2026',
     ])
-    expect(r.map((x) => x.json.fuente)).toEqual(FUENTES)
+    expect(r.map((x) => x.json.fuente)).toEqual(OFICIALES)
+    expect(correr(['https://www.investing.com/news/stock-market-news/x-123'])[0].json.fuente).toBe('Investing.com')
   })
 
   it('del BCE solo entran los comunicados: discursos, entrevistas y blog llevan nombre de autor y piden permiso escrito', () => {
@@ -72,7 +74,7 @@ describe('Priorizar y limitar: reparto entre fuentes', () => {
   const ahora = Date.now()
   const hace = (h: number) => new Date(ahora - h * 3_600_000).toISOString()
   const link = (f: string, n: number) =>
-    ({ CFTC: 'https://www.cftc.gov/p/', 'Reserva Federal': 'https://www.federalreserve.gov/p/', SEC: 'https://www.sec.gov/p/', BCE: 'https://www.ecb.europa.eu/press/pr/', EIA: 'https://www.eia.gov/t/', BEA: 'https://www.bea.gov/n/' } as Record<string, string>)[f] + n
+    ({ 'Investing.com': 'https://www.investing.com/n/', CFTC: 'https://www.cftc.gov/p/', 'Reserva Federal': 'https://www.federalreserve.gov/p/', SEC: 'https://www.sec.gov/p/', BCE: 'https://www.ecb.europa.eu/press/pr/', EIA: 'https://www.eia.gov/t/', BEA: 'https://www.bea.gov/n/' } as Record<string, string>)[f] + n
 
   function elegir(candidatas: { fuente: string; h: number }[], publicadas24h: Record<string, number> = {}) {
     const items = candidatas.map((c, i) => ({ json: { fuente: c.fuente, title: `${c.fuente}-${i}`, link: link(c.fuente, i), pubDate: hace(c.h) } }))
@@ -93,6 +95,20 @@ describe('Priorizar y limitar: reparto entre fuentes', () => {
     ])
     expect(r).toHaveLength(3)
     expect(new Set(r.map((t) => t.split('-')[0]))).toEqual(new Set(['EIA', 'CFTC', 'BCE']))
+  })
+
+  it('Investing.com no desplaza a las oficiales: con muchas notas suyas y una oficial, entran las dos', () => {
+    const r = elegir(
+      [{ fuente: 'Investing.com', h: 0.1 }, { fuente: 'Investing.com', h: 0.2 }, { fuente: 'Investing.com', h: 0.3 }, { fuente: 'Investing.com', h: 0.4 }, { fuente: 'CFTC', h: 30 }],
+      { 'Investing.com': 20 }
+    )
+    expect(r).toHaveLength(3)
+    expect(r[0]).toBe('CFTC-4')
+    expect(r.filter((t) => t.startsWith('Investing.com')).length).toBe(2)
+  })
+
+  it('cuando las oficiales no tienen nada, Investing.com llena las plazas (el volumen no se hunde)', () => {
+    expect(elegir([{ fuente: 'Investing.com', h: 1 }, { fuente: 'Investing.com', h: 2 }, { fuente: 'Investing.com', h: 3 }, { fuente: 'Investing.com', h: 4 }])).toHaveLength(3)
   })
 
   it('va primero la fuente que menos ha publicado en las últimas 24 h', () => {
@@ -121,7 +137,7 @@ describe('atribución estructurada (source_id)', () => {
     const m = codigo.match(/\{\s*'CFTC': \d+[^}]*\}/)!
     return Object.fromEntries([...m[0].matchAll(/'([^']+)':\s*(\d+)/g)].map((x) => [x[1], Number(x[2])]))
   }
-  const esperado = { CFTC: 11, 'Reserva Federal': 9, SEC: 10, BCE: 12, EIA: 13, BEA: 14 }
+  const esperado = { CFTC: 11, 'Investing.com': 4, 'Reserva Federal': 9, SEC: 10, BCE: 12, EIA: 13, BEA: 14 }
 
   it('los tres sitios del flujo que traducen fuente -> id usan el mismo mapa', () => {
     expect(mapaDe(nodo('Parsear JSON').parameters.jsCode)).toEqual(esperado)
