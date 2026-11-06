@@ -24,7 +24,7 @@ export const metadata: Metadata = {
 const TOC: TocItem[] = [
   { id: 'que-son', label: '¿Qué son las cookies?' },
   { id: 'utilizamos', label: 'Cookies que utilizamos actualmente' },
-  { id: 'no-usamos', label: 'Lo que no usamos (por ahora)' },
+  { id: 'no-usamos', label: 'Analítica y lo que no usamos' },
   { id: 'gestionar', label: 'Cómo gestionar las cookies' },
   { id: 'privacidad', label: 'Más información sobre privacidad' },
   { id: 'cambios', label: 'Cambios a esta política' },
@@ -35,7 +35,7 @@ export default async function CookiePolicyPage() {
   const locale = await getRouteLocale()
   const dict = getDictionary(locale)
   const isEnglish = locale === 'en'
-  const updatedDate = isEnglish ? 'October 2, 2026' : '2 de octubre de 2026'
+  const updatedDate = isEnglish ? 'November 6, 2026' : '6 de noviembre de 2026'
 
   return (
     <>
@@ -85,14 +85,33 @@ export default async function CookiePolicyPage() {
             configuran con los atributos <code>httpOnly</code> y <code>secure</code> (en producción) para reducir el
             riesgo de acceso indebido desde JavaScript de terceros.
           </li>
+          <li>
+            <strong>
+              <code>_ga</code>
+            </strong>{' '}
+            y{' '}
+            <strong>
+              <code>_ga_*</code>
+            </strong>{' '}
+            (Google Analytics 4) — Se crean <strong>solo si aceptas</strong> las cookies de analítica en el aviso del
+            Sitio. Distinguen visitas para medir cuántas personas visitan el Sitio y qué páginas leen. Las establece
+            Google LLC. Duración: hasta 2 años. Si rechazas, no se crean; si las aceptas y luego cambias de decisión,
+            las borramos.
+          </li>
         </ul>
 
-        <h2 id="no-usamos">3. Lo que no usamos (por ahora)</h2>
+        <h2 id="no-usamos">3. Analítica y lo que no usamos</h2>
         <p>
-          Actualmente el Sitio <strong>no utiliza cookies de analítica, publicidad ni de terceros con fines de
-          seguimiento</strong> (por ejemplo, Google Analytics, píxeles publicitarios o cookies de redes sociales
-          embebidas). Si esto cambia en el futuro, actualizaremos esta política e indicaremos la fecha del cambio
-          antes de activarlas.
+          El Sitio usa <strong>Google Analytics 4</strong> (Google LLC) para medir de forma agregada cuántas personas lo
+          visitan y qué páginas leen. <strong>Solo se activa si aceptas</strong> en el aviso de cookies: hasta
+          entonces no se carga nada de Google ni se guarda ninguna cookie suya. Si rechazas, o si tu navegador envía la
+          señal <em>Global Privacy Control</em>, no se activa. Puedes cambiar tu decisión en cualquier momento con el
+          enlace «Preferencias de cookies» del pie de página, que además borra las cookies de Google Analytics.
+        </p>
+        <p>
+          Tenemos desactivadas las señales de Google y la personalización de anuncios.{' '}
+          <strong>No utilizamos cookies de publicidad ni de seguimiento de redes sociales</strong>. Si esto cambia en el
+          futuro, actualizaremos esta política e indicaremos la fecha del cambio antes de activarlas.
         </p>
 
         <h2 id="gestionar">4. Cómo gestionar las cookies</h2>

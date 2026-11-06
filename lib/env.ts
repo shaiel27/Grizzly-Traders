@@ -26,6 +26,8 @@ const schema = z.object({
   N8N_API_KEY: optionalText,
   NEXT_PUBLIC_VIP_URL: z.url().optional(),
   NEXT_PUBLIC_DISCORD_URL: z.url().optional(),
+  // Google Analytics 4: ID de medición (G-XXXXXXXXXX). Sin él la analítica queda apagada y no se muestra el aviso de cookies.
+  NEXT_PUBLIC_GA_MEASUREMENT_ID: z.string().regex(/^G-[A-Z0-9]{6,14}$/).optional(),
   // Boletín por correo. Todo opcional: sin RESEND_API_KEY se usa el proveedor simulado (solo fuera de producción)
   RESEND_API_KEY: optionalText,
   EMAIL_FROM: optionalText,

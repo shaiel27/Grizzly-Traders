@@ -40,7 +40,7 @@ export default async function PrivacyPolicyPage() {
   const locale = await getRouteLocale()
   const dict = getDictionary(locale)
   const isEnglish = locale === 'en'
-  const updatedDate = isEnglish ? 'October 2, 2026' : '2 de octubre de 2026'
+  const updatedDate = isEnglish ? 'November 6, 2026' : '6 de noviembre de 2026'
 
   return (
     <>
@@ -103,6 +103,12 @@ export default async function PrivacyPolicyPage() {
             registrados automáticamente por la infraestructura del Sitio (Supabase) con fines de seguridad y
             diagnóstico.
           </li>
+          <li>
+            <strong>Datos de analítica (solo si aceptas las cookies de analítica):</strong> un identificador en una
+            cookie (<code>_ga</code>), las páginas que visitas, el origen de la visita, el tipo de dispositivo y de
+            navegador y tu ubicación aproximada (país o ciudad), recogidos por Google Analytics para medir el uso del
+            Sitio de forma agregada. No usamos estos datos para publicidad. Si rechazas, no se recogen.
+          </li>
         </ul>
         <p>
           No recopilamos categorías especiales de datos personales (salud, origen étnico, afiliación sindical, etc.)
@@ -147,6 +153,11 @@ export default async function PrivacyPolicyPage() {
             <strong>Proveedores de datos de mercado</strong> (cotizaciones y niveles técnicos) — no reciben datos
             personales de usuarios; su integración es unidireccional (datos de mercado hacia el Sitio).
           </li>
+          <li>
+            <strong>Google (Google Analytics 4)</strong> — medición del uso del Sitio. <strong>Solo recibe datos si
+            aceptas</strong> las cookies de analítica; los datos pueden tratarse en servidores de Google fuera de tu
+            país, incluido Estados Unidos. Tenemos desactivadas las señales de Google y la personalización de anuncios.
+          </li>
         </ul>
         <p>
           <strong>
@@ -163,6 +174,11 @@ export default async function PrivacyPolicyPage() {
           <Link href="/newsletter/baja">Darte de baja</Link> o escribiéndonos a grizzlytraders@gmail.com. Los registros técnicos (logs) se conservan durante un periodo limitado con fines de
           seguridad y luego se eliminan o anonimizan conforme a la configuración estándar de nuestro proveedor de
           infraestructura.
+        </p>
+
+        <p>
+          Los datos de Google Analytics se conservan durante el periodo configurado en nuestra propiedad (2 meses para
+          los datos de nivel de evento) y después se eliminan.
         </p>
 
         <h2 id="derechos">6. Tus derechos bajo la CCPA/CPRA</h2>
@@ -210,8 +226,9 @@ export default async function PrivacyPolicyPage() {
 
         <h2 id="cookies">9. Cookies</h2>
         <p>
-          El Sitio usa cookies técnicas estrictamente necesarias. El detalle de cada cookie, su propósito y cómo
-          gestionarlas está en nuestra <Link href="/legal/cookies">Política de Cookies</Link>.
+          El Sitio usa cookies técnicas estrictamente necesarias y, solo si lo aceptas, cookies de analítica (Google
+          Analytics). Puedes cambiar tu decisión en cualquier momento desde «Preferencias de cookies» en el pie de
+          página. El detalle de cada cookie, su propósito y cómo gestionarlas está en nuestra <Link href="/legal/cookies">Política de Cookies</Link>.
         </p>
 
         <h2 id="cambios">10. Cambios a esta política</h2>

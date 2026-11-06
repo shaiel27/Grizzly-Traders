@@ -48,6 +48,15 @@
     "closeMenu": "Close menu",
     "logoAria": "Grizzly Traders - Home"
   },
+  "cookieConsent": {
+    "region": "Cookie notice",
+    "title": "Your privacy",
+    "body": "We use Google Analytics to measure how many people visit the site and which articles they read. It only runs if you accept, and we do not use advertising cookies.",
+    "policy": "Cookie policy",
+    "accept": "Accept",
+    "reject": "Reject",
+    "manage": "Cookie preferences"
+  },
   "footer": {
     "newsletterTitle": "Stay on top of the markets",
     "newsletterSubtitle": "Financial analysis and news straight to your inbox.",
