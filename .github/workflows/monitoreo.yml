@@ -1,0 +1,35 @@
+name: Monitoreo del sitio
+
+# Chequeo externo cada 5 minutos, desde fuera del servidor. Si falla, GitHub avisa por correo de la ejecución fallida.
+# Detalle y cómo activar los avisos: docs/monitoreo.md
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+# Una sola ejecución a la vez: si una se atasca, la siguiente la sustituye
+concurrency:
+  group: monitoreo
+  cancel-in-progress: true
+
+jobs:
+  sitio:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/uptime-check.mjs
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Chequear el sitio
+        run: node scripts/uptime-check.mjs
+        env:
+          SITE_URL: https://grizzlytraders.com
+          # Opcional: un webhook de Discord (canal de alertas) en Settings > Secrets > Actions > ALERT_WEBHOOK
+          ALERT_WEBHOOK: ${{ secrets.ALERT_WEBHOOK }}
