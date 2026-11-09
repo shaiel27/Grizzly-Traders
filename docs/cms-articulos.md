@@ -23,3 +23,8 @@ La lista del CMS separa tres ámbitos que no se mezclan, con búsqueda, filtros 
 - **Conflictos:** si el texto de ese idioma cambió desde que se abrió (otra persona o el flujo automático), el guardado responde 409 y **no escribe nada**; el panel lo explica y ofrece cargar la versión actual (el borrador local queda a salvo).
 - **Historial:** antes de sustituir un título/texto se guarda la versión anterior (quién y cuándo), últimas 20 por artículo e idioma, en `posts_historial`. *Historial → Restaurar* la devuelve y guarda antes la actual (restaurar también se deshace). Un historial roto nunca impide guardar.
 - **Avisos al editar:** un artículo de la automatización o ya publicado muestra una franja informativa.
+
+## Extras de la lista
+- **Acciones en lote:** casilla en cada fila (y una general por página). Con selección aparece la barra *Publicar · Despublicar · Borrar* (hasta 50, con confirmación). `POST /api/posts/lote`. Publicar conserva la fecha original y completa lo que falte (portada, categoría, traducción).
+- **Nueva portada:** botón ✨ en los artículos publicados que tienen portada. Descarta la actual (y borra el archivo si nadie más lo usa) y lanza el flujo de completado, que genera otra. Los que ya no tienen portada (por la retención de 18 días) muestran «Le falta: portada · Completar». `POST /api/posts/regenerar-portada`.
+- **Títulos parecidos:** al salir del campo título, el editor avisa si en los últimos 30 días ya hay un artículo con un título muy parecido (`GET /api/posts/duplicados`). Solo avisa, nunca impide guardar.

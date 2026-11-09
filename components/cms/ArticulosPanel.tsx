@@ -28,7 +28,9 @@ export interface ArticulosPanelProps {
   onDelete: (id: string) => void
   onCompletar: (id: string) => void
   onCargada: (items: ArticuloLista[]) => void
-  askConfirm: (mensaje: string) => Promise<boolean>
+  askConfirm: (mensaje: string, opciones?: { title?: string; confirmLabel?: string; cancelLabel?: string }) => Promise<boolean>
+  // Tras pedir una portada nueva: sigue el artículo hasta que termine (igual que «Completar»)
+  onSeguir: (id: string) => void
   notify: (mensaje: string) => void
 }
 
@@ -52,7 +54,7 @@ function parametros(f: Filtros): string {
 }
 
 export function ArticulosPanel(props: ArticulosPanelProps) {
-  const { categories, sources, version, editingId, completando, encabezado, onEdit, onToggleStatus, onToggleFeatured, onDelete, onCompletar, onCargada, askConfirm, notify } = props
+  const { categories, sources, version, editingId, completando, encabezado, onEdit, onToggleStatus, onToggleFeatured, onDelete, onCompletar, onCargada, askConfirm, notify, onSeguir } = props
   const dict = useDictionary().cms
   const { locale } = useLocale()
   const [filtros, setFiltros] = useState<Filtros>(FILTROS_INICIALES)
@@ -65,6 +67,8 @@ export function ArticulosPanel(props: ArticulosPanelProps) {
   const [ahora, setAhora] = useState(0)
   const [fallo, setFallo] = useState(false)
   const [ocupados, setOcupados] = useState<Record<string, boolean>>({})
+  const [seleccion, setSeleccion] = useState<string[]>([])
+  const [enLote, setEnLote] = useState(false)
   const ultimaVersion = useRef(version.n)
   const onCargadaRef = useRef(onCargada)
   useEffect(() => {
@@ -105,6 +109,7 @@ export function ArticulosPanel(props: ArticulosPanelProps) {
           return
         }
         setItems(r.data)
+        setSeleccion((sel) => sel.filter((id) => r.data.some((p) => p.id === id)))
         setAhora(Date.now())
         setTotal(r.total)
         setConteos(r.conteos)
@@ -121,14 +126,63 @@ export function ArticulosPanel(props: ArticulosPanelProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [consulta, version.n])
 
-  const cambiar = (cambio: Partial<Filtros>) => setFiltros((f) => ({ ...f, ...cambio, pagina: cambio.pagina ?? 1 }))
+  const cambiar = (cambio: Partial<Filtros>) => {
+    setSeleccion([])
+    setFiltros((f) => ({ ...f, ...cambio, pagina: cambio.pagina ?? 1 }))
+  }
   const hayFiltros = filtros.estado !== 'todos' || filtros.q !== '' || filtros.categoria !== '' || filtros.fuente !== ''
   const quitarFiltros = () => {
+    setSeleccion([])
     setBusqueda('')
     setFiltros((f) => ({ ...FILTROS_INICIALES, ambito: f.ambito }))
   }
   const paginas = totalPaginas(total)
   const recargar = () => setFiltros((f) => ({ ...f }))
+
+  // ---- Acciones en lote y portada nueva
+  const alternar = (id: string) => setSeleccion((sel) => (sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]))
+  const todosMarcados = items.length > 0 && items.every((p) => seleccion.includes(p.id))
+
+  async function lote(accion: 'publicar' | 'despublicar' | 'borrar') {
+    const ids = seleccion
+    const textos = {
+      publicar: [t(dict.posts.bulkPublishConfirm, { n: ids.length }), dict.posts.bulkPublishTitle, dict.posts.bulkPublish],
+      despublicar: [t(dict.posts.bulkUnpublishConfirm, { n: ids.length }), dict.posts.bulkUnpublishTitle, dict.posts.bulkUnpublish],
+      borrar: [t(dict.posts.bulkDeleteConfirm, { n: ids.length }), undefined, undefined],
+    }[accion]
+    if (!(await askConfirm(textos[0] as string, textos[1] ? { title: textos[1], confirmLabel: textos[2] } : undefined))) return
+    setEnLote(true)
+    try {
+      const res = await fetch('/api/posts/lote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accion, ids }) })
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data?.success) notify(data?.error ?? dict.posts.bulkFailed)
+      else notify(t(dict.posts.bulkDone, { n: data.data.cambiados, total: data.data.pedidos }))
+    } catch {
+      notify(dict.connectionError)
+    } finally {
+      setEnLote(false)
+      setSeleccion([])
+      recargar()
+    }
+  }
+
+  async function nuevaPortada(id: string) {
+    if (!(await askConfirm(dict.posts.newCoverConfirm, { title: dict.posts.newCoverTitle, confirmLabel: dict.posts.newCover }))) return
+    try {
+      const res = await fetch('/api/posts/regenerar-portada', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data?.success) {
+        notify(data?.error ?? dict.posts.newCoverFailed)
+      } else {
+        notify(dict.posts.newCoverStarted)
+        onSeguir(id)
+      }
+    } catch {
+      notify(dict.connectionError)
+    } finally {
+      recargar()
+    }
+  }
 
   // ---- Errores del pipeline
   async function accionError(id: string, accion: 'reintentar' | 'descartar') {
@@ -190,6 +244,7 @@ export function ArticulosPanel(props: ArticulosPanelProps) {
             aria-pressed={filtros.ambito === s.id}
             // Cada ámbito empieza limpio: un texto de búsqueda o un filtro de otro ámbito no debe quedar oculto y seguir aplicándose
             onClick={() => {
+              setSeleccion([])
               setBusqueda('')
               setFiltros({ ...FILTROS_INICIALES, ambito: s.id })
             }}
@@ -299,6 +354,31 @@ export function ArticulosPanel(props: ArticulosPanelProps) {
           <p className="text-body text-ink-muted">{vacio}</p>
         </div>
       ) : (
+        <>
+          {filtros.ambito !== 'errores' && (
+            <div className="mb-2 flex flex-wrap items-center gap-3 rounded-xl border border-hairline bg-surface-1 px-4 py-2.5">
+              <label className="flex items-center gap-2 text-[13px] font-bold text-ink-muted">
+                <input type="checkbox" checked={todosMarcados} onChange={() => setSeleccion(todosMarcados ? [] : items.map((p) => p.id))} className="size-4 accent-[var(--color-accent-blue)]" />
+                {seleccion.length > 0 ? t(dict.posts.selectedCount, { n: seleccion.length }) : dict.posts.selectAll}
+              </label>
+              {seleccion.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2" role="group">
+                  <button type="button" disabled={enLote} onClick={() => lote('publicar')} className={clsx('rounded-lg bg-accent-blue/10 px-3 py-1.5 text-xs font-bold text-accent-blue-hover hover:bg-accent-blue/20 disabled:opacity-60', focusRing)}>
+                    {dict.posts.bulkPublish}
+                  </button>
+                  <button type="button" disabled={enLote} onClick={() => lote('despublicar')} className={clsx('rounded-lg border border-hairline px-3 py-1.5 text-xs font-bold text-ink hover:bg-surface-2 disabled:opacity-60', focusRing)}>
+                    {dict.posts.bulkUnpublish}
+                  </button>
+                  <button type="button" disabled={enLote} onClick={() => lote('borrar')} className={clsx('rounded-lg px-3 py-1.5 text-xs font-bold text-semantic-danger hover:bg-semantic-danger/10 disabled:opacity-60', focusRing)}>
+                    {dict.posts.bulkDelete}
+                  </button>
+                  <button type="button" onClick={() => setSeleccion([])} className={clsx('rounded-lg px-2 py-1.5 text-xs font-bold text-ink-muted hover:underline', focusRing)}>
+                    {dict.posts.bulkClear}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         <ul className="space-y-2">
           {items.map((post) =>
             filtros.ambito === 'errores' ? (
@@ -358,10 +438,14 @@ export function ArticulosPanel(props: ArticulosPanelProps) {
                 onToggleFeatured={onToggleFeatured}
                 onDelete={onDelete}
                 onCompletar={onCompletar}
+                seleccionado={seleccion.includes(post.id)}
+                onSeleccion={alternar}
+                onNuevaPortada={nuevaPortada}
               />
             )
           )}
         </ul>
+        </>
       )}
 
       {!cargando && total > 0 && (
@@ -393,14 +477,24 @@ interface FilaProps {
   onToggleFeatured: (id: string, actual: boolean) => void
   onDelete: (id: string) => void
   onCompletar: (id: string) => void
+  seleccionado: boolean
+  onSeleccion: (id: string) => void
+  onNuevaPortada: (id: string) => void
 }
 
-function FilaArticulo({ post, editando, enCurso, ambito, href, fecha, onEdit, onToggleStatus, onToggleFeatured, onDelete, onCompletar }: FilaProps) {
+function FilaArticulo({ post, editando, enCurso, ambito, href, fecha, onEdit, onToggleStatus, onToggleFeatured, onDelete, onCompletar, seleccionado, onSeleccion, onNuevaPortada }: FilaProps) {
   const dict = useDictionary().cms
   const f = post.faltantes
   const faltan = [f?.portada && dict.posts.missingCover, f?.categoria && dict.posts.missingCategory, f?.traduccion && dict.posts.missingTranslation].filter(Boolean)
   return (
     <li className={clsx('flex flex-col gap-3 rounded-xl border bg-surface-1 p-4 transition-colors sm:flex-row sm:items-center sm:gap-4', editando ? 'border-accent-blue/60' : 'border-hairline hover:border-outline-variant')}>
+      <input
+        type="checkbox"
+        checked={seleccionado}
+        onChange={() => onSeleccion(post.id)}
+        aria-label={t(dict.posts.selectRow, { title: post.title })}
+        className="size-4 shrink-0 self-start accent-[var(--color-accent-blue)] sm:self-center"
+      />
       <div className="min-w-0 flex-1">
         <div className="mb-1.5 flex flex-wrap items-center gap-2">
           {/* Pastilla con marca de forma además del color: publicado = punto lleno, programado = anillo, borrador = anillo punteado */}
@@ -440,6 +534,11 @@ function FilaArticulo({ post, editando, enCurso, ambito, href, fecha, onEdit, on
           <span className="material-symbols-outlined text-[16px]" aria-hidden="true">edit</span>
           <span className="text-xs font-bold">{dict.posts.edit}</span>
         </button>
+        {post.status === 'published' && !f?.portada && (
+          <button type="button" disabled={enCurso} onClick={() => onNuevaPortada(post.id)} aria-label={dict.posts.newCover} title={dict.posts.newCover} className={clsx('rounded-lg p-2 text-ink-muted transition-colors hover:bg-surface-2 hover:text-accent-blue-hover disabled:opacity-50', focusRing)}>
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">auto_awesome</span>
+          </button>
+        )}
         <span className="mx-1 h-5 w-px bg-hairline" aria-hidden="true" />
         <button
           type="button"

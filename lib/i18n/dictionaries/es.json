@@ -1120,7 +1120,9 @@
       "saveDraft": "Guardar Borrador",
       "completingNote": "completando portada, categoría y traducción en segundo plano",
       "titleAndContentRequired": "✗ Título y contenido son requeridos",
-      "loadPostFailed": "No se pudo cargar el artículo"
+      "loadPostFailed": "No se pudo cargar el artículo",
+      "dupTitle": "Ya hay un artículo con un título parecido",
+      "dupBody": "Revisa que no sea el mismo tema antes de publicar:"
     },
     "posts": {
       "automationHeading": "Automatización de publicación",
@@ -1199,7 +1201,26 @@
       "errAttempts": "{n} intento(s)",
       "errActionFailed": "No se pudo completar la acción.",
       "pipelineFailure": "Fallo técnico del pipeline",
-      "pipelineAttempts": "Intentos: {n}"
+      "pipelineAttempts": "Intentos: {n}",
+      "selectRow": "Seleccionar «{title}»",
+      "selectAll": "Seleccionar todos los de esta página",
+      "selectedCount": "{n} seleccionados",
+      "bulkPublish": "Publicar",
+      "bulkUnpublish": "Despublicar",
+      "bulkDelete": "Borrar",
+      "bulkClear": "Quitar selección",
+      "bulkPublishConfirm": "¿Publicar {n} artículos? Serán visibles en el sitio enseguida.",
+      "bulkPublishTitle": "Publicar artículos",
+      "bulkUnpublishConfirm": "¿Despublicar {n} artículos? Dejarán de verse en el sitio y pasarán a borrador.",
+      "bulkUnpublishTitle": "Despublicar artículos",
+      "bulkDeleteConfirm": "¿Borrar {n} artículos? No se puede deshacer.",
+      "bulkDone": "{n} de {total} artículos actualizados.",
+      "bulkFailed": "No se pudo completar la acción. Revisa la lista: puede que algunos sí se hayan cambiado.",
+      "newCover": "Nueva portada",
+      "newCoverConfirm": "Se descarta la portada actual y se genera otra con IA (tarda unos minutos). ¿Continuar?",
+      "newCoverTitle": "Nueva portada",
+      "newCoverStarted": "Generando la portada nueva…",
+      "newCoverFailed": "No se pudo iniciar la portada nueva."
     },
     "settings": {
       "categoriesTitle": "Categorías",

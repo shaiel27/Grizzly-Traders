@@ -241,6 +241,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
   const [conflicto, setConflicto] = useState(false)
   const [borrador, setBorrador] = useState<{ datos: EstadoForm; cuando: string } | null>(null)
   const [historialAbierto, setHistorialAbierto] = useState(false)
+  const [parecidos, setParecidos] = useState<{ id: string; title: string; slug: string }[]>([])
   const ed = dict.edicion
 
   const cuandoTexto = (guardadoEn: string) => {
@@ -265,6 +266,20 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
       return
     }
     setBorrador(b && esRestaurable(b, abierto) ? { datos: b.datos, cuando: cuandoTexto(b.guardadoEn) } : null)
+  }
+  // Al terminar de escribir el título: ¿ya hay uno parecido en los últimos 30 días? Solo avisa, nunca impide guardar
+  const revisarTitulo = async (titulo: string) => {
+    if (titulo.trim().length < 12) {
+      setParecidos([])
+      return
+    }
+    try {
+      const res = await fetch(`/api/posts/duplicados?titulo=${encodeURIComponent(titulo)}${editingId ? `&excluir=${editingId}` : ''}`)
+      const data = await res.json().catch(() => null)
+      setParecidos(res.ok && data?.success ? data.data : [])
+    } catch {
+      setParecidos([])
+    }
   }
   const confirmarSalida = async () => {
     if (!dirty) return true
@@ -1242,10 +1257,26 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                       type="text"
                       value={current.title}
                       onChange={(e) => handleTitleChange(e.target.value)}
+                      onBlur={(e) => revisarTitulo(e.target.value)}
                       placeholder={dict.editor.titlePlaceholder}
                       className={clsx('w-full rounded-xl bg-surface-2 px-4 py-3 text-lg font-bold text-ink placeholder:font-medium placeholder:text-ink-subtle', fieldStateClass)}
                     />
                     {current.slug && <p className="mt-1.5 truncate font-mono text-[12px] text-ink-muted">/articulos/{current.slug}</p>}
+                    {parecidos.length > 0 && (
+                      <div role="status" className="mt-2 rounded-lg border border-semantic-warning/30 bg-semantic-warning/[0.07] px-3 py-2 text-[13px] leading-relaxed">
+                        <p className="font-bold text-semantic-warning">{dict.editor.dupTitle}</p>
+                        <p className="text-ink-muted">{dict.editor.dupBody}</p>
+                        <ul className="mt-1 list-disc pl-5 text-ink">
+                          {parecidos.map((x) => (
+                            <li key={x.id}>
+                              <a href={`/articulos/${x.slug}`} target="_blank" rel="noreferrer" className="underline">
+                                {x.title}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
 
                   {/* Content */}
@@ -1621,6 +1652,7 @@ export function CMSPanel({ initialCategories, initialTags, initialAssets, initia
                 onToggleFeatured={handleToggleFeatured}
                 onDelete={handleDeletePost}
                 onCompletar={handleCompletar}
+                onSeguir={iniciarSeguimiento}
                 onCargada={alCargarLista}
                 askConfirm={askConfirm}
                 notify={notify}
