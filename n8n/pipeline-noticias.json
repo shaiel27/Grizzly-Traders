@@ -942,8 +942,8 @@
         3420
       ],
       "parameters": {
-        "method": "PATCH",
-        "url": "={{ 'https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts?status=eq.draft&' + ($json.post_id ? 'id=eq.' + $json.post_id : 'source_url=eq.' + encodeURIComponent($json.source_url || 'sin-url')) }}",
+        "method": "POST",
+        "url": "https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/rpc/pipeline_registrar_fallo",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "sendHeaders": true,
@@ -955,13 +955,13 @@
             },
             {
               "name": "Prefer",
-              "value": "return=representation"
+              "value": "return=minimal"
             }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ pipeline_error: $json.pipeline_error }) }}",
+        "jsonBody": "={{ JSON.stringify({ p_post_id: $json.post_id, p_source_url: $json.source_url, p_titulo: $json.titulo, p_detalle: String($json.pipeline_error || '').replace(/^(error|checklist): ?/, ''), p_motivo: $json.log_status === 'draft_checklist' ? 'checklist' : 'fallo' }) }}",
         "options": {}
       },
       "credentials": {
@@ -1021,7 +1021,7 @@
         240
       ],
       "parameters": {
-        "url": "={{ 'https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts?select=source_url,status,origen,pipeline_attempts,pipeline_error,created_at&limit=2000&source_url=not.is.null&created_at=gte.' + encodeURIComponent($now.minus({ hours: 240 }).toUTC().toISO()) }}",
+        "url": "https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/rpc/pipeline_tratados",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "sendHeaders": true,
@@ -1039,7 +1039,11 @@
               "fullResponse": true
             }
           }
-        }
+        },
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_horas: 240 }) }}"
       },
       "credentials": {
         "supabaseApi": {
@@ -1362,7 +1366,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/posts?on_conflict=source_url",
+        "url": "https://pudzvatuubywmwdmboiq.supabase.co/rest/v1/rpc/pipeline_registrar_duplicado",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "sendHeaders": true,
@@ -1371,16 +1375,12 @@
             {
               "name": "Content-Type",
               "value": "application/json"
-            },
-            {
-              "name": "Prefer",
-              "value": "resolution=ignore-duplicates,return=minimal"
             }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ title: String($('Normalizar Item').item.json.title || 'duplicado').slice(0, 200), slug: 'duplicado-' + [...String($('Normalizar Item').item.json.link)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7).toString(36), content_html: '<p></p>', status: 'draft', origen: 'rss', author_id: 5, source_url: $('Normalizar Item').item.json.link, source_id: ({ 'CFTC': 11, 'Investing.com': 4, 'Reserva Federal': 9, 'SEC': 10, 'BCE': 12, 'EIA': 13, 'BEA': 14, 'EDGAR': 15, 'OCC': 16, 'FDIC': 17, 'GlobeNewswire': 18 })[$('Normalizar Item').item.json.fuente] ?? null, ai_assisted: true, pipeline_attempts: 2, pipeline_error: 'duplicado: ' + $json.titulo_similar }) }}",
+        "jsonBody": "={{ JSON.stringify({ p_source_url: $('Normalizar Item').item.json.link, p_titulo: String($('Normalizar Item').item.json.title || '').slice(0, 200), p_similar: $json.titulo_similar }) }}",
         "options": {}
       },
       "id": "a9b8c7d6-e5f4-4a3b-9c2d-1e0f9a8b7c77",

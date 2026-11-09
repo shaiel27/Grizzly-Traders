@@ -18,7 +18,7 @@ export type EstadoFiltro = (typeof ESTADOS)[number]
 
 export const POR_PAGINA = 25
 // Los restos de error se borran solos pasado este tiempo (función SQL limpiar_errores_pipeline y botón «Limpiar» del CMS)
-export const DIAS_LIMPIEZA_ERRORES = 7
+export const DIAS_LIMPIEZA_ERRORES = 1
 
 export const PREFIJO_PENDIENTE = 'pendiente-'
 export const PREFIJO_DUPLICADO = 'duplicado-'

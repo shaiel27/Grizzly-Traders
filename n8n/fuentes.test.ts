@@ -144,10 +144,9 @@ describe('atribución estructurada (source_id)', () => {
   }
   const esperado = { CFTC: 11, 'Investing.com': 4, 'Reserva Federal': 9, SEC: 10, BCE: 12, EIA: 13, BEA: 14, EDGAR: 15, OCC: 16, FDIC: 17, GlobeNewswire: 18 }
 
-  it('los tres sitios del flujo que traducen fuente -> id usan el mismo mapa', () => {
+  it('los sitios del flujo que traducen fuente -> id usan el mismo mapa (los duplicados ya no crean fila, no lo necesitan)', () => {
     expect(mapaDe(nodo('Parsear JSON').parameters.jsCode)).toEqual(esperado)
     expect(mapaDe(JSON.stringify(nodo('Reservar URL').parameters).replace(/\\"/g, '"'))).toEqual(esperado)
-    expect(mapaDe(JSON.stringify(nodo('Guardar duplicado').parameters).replace(/\\"/g, '"'))).toEqual(esperado)
   })
 
   it('la migración crea exactamente los ids nuevos que usa el flujo', () => {
