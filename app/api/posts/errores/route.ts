@@ -9,7 +9,7 @@ import { firstIssue, postIdSchema } from '@/lib/validation'
 // Restos de error del pipeline (reservas sin terminar, duplicados, fallos guardados): reintentar, descartar o limpiar los antiguos.
 //   POST { accion: 'reintentar', id }     el pipeline vuelve a intentarlo en el próximo ciclo (si la noticia sigue en el feed)
 //   POST { accion: 'descartar', id }      lo borra de la base
-//   POST { accion: 'limpiar_antiguos' }   borra los de más de 7 días (lo mismo que hace solo la función SQL limpiar_errores_pipeline)
+//   POST { accion: 'limpiar_antiguos' }   borra las reservas de más de 1 día (lo mismo que hace solo la función SQL limpiar_errores_pipeline)
 // Todas comprueban en el servidor que la fila ES un resto de error: nunca borran ni tocan un artículo publicado ni uno escrito en el CMS.
 
 export const dynamic = 'force-dynamic'

@@ -104,7 +104,7 @@ describe('POST /api/posts/errores', () => {
     expect(escribio('update')).toBe(false)
   })
 
-  it('limpiar_antiguos borra solo restos de error con más de 7 días y dice cuántos', async () => {
+  it('limpiar_antiguos borra solo restos de error con más de 1 día y dice cuántos', async () => {
     escritura = { data: [{ id: 'a' }, { id: 'b' }, { id: 'c' }], error: null }
     const antes = Date.now()
     const { res, json } = await llamar({ accion: 'limpiar_antiguos' })
@@ -115,7 +115,7 @@ describe('POST /api/posts/errores', () => {
     expect(f.some((l) => l.metodo === 'eq' && l.args[0] === 'status' && l.args[1] === 'draft')).toBe(true)
     expect(String(f.find((l) => l.metodo === 'or')!.args[0])).toContain('pendiente-')
     const limite = Date.parse(String(f.find((l) => l.metodo === 'lt')!.args[1]))
-    expect(antes - limite).toBeGreaterThanOrEqual(7 * 86_400_000 - 5000)
-    expect(antes - limite).toBeLessThan(7 * 86_400_000 + 5000)
+    expect(antes - limite).toBeGreaterThanOrEqual(1 * 86_400_000 - 5000)
+    expect(antes - limite).toBeLessThan(1 * 86_400_000 + 5000)
   })
 })

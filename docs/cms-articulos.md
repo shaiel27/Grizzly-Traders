@@ -11,11 +11,12 @@ La lista del CMS separa tres ámbitos que no se mezclan, con búsqueda, filtros 
 `GET /api/posts/list?ambito=mis|auto|errores&estado=todos|published|draft|scheduled&q=…&categoria=id&fuente=id&pagina=n` devuelve la página, el total y los contadores de los tres ámbitos.
 
 ## Errores del pipeline
-- **No se ven en el sitio** (son borradores) y salen de la lista normal.
-- **Por qué no se borran al instante:** el pipeline usa esas filas como marca de «esta noticia ya se trató» (mira 10 días atrás). Se limpian solos a los **7 días**, cuando la noticia ya no entra por la ventana de fechas de las fuentes.
-- **Limpieza automática:** la función SQL `limpiar_errores_pipeline(7)` (migración `0013`) corre cada día a las 07:17 UTC con `pg_cron` y deja una línea en `pipeline_logs`. El botón «Limpiar los de más de 7 días» hace lo mismo desde el CMS.
-- **Acciones por fila:** *Reintentar* (pone los intentos a 0; el pipeline lo vuelve a procesar si la noticia sigue en el feed), *Descartar* (borra la fila) y, en los rechazados por el checklist, *Editar*. Un duplicado no se reintenta.
-- `POST /api/posts/errores` comprueba **en el servidor** que la fila es un resto de error: nunca borra ni toca un artículo publicado ni uno escrito en el CMS.
+Desde la migración `0015` el pipeline **ya no deja filas de error en `posts`**:
+- Una noticia que **falla** o resulta **duplicada** se recuerda en la tabla ligera `pipeline_vistos` (URL, motivo, intentos; se vacía sola a los 10 días, la ventana que mira el pipeline) y el borrador fallido **se borra al momento**. Un fallo técnico se reintenta una vez; un duplicado o un rechazo del checklist no se reintentan.
+- Los motivos de cada fallo siguen en `pipeline_logs`.
+- Funciones SQL: `pipeline_tratados` (lo ya tratado: artículos + lo visto), `pipeline_registrar_fallo`, `pipeline_registrar_duplicado`; `pipeline_claim_post` no cambia.
+- La pestaña **Errores del pipeline** queda solo para las **reservas que se quedan a medias** por una caída (ya no se ven en el sitio y la función `limpiar_errores_pipeline(1)` las borra a las 24 h, cada día a las 07:17 UTC con `pg_cron`). Un borrador con traducciones (contenido real) nunca se borra solo.
+- `POST /api/posts/errores` comprueba **en el servidor** que la fila es un resto de error: nunca toca un artículo publicado ni uno escrito en el CMS.
 
 ## Edición segura (migración `0014`)
 - **Aviso de cambios sin guardar:** indicador en el editor, aviso propio al cambiar de pestaña, abrir otro artículo o cancelar, y aviso del navegador al cerrar la pestaña.
