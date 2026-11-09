@@ -55,11 +55,18 @@ interface AdSlotProps {
   enLista?: boolean
 }
 
+// ¿Hay algo visible además del propio <script> que cargamos? (el anuncio puede ser un iframe, una imagen o un bloque de texto)
+export function hayAnuncio(contenedor: HTMLElement): boolean {
+  return Array.from(contenedor.children).some((n) => n.tagName !== 'SCRIPT')
+}
+
 export function AdSlot({ nombre, etiqueta = 'Publicidad', className, enLista = false }: AdSlotProps) {
   const espacio = ESPACIOS[nombre]
   const estado = useEstadoPublicidad()
   const contenedor = useRef<HTMLDivElement>(null)
   const [cerca, setCerca] = useState(false)
+  // Sin anuncio (bloqueador, sin oferta, fallo de red): el espacio desaparece en vez de dejar una caja vacía con la etiqueta «Publicidad»
+  const [vacio, setVacio] = useState(false)
   const mostrar = PUBLICIDAD_ACTIVA && espacio !== undefined && puedeMostrarAnuncios(true, estado)
 
   // Carga perezosa: solo cuando el espacio está a ~300 px de la pantalla
@@ -81,15 +88,24 @@ export function AdSlot({ nombre, etiqueta = 'Publicidad', className, enLista = f
   useEffect(() => {
     const el = contenedor.current
     if (!mostrar || !cerca || !el) return
-    void cargar(el, espacio)
+    let activo = true
+    let espera: number | undefined
+    void cargar(el, espacio).then(() => {
+      // El anuncio puede tardar en pintarse tras cargar su script: se da un margen antes de dar el espacio por vacío
+      espera = window.setTimeout(() => {
+        if (activo && !hayAnuncio(el)) setVacio(true)
+      }, 5000)
+    })
     // Al retirar el consentimiento o cambiar de página, el anuncio se quita
     return () => {
+      activo = false
+      window.clearTimeout(espera)
       el.replaceChildren()
       el.removeAttribute('id')
     }
   }, [mostrar, cerca, espacio])
 
-  if (!mostrar) return null
+  if (!mostrar || vacio) return null
   const anuncio = (
     <aside aria-label={etiqueta} className={className ?? (enLista ? '' : 'my-8 max-w-[68ch]')}>
       <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-ink-subtle">{etiqueta}</p>
