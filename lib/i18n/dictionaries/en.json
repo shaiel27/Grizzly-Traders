@@ -1120,7 +1120,9 @@
       "saveDraft": "Save Draft",
       "completingNote": "completing cover, category and translation in the background",
       "titleAndContentRequired": "✗ Title and content are required",
-      "loadPostFailed": "We couldn't load the article"
+      "loadPostFailed": "We couldn't load the article",
+      "dupTitle": "An article with a similar title already exists",
+      "dupBody": "Check it is not the same topic before publishing:"
     },
     "posts": {
       "automationHeading": "Publishing automation",
@@ -1199,7 +1201,26 @@
       "errAttempts": "{n} attempt(s)",
       "errActionFailed": "The action could not be completed.",
       "pipelineFailure": "Pipeline technical failure",
-      "pipelineAttempts": "Attempts: {n}"
+      "pipelineAttempts": "Attempts: {n}",
+      "selectRow": "Select “{title}”",
+      "selectAll": "Select all on this page",
+      "selectedCount": "{n} selected",
+      "bulkPublish": "Publish",
+      "bulkUnpublish": "Unpublish",
+      "bulkDelete": "Delete",
+      "bulkClear": "Clear selection",
+      "bulkPublishConfirm": "Publish {n} articles? They will be visible on the site right away.",
+      "bulkPublishTitle": "Publish articles",
+      "bulkUnpublishConfirm": "Unpublish {n} articles? They will disappear from the site and become drafts.",
+      "bulkUnpublishTitle": "Unpublish articles",
+      "bulkDeleteConfirm": "Delete {n} articles? This cannot be undone.",
+      "bulkDone": "{n} of {total} articles updated.",
+      "bulkFailed": "The action could not be completed. Check the list: some may have changed.",
+      "newCover": "New cover",
+      "newCoverConfirm": "The current cover is discarded and another one is generated with AI (it takes a few minutes). Continue?",
+      "newCoverTitle": "New cover",
+      "newCoverStarted": "Generating the new cover…",
+      "newCoverFailed": "Could not start the new cover."
     },
     "settings": {
       "categoriesTitle": "Categories",
