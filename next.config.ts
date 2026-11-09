@@ -13,7 +13,7 @@ const gaScripts = gaActivo ? " https://www.googletagmanager.com" : "";
 const gaConexiones = gaActivo ? " https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com" : "";
 const gaImagenes = gaActivo ? " https://*.google-analytics.com https://*.googletagmanager.com" : "";
 
-// Publicidad (Adsterra): con ella activada, las páginas de ARTÍCULO llevan una política de seguridad que admite los servidores de los anuncios
+// Publicidad (Adsterra): con ella activada, las páginas de ARTÍCULO y el LISTADO de artículos llevan una política de seguridad que admite los servidores de los anuncios
 // (los de NEXT_PUBLIC_ADS_SLOTS y NEXT_PUBLIC_ADS_HOSTS). El resto del sitio conserva la política estricta. Sin publicidad activa, nada cambia.
 const hostValido = /^(?:\*\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i;
 const adsActiva = process.env.NEXT_PUBLIC_ADS_ACTIVO === "true";
@@ -106,8 +106,10 @@ const nextConfig: NextConfig = {
       // Con ella: solo las páginas de artículo admiten los servidores de los anuncios; el resto sigue estricto.
       ...(adsHosts.length
         ? [
+            // Páginas con anuncios: el listado de artículos (/articulos) y cada artículo (/articulos/<slug>)
+            { source: "/articulos", headers: [cspConAnuncios] },
             { source: "/articulos/:slug", headers: [cspConAnuncios] },
-            { source: "/((?!articulos/[^/]+$).*)", headers: [cspEstricta] },
+            { source: "/((?!articulos(?:/[^/]+)?$).*)", headers: [cspEstricta] },
           ]
         : [{ source: "/:path*", headers: [cspEstricta] }]),
       // Texturas del globo y fuente de iconos: no cambian entre despliegues salvo a mano, una semana basta
