@@ -47,7 +47,15 @@ function cargar(contenedor: HTMLElement, espacio: Espacio): Promise<void> {
   return cola
 }
 
-export function AdSlot({ nombre, etiqueta = 'Publicidad', className }: { nombre: string; etiqueta?: string; className?: string }) {
+interface AdSlotProps {
+  nombre: string
+  etiqueta?: string
+  className?: string
+  // Dentro de una lista (<ul>): se envuelve en un <li> que ocupa toda la fila de la rejilla. Si no se muestra, no deja ni el <li>.
+  enLista?: boolean
+}
+
+export function AdSlot({ nombre, etiqueta = 'Publicidad', className, enLista = false }: AdSlotProps) {
   const espacio = ESPACIOS[nombre]
   const estado = useEstadoPublicidad()
   const contenedor = useRef<HTMLDivElement>(null)
@@ -82,11 +90,12 @@ export function AdSlot({ nombre, etiqueta = 'Publicidad', className }: { nombre:
   }, [mostrar, cerca, espacio])
 
   if (!mostrar) return null
-  return (
-    <aside aria-label={etiqueta} className={className ?? 'my-8 max-w-[68ch]'}>
+  const anuncio = (
+    <aside aria-label={etiqueta} className={className ?? (enLista ? '' : 'my-8 max-w-[68ch]')}>
       <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-ink-subtle">{etiqueta}</p>
       {/* Altura reservada: el anuncio al cargar no desplaza lo que hay debajo */}
       <div ref={contenedor} style={{ minHeight: espacio.tipo === 'banner' ? espacio.alto : 250 }} className="flex justify-center overflow-hidden rounded-lg border border-hairline-soft bg-surface-1" />
     </aside>
   )
+  return enLista ? <li className="col-span-full">{anuncio}</li> : anuncio
 }
