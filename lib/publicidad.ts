@@ -13,11 +13,14 @@ export const PUBLICIDAD_ACTIVA = publicidadActiva(process.env.NEXT_PUBLIC_ADS_AC
 //                            "nativo":{"tipo":"nativo","clave":"def456…","host":"pl000.ejemplo.com"}}
 //   NEXT_PUBLIC_ADS_HOSTS = servidores extra que usan los anuncios (script, imágenes, marcos), separados por comas (ver docs/publicidad.md)
 export type Espacio =
-  | { tipo: 'banner'; clave: string; host: string; ancho: number; alto: number }
-  | { tipo: 'nativo'; clave: string; host: string }
+  | { tipo: 'banner'; clave: string; host: string; ruta?: string; ancho: number; alto: number }
+  | { tipo: 'nativo'; clave: string; host: string; ruta?: string }
 
 const HOST = /^(?:\*\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i
 const CLAVE = /^[A-Za-z0-9]{8,64}$/
+// Ruta del script del anuncio en su servidor, tal como la da el panel (p. ej. /21/<clave>). Sin ella: /<clave>/invoke.js
+const RUTA = /^\/[A-Za-z0-9/_.-]{1,120}$/
+const rutaValida = (r: unknown): r is string => typeof r === 'string' && RUTA.test(r) && !r.includes('..') && !r.includes('//')
 
 export const esHostValido = (valor: unknown): valor is string => typeof valor === 'string' && HOST.test(valor)
 
@@ -40,15 +43,17 @@ export function espaciosDeAnuncios(json: string | null | undefined): Record<stri
     const v = valor as Record<string, unknown>
     // `*.` no vale para el servidor del código: ahí se escribe una dirección concreta
     if (typeof v.clave !== 'string' || !CLAVE.test(v.clave) || !esHostValido(v.host) || v.host.startsWith('*.')) continue
-    if (v.tipo === 'nativo') espacios[nombre] = { tipo: 'nativo', clave: v.clave, host: v.host.toLowerCase() }
+    if (v.ruta !== undefined && !rutaValida(v.ruta)) continue
+    const ruta = v.ruta as string | undefined
+    if (v.tipo === 'nativo') espacios[nombre] = { tipo: 'nativo', clave: v.clave, host: v.host.toLowerCase(), ...(ruta ? { ruta } : {}) }
     else if (v.tipo === 'banner' && Number.isInteger(v.ancho) && Number.isInteger(v.alto) && (v.ancho as number) > 0 && (v.alto as number) > 0 && (v.ancho as number) <= 970 && (v.alto as number) <= 600) {
-      espacios[nombre] = { tipo: 'banner', clave: v.clave, host: v.host.toLowerCase(), ancho: v.ancho as number, alto: v.alto as number }
+      espacios[nombre] = { tipo: 'banner', clave: v.clave, host: v.host.toLowerCase(), ...(ruta ? { ruta } : {}), ancho: v.ancho as number, alto: v.alto as number }
     }
   }
   return espacios
 }
 
-export const urlDelAnuncio = (e: Espacio) => `https://${e.host}/${e.clave}/invoke.js`
+export const urlDelAnuncio = (e: Espacio) => `https://${e.host}${e.ruta ?? `/${e.clave}/invoke.js`}`
 
 export const ESPACIOS = espaciosDeAnuncios(process.env.NEXT_PUBLIC_ADS_SLOTS)
 
