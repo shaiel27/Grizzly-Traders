@@ -1,6 +1,8 @@
+import { Fragment } from 'react'
 import { Metadata } from 'next'
 import Link from 'next/link'
 import { CategoryFilter, ArticleCard, Pagination } from '@/components/ui'
+import { AdSlot } from '@/components/ads/AdSlot'
 import { getPublishedPosts, getCategories, getTags, getAssets } from '@/lib/api'
 import { getRouteLocale } from '@/lib/i18n/route-locale'
 import { getDictionary } from '@/lib/i18n/get-dictionary'
@@ -60,10 +62,14 @@ export default async function ArticlesPage({ searchParams }: ArticlesPageProps) 
         <section aria-label={dict.listings.articlesAria}>
           <div className="section-container">
             <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {posts.map((post) => (
-                <li key={post.id}>
-                  <ArticleCard post={post} locale={locale} />
-                </li>
+              {posts.map((post, i) => (
+                <Fragment key={post.id}>
+                  <li>
+                    <ArticleCard post={post} locale={locale} />
+                  </li>
+                  {/* Publicidad (Adsterra): una sola, tras la sexta tarjeta; no pinta nada salvo que esté activada, configurada y aceptada */}
+                  {i === 5 && posts.length > 6 && <AdSlot nombre="listado" enLista />}
+                </Fragment>
               ))}
             </ul>
 
