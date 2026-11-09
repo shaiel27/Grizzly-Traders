@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Header, Footer } from '@/components/ui'
 import { Analytics } from '@/components/analytics/Analytics'
+import { PUBLICIDAD_ACTIVA } from '@/lib/publicidad'
 import { getCategories } from '@/lib/api'
 import { getRouteLocale } from '@/lib/i18n/route-locale'
 import { getDictionary, LOCALES } from '@/lib/i18n/get-dictionary'
@@ -36,7 +37,7 @@ export default async function SiteRootLayout({ children }: { children: ReactNode
         {children}
         <Footer categories={categories} locale={locale} dictionary={dictionary} />
         {/* Google Analytics con consentimiento previo; sin NEXT_PUBLIC_GA_MEASUREMENT_ID no hace nada (docs/analitica.md) */}
-        <Analytics measurementId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID} />
+        <Analytics measurementId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID} publicidadActiva={PUBLICIDAD_ACTIVA} />
       </LocaleProvider>
     </RootHtml>
   )

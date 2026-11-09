@@ -42,3 +42,24 @@ export function comandosDeInicio(id: string): unknown[][] {
     ['config', id, { send_page_view: false, allow_google_signals: false, allow_ad_personalization_signals: false }],
   ]
 }
+
+// ---- Publicidad (Adsterra) -------------------------------------------------------------------------------------------------------------
+// La publicidad tiene su PROPIO consentimiento, separado de la analítica (`gt_consent_ads`): aceptar una cosa no acepta la otra. Quien ya había
+// decidido sobre la analítica no ha decidido todavía sobre la publicidad, así que se le vuelve a preguntar solo cuando la publicidad se activa.
+// Global Privacy Control cuenta como rechazo de la publicidad.
+export const CLAVE_CONSENTIMIENTO_PUBLICIDAD = 'gt_consent_ads'
+
+export type EstadoConsentimiento = Consentimiento | 'pendiente'
+
+export const publicidadActiva = (valor: string | null | undefined) => valor === 'true'
+
+// ¿Hay que mostrar el aviso? Solo si algo que está ACTIVO en el sitio aún no tiene decisión.
+export function hayQuePreguntar(
+  activas: { analitica: boolean; publicidad: boolean },
+  estados: { analitica: EstadoConsentimiento; publicidad: EstadoConsentimiento }
+): boolean {
+  return (activas.analitica && estados.analitica === 'pendiente') || (activas.publicidad && estados.publicidad === 'pendiente')
+}
+
+// Los anuncios solo se cargan con publicidad activada en el sitio Y consentimiento concedido
+export const puedeMostrarAnuncios = (activa: boolean, estado: EstadoConsentimiento | 'servidor') => activa && estado === 'concedido'

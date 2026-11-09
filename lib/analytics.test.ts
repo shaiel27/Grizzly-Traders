@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { comandosDeInicio, esCookieDeGoogleAnalytics, esIdMedicion, leerConsentimiento, nombresDeCookies } from './analytics'
+import { CLAVE_CONSENTIMIENTO_PUBLICIDAD, comandosDeInicio, hayQuePreguntar, publicidadActiva, puedeMostrarAnuncios, esCookieDeGoogleAnalytics, esIdMedicion, leerConsentimiento, nombresDeCookies } from './analytics'
 
 describe('ID de medición de GA4', () => {
   it('solo acepta el formato G-XXXXXXXXXX; cualquier otra cosa deja la analítica apagada', () => {
@@ -58,5 +58,40 @@ describe('comandos de inicio de gtag', () => {
 
   it('el consentimiento se declara antes de configurar la medición', () => {
     expect(comandos.map((c) => c[0])).toEqual(['js', 'consent', 'config'])
+  })
+})
+
+describe('publicidad: consentimiento propio y separado', () => {
+  it('tiene su propia clave: aceptar la analítica no acepta la publicidad', () => {
+    expect(CLAVE_CONSENTIMIENTO_PUBLICIDAD).toBe('gt_consent_ads')
+    // quien ya aceptó la analítica sigue «pendiente» en publicidad: leerConsentimiento solo mira SU clave
+    expect(leerConsentimiento(null, false)).toBeNull()
+  })
+
+  it('Global Privacy Control rechaza la publicidad sin preguntar', () => {
+    expect(leerConsentimiento('concedido', true)).toBe('denegado')
+  })
+
+  it('el interruptor solo se activa con el texto exacto «true»', () => {
+    expect(publicidadActiva('true')).toBe(true)
+    for (const v of ['', 'false', 'TRUE', '1', 'yes', undefined, null]) expect(publicidadActiva(v as never)).toBe(false)
+  })
+
+  it('solo se pregunta por lo que está activo y aún sin decidir', () => {
+    const pend = { analitica: 'pendiente', publicidad: 'pendiente' } as const
+    expect(hayQuePreguntar({ analitica: true, publicidad: false }, pend)).toBe(true)
+    expect(hayQuePreguntar({ analitica: false, publicidad: true }, pend)).toBe(true)
+    expect(hayQuePreguntar({ analitica: false, publicidad: false }, pend)).toBe(false)
+    // ya decidió la analítica; al activarse la publicidad se le vuelve a preguntar solo por ella
+    expect(hayQuePreguntar({ analitica: true, publicidad: true }, { analitica: 'concedido', publicidad: 'pendiente' })).toBe(true)
+    expect(hayQuePreguntar({ analitica: true, publicidad: true }, { analitica: 'concedido', publicidad: 'denegado' })).toBe(false)
+    // con la publicidad apagada, su decisión pendiente no molesta
+    expect(hayQuePreguntar({ analitica: true, publicidad: false }, { analitica: 'denegado', publicidad: 'pendiente' })).toBe(false)
+  })
+
+  it('los anuncios exigen sitio activo Y consentimiento concedido: nunca con «pendiente», «denegado» ni en el servidor', () => {
+    expect(puedeMostrarAnuncios(true, 'concedido')).toBe(true)
+    for (const e of ['pendiente', 'denegado', 'servidor'] as const) expect(puedeMostrarAnuncios(true, e)).toBe(false)
+    expect(puedeMostrarAnuncios(false, 'concedido')).toBe(false)
   })
 })

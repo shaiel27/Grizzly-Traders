@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Breadcrumbs } from '@/components/ui'
 import { getRouteLocale } from '@/lib/i18n/route-locale'
 import { getDictionary, t } from '@/lib/i18n/get-dictionary'
+import { PUBLICIDAD_ACTIVA } from '@/lib/publicidad'
 import {
   legalProseClass,
   LegalToc,
@@ -98,6 +99,16 @@ export default async function CookiePolicyPage() {
             Google LLC. Duración: hasta 2 años. Si rechazas, no se crean; si las aceptas y luego cambias de decisión,
             las borramos.
           </li>
+          {PUBLICIDAD_ACTIVA && (
+            <li>
+              <strong>Cookies e identificadores de publicidad (Adsterra)</strong> — Se crean{' '}
+              <strong>solo si aceptas la publicidad</strong> en el aviso del Sitio. Los establece Adsterra y sus socios
+              publicitarios para mostrar anuncios, medirlos y prevenir el fraude; su nombre y duración los define cada
+              proveedor y pueden cambiar. Si rechazas, no se carga ningún anuncio. Si aceptas y luego cambias de decisión,
+              los anuncios dejan de cargarse, pero lo que Adsterra ya guardó solo puedes borrarlo desde la configuración
+              de tu navegador.
+            </li>
+          )}
         </ul>
 
         <h2 id="no-usamos">3. Analítica y lo que no usamos</h2>
@@ -108,11 +119,20 @@ export default async function CookiePolicyPage() {
           señal <em>Global Privacy Control</em>, no se activa. Puedes cambiar tu decisión en cualquier momento con el
           enlace «Preferencias de cookies» del pie de página, que además borra las cookies de Google Analytics.
         </p>
-        <p>
-          Tenemos desactivadas las señales de Google y la personalización de anuncios.{' '}
-          <strong>No utilizamos cookies de publicidad ni de seguimiento de redes sociales</strong>. Si esto cambia en el
-          futuro, actualizaremos esta política e indicaremos la fecha del cambio antes de activarlas.
-        </p>
+        {PUBLICIDAD_ACTIVA ? (
+          <p>
+            Tenemos desactivadas las señales de Google y la personalización de anuncios de Google.{' '}
+            <strong>Mostramos publicidad de Adsterra solo si aceptas la publicidad</strong> (es una decisión
+            independiente de la analítica) y no utilizamos cookies de seguimiento de redes sociales. Si tu navegador envía
+            la señal <em>Global Privacy Control</em>, la publicidad no se activa.
+          </p>
+        ) : (
+          <p>
+            Tenemos desactivadas las señales de Google y la personalización de anuncios.{' '}
+            <strong>No utilizamos cookies de publicidad ni de seguimiento de redes sociales</strong>. Si esto cambia en el
+            futuro, actualizaremos esta política e indicaremos la fecha del cambio antes de activarlas.
+          </p>
+        )}
 
         <h2 id="gestionar">4. Cómo gestionar las cookies</h2>
         <p>
