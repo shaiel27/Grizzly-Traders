@@ -12,6 +12,7 @@ import { categoryMeta, localizedAuthor, localizedPostContent } from '@/lib/feed'
 import { getRouteLocale } from '@/lib/i18n/route-locale'
 import { getDictionary, t } from '@/lib/i18n/get-dictionary'
 import Image from 'next/image'
+import { AdSlot } from '@/components/ads/AdSlot'
 import { format, formatDistanceToNow } from 'date-fns'
 import { es, enUS } from 'date-fns/locale'
 
@@ -238,6 +239,9 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
             className="article-body prose prose-lg max-w-[68ch] font-serif prose-headings:font-serif prose-headings:font-bold prose-headings:tracking-tight prose-p:leading-[1.8] prose-a:font-medium prose-a:no-underline hover:prose-a:underline prose-blockquote:font-normal prose-blockquote:not-italic prose-img:rounded-xl prose-img:border prose-img:border-hairline prose-figcaption:font-sans prose-table:font-sans prose-table:text-sm"
             dangerouslySetInnerHTML={{ __html: content }}
           />
+
+          {/* Publicidad (Adsterra): no pinta nada salvo que esté activada, configurada y aceptada por el visitante */}
+          <AdSlot nombre="articulo" />
 
           {/* Guía de cumplimiento P2 #3 y #7: atribución con enlace al original y aviso de contenido
               asistido por IA. Solo se muestra lo que el artículo realmente tiene. */}

@@ -13,31 +13,51 @@ const gaScripts = gaActivo ? " https://www.googletagmanager.com" : "";
 const gaConexiones = gaActivo ? " https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com" : "";
 const gaImagenes = gaActivo ? " https://*.google-analytics.com https://*.googletagmanager.com" : "";
 
-const securityHeaders = [
+// Publicidad (Adsterra): con ella activada, las páginas de ARTÍCULO llevan una política de seguridad que admite los servidores de los anuncios
+// (los de NEXT_PUBLIC_ADS_SLOTS y NEXT_PUBLIC_ADS_HOSTS). El resto del sitio conserva la política estricta. Sin publicidad activa, nada cambia.
+const hostValido = /^(?:\*\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i;
+const adsActiva = process.env.NEXT_PUBLIC_ADS_ACTIVO === "true";
+const adsHosts: string[] = (() => {
+  if (!adsActiva) return [];
+  const hosts = (process.env.NEXT_PUBLIC_ADS_HOSTS ?? "").split(",").map((h) => h.trim().toLowerCase());
+  try {
+    const slots = JSON.parse(process.env.NEXT_PUBLIC_ADS_SLOTS ?? "{}") as Record<string, { host?: string }>;
+    for (const s of Object.values(slots)) if (typeof s?.host === "string") hosts.push(s.host.toLowerCase());
+  } catch {
+    // JSON ilegible: lib/publicidad.ts también lo ignora (sin espacios no hay anuncios)
+  }
+  return [...new Set(hosts.filter((h) => hostValido.test(h)))].map((h) => `https://${h}`);
+})();
+const ads = adsHosts.length ? ` ${adsHosts.join(" ")}` : "";
+
+const cspDirectivas = (extra: { script: string; img: string; connect: string; frame: string }) =>
+  [
+    "default-src 'self'",
+    `script-src 'self' 'unsafe-inline' https://s3.tradingview.com${gaScripts}${extra.script}${isDev ? " 'unsafe-eval'" : ""}`,
+    "style-src 'self' 'unsafe-inline'",
+    `img-src 'self' data: blob: https://pudzvatuubywmwdmboiq.supabase.co https://coin-images.coingecko.com${gaImagenes}${extra.img}`,
+    "font-src 'self'",
+    `connect-src 'self' https://pudzvatuubywmwdmboiq.supabase.co https://*.supabase.co wss://*.supabase.co${gaConexiones}${extra.connect}`,
+    "worker-src 'self' blob:",
+    // Widget Advanced Chart de TradingView (components/ui/TradingViewWidget.tsx): el script oficial
+    // viene de s3.tradingview.com (script-src) y crea un iframe de www.tradingview-widget.com.
+    // Sin comodines.
+    `frame-src https://www.tradingview-widget.com${extra.frame}`,
+    "frame-ancestors 'none'",
+    "base-uri 'self'; form-action 'self'",
+  ].join("; ");
+
+const sinCsp = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
-  {
-    key: "Content-Security-Policy",
-    value: [
-      "default-src 'self'",
-      `script-src 'self' 'unsafe-inline' https://s3.tradingview.com${gaScripts}${isDev ? " 'unsafe-eval'" : ""}`,
-      "style-src 'self' 'unsafe-inline'",
-      `img-src 'self' data: blob: https://pudzvatuubywmwdmboiq.supabase.co https://coin-images.coingecko.com${gaImagenes}`,
-      "font-src 'self'",
-      `connect-src 'self' https://pudzvatuubywmwdmboiq.supabase.co https://*.supabase.co wss://*.supabase.co${gaConexiones}`,
-      "worker-src 'self' blob:",
-      // Widget Advanced Chart de TradingView (components/ui/TradingViewWidget.tsx): el script oficial
-      // viene de s3.tradingview.com (script-src) y crea un iframe de www.tradingview-widget.com.
-      // Sin comodines.
-      "frame-src https://www.tradingview-widget.com",
-      "frame-ancestors 'none'",
-      "base-uri 'self'; form-action 'self'",
-    ].join("; "),
-  },
 ];
+
+const csp = (value: string) => ({ key: "Content-Security-Policy", value });
+const cspEstricta = csp(cspDirectivas({ script: "", img: "", connect: "", frame: "" }));
+const cspConAnuncios = csp(cspDirectivas({ script: ads, img: ads, connect: ads, frame: ads }));
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
@@ -81,7 +101,15 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
-      { source: "/:path*", headers: securityHeaders },
+      { source: "/:path*", headers: sinCsp },
+      // Sin publicidad (o sin servidores de anuncios configurados): la política estricta en todas partes, como siempre.
+      // Con ella: solo las páginas de artículo admiten los servidores de los anuncios; el resto sigue estricto.
+      ...(adsHosts.length
+        ? [
+            { source: "/articulos/:slug", headers: [cspConAnuncios] },
+            { source: "/((?!articulos/[^/]+$).*)", headers: [cspEstricta] },
+          ]
+        : [{ source: "/:path*", headers: [cspEstricta] }]),
       // Texturas del globo y fuente de iconos: no cambian entre despliegues salvo a mano, una semana basta
       { source: "/globo/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=86400" }] },
       { source: "/fonts/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=86400" }] },
