@@ -21,7 +21,7 @@ Con el interruptor encendido, las políticas de cookies y de privacidad: añaden
   - `NEXT_PUBLIC_ADS_HOSTS=a.com,b.com` (opcional): otros servidores que usen los anuncios (imágenes, marcos…); se sacan de los errores de la consola del navegador al probar.
   - `ADS_TXT` (en ejecución, no al compilar): las líneas que dé el panel, con `
 ` entre ellas → `/ads.txt`. Sin variable, 404.
-- **Política de seguridad (CSP):** con la publicidad activada, solo las páginas de **artículo** admiten los servidores de los anuncios; el resto del sitio conserva la política estricta (una sola cabecera CSP por página). Los anuncios cargan scripts de terceros dentro de esas páginas: es el coste de la publicidad. El contenido de los artículos sigue pasando por la sanitización. Si al probar con códigos reales la consola muestra bloqueos, se añaden esos servidores a `NEXT_PUBLIC_ADS_HOSTS`.
+- **Política de seguridad (CSP):** con la publicidad activada, solo las páginas de **artículo** y el **listado de artículos** admiten los servidores de los anuncios; el resto del sitio conserva la política estricta (una sola cabecera CSP por página). Los anuncios cargan scripts de terceros dentro de esas páginas: es el coste de la publicidad. El contenido de los artículos sigue pasando por la sanitización. Si al probar con códigos reales la consola muestra bloqueos, se añaden esos servidores a `NEXT_PUBLIC_ADS_HOSTS`.
 - **Pendiente de comprobar con códigos reales** (no se puede sin cuenta): que el `invoke.js` de cada formato funciona al cargarse de forma dinámica y cuántos servidores usa. Se probó con un servidor de anuncios simulado.
 
 ## Puesta en marcha (fase 3)
