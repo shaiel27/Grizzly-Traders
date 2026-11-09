@@ -55,7 +55,19 @@
     "policy": "Cookie policy",
     "accept": "Accept",
     "reject": "Reject",
-    "manage": "Cookie preferences"
+    "manage": "Cookie preferences",
+    "bodyAds": "We use Google Analytics to measure how many people visit the site and show Adsterra advertising to fund it. Each one only runs if you accept it, and you can choose separately.",
+    "acceptAll": "Accept all",
+    "rejectAll": "Reject all",
+    "customize": "Choose",
+    "saveSelection": "Save selection",
+    "catAnalytics": "Analytics",
+    "catAnalyticsDesc": "Measures in aggregate which pages are read (Google Analytics).",
+    "catAds": "Advertising",
+    "catAdsDesc": "Shows Adsterra ads, which may store cookies and identifiers to deliver and measure them. If you reject it, no ad is loaded.",
+    "on": "On",
+    "off": "Off",
+    "adsNote": "If you withdraw advertising, ads stop loading; to delete what Adsterra already stored, clear your browser cookies."
   },
   "footer": {
     "newsletterTitle": "Stay on top of the markets",

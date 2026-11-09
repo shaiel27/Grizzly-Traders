@@ -55,7 +55,19 @@
     "policy": "Política de cookies",
     "accept": "Aceptar",
     "reject": "Rechazar",
-    "manage": "Preferencias de cookies"
+    "manage": "Preferencias de cookies",
+    "bodyAds": "Usamos Google Analytics para medir cuántas personas visitan el sitio y mostramos publicidad de Adsterra para financiarlo. Cada cosa solo se activa si la aceptas, y puedes elegir por separado.",
+    "acceptAll": "Aceptar todo",
+    "rejectAll": "Rechazar todo",
+    "customize": "Elegir",
+    "saveSelection": "Guardar selección",
+    "catAnalytics": "Analítica",
+    "catAnalyticsDesc": "Mide de forma agregada qué páginas se leen (Google Analytics).",
+    "catAds": "Publicidad",
+    "catAdsDesc": "Muestra anuncios de Adsterra, que puede guardar cookies e identificadores para mostrarlos y medirlos. Si la rechazas, no se carga ningún anuncio.",
+    "on": "Activado",
+    "off": "Desactivado",
+    "adsNote": "Si retiras la publicidad, los anuncios dejan de cargarse; para borrar lo que Adsterra ya guardó, limpia las cookies de tu navegador."
   },
   "footer": {
     "newsletterTitle": "Mantente al día con los mercados",

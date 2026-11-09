@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Breadcrumbs } from '@/components/ui'
 import { getRouteLocale } from '@/lib/i18n/route-locale'
 import { getDictionary, t } from '@/lib/i18n/get-dictionary'
+import { PUBLICIDAD_ACTIVA } from '@/lib/publicidad'
 import {
   legalProseClass,
   LegalToc,
@@ -123,10 +124,18 @@ export default async function PrivacyPolicyPage() {
           </li>
           <li>Cumplir obligaciones legales cuando corresponda.</li>
         </ul>
-        <p>
-          No utilizamos tus datos personales para publicidad dirigida ni elaboramos perfiles automatizados con
-          efectos legales sobre ti.
-        </p>
+        {PUBLICIDAD_ACTIVA ? (
+          <p>
+            Solo si aceptas la publicidad en el aviso de cookies, Adsterra y sus socios pueden tratar identificadores de
+            tu dispositivo y datos de navegación para mostrarte anuncios, medirlos y prevenir el fraude. No elaboramos
+            perfiles automatizados con efectos legales sobre ti.
+          </p>
+        ) : (
+          <p>
+            No utilizamos tus datos personales para publicidad dirigida ni elaboramos perfiles automatizados con
+            efectos legales sobre ti.
+          </p>
+        )}
 
         <h2 id="compartimos">4. Con quién compartimos datos</h2>
         <p>
@@ -158,14 +167,34 @@ export default async function PrivacyPolicyPage() {
             aceptas</strong> las cookies de analítica; los datos pueden tratarse en servidores de Google fuera de tu
             país, incluido Estados Unidos. Tenemos desactivadas las señales de Google y la personalización de anuncios.
           </li>
+          {PUBLICIDAD_ACTIVA && (
+            <li>
+              <strong>Adsterra y sus socios publicitarios</strong> — muestran anuncios en el Sitio.{' '}
+              <strong>Solo reciben datos si aceptas la publicidad</strong>; pueden tratar identificadores del dispositivo,
+              la dirección IP, el tipo de navegador y las páginas que visitas, y pueden hacerlo fuera de tu país, incluido
+              Estados Unidos. Cada proveedor trata esos datos conforme a su propia política de privacidad.
+            </li>
+          )}
         </ul>
-        <p>
-          <strong>
-            No vendemos ni &quot;compartimos&quot; (en el sentido de la CPRA, incluida publicidad conductual entre
-            contextos) tus datos personales a terceros
-          </strong>{' '}
-          y no lo hemos hecho en los últimos 12 meses.
-        </p>
+        {PUBLICIDAD_ACTIVA ? (
+          <p>
+            <strong>
+              Si aceptas la publicidad, los datos que recogen Adsterra y sus socios pueden considerarse una
+              &quot;venta&quot; o &quot;compartición&quot; (en el sentido de la CPRA, incluida publicidad conductual entre
+              contextos)
+            </strong>
+            . Puedes rechazarlo en cualquier momento con el enlace «Preferencias de cookies» del pie de página, o con la
+            señal <em>Global Privacy Control</em> de tu navegador, que respetamos. Sin tu aceptación no se envía nada.
+          </p>
+        ) : (
+          <p>
+            <strong>
+              No vendemos ni &quot;compartimos&quot; (en el sentido de la CPRA, incluida publicidad conductual entre
+              contextos) tus datos personales a terceros
+            </strong>{' '}
+            y no lo hemos hecho en los últimos 12 meses.
+          </p>
+        )}
 
         <h2 id="retencion">5. Retención de datos</h2>
         <p>
