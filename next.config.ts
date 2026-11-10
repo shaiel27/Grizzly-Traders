@@ -13,7 +13,7 @@ const gaScripts = gaActivo ? " https://www.googletagmanager.com" : "";
 const gaConexiones = gaActivo ? " https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com" : "";
 const gaImagenes = gaActivo ? " https://*.google-analytics.com https://*.googletagmanager.com" : "";
 
-// Publicidad (Adsterra): con ella activada, las páginas de ARTÍCULO y el LISTADO de artículos llevan una política de seguridad que admite los servidores de los anuncios
+// Publicidad (Adsterra): con ella activada, las páginas de ARTÍCULO, el LISTADO de artículos y las herramientas con anuncios laterales (calendario y pivots) llevan una política de seguridad que admite los servidores de los anuncios
 // (los de NEXT_PUBLIC_ADS_SLOTS y NEXT_PUBLIC_ADS_HOSTS). El resto del sitio conserva la política estricta. Sin publicidad activa, nada cambia.
 const hostValido = /^(?:\*\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i;
 const adsActiva = process.env.NEXT_PUBLIC_ADS_ACTIVO === "true";
@@ -109,7 +109,10 @@ const nextConfig: NextConfig = {
             // Páginas con anuncios: el listado de artículos (/articulos) y cada artículo (/articulos/<slug>)
             { source: "/articulos", headers: [cspConAnuncios] },
             { source: "/articulos/:slug", headers: [cspConAnuncios] },
-            { source: "/((?!articulos(?:/[^/]+)?$).*)", headers: [cspEstricta] },
+            // Herramientas con columnas de publicidad a los lados
+            { source: "/calendario", headers: [cspConAnuncios] },
+            { source: "/pivot-points", headers: [cspConAnuncios] },
+            { source: "/((?!(?:articulos(?:/[^/]+)?|calendario|pivot-points)$).*)", headers: [cspEstricta] },
           ]
         : [{ source: "/:path*", headers: [cspEstricta] }]),
       // Texturas del globo y fuente de iconos: no cambian entre despliegues salvo a mano, una semana basta
