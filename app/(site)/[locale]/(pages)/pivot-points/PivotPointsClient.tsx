@@ -1,5 +1,6 @@
 'use client'
 
+import { AnunciosLaterales } from '@/components/ads/AnunciosLaterales'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { clsx } from 'clsx'
 import { PivotAssetList, type PivotRow } from '@/components/ui/PivotAssetList'
@@ -192,7 +193,7 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
 
   return (
     <main id="main-content" tabIndex={-1} className="flex-1 pt-[var(--header-height)] pb-24">
-      <div className="container-wide pt-8">
+      <div className="container-wide relative pt-8">
         <header className="mb-8">
           <div className="mb-3 flex items-center gap-3">
             <span className="material-symbols-outlined text-[28px] text-accent-blue" aria-hidden="true">
@@ -436,6 +437,7 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
           </div>
           <p className="mt-6 max-w-3xl text-micro leading-relaxed text-ink-subtle">{dict.disclaimer}</p>
         </section>
+        <AnunciosLaterales pantalla="ancho" />
       </div>
     </main>
   )
