@@ -57,7 +57,10 @@ const sinCsp = [
 
 const csp = (value: string) => ({ key: "Content-Security-Policy", value });
 const cspEstricta = csp(cspDirectivas({ script: "", img: "", connect: "", frame: "" }));
-const cspConAnuncios = csp(cspDirectivas({ script: ads, img: ads, connect: ads, frame: ads }));
+// El anuncio de Adsterra se construye dentro de un marco about:blank, que HEREDA esta política. Sus imágenes salen de servidores que rotan
+// (no hay lista cerrada), así que en estas páginas se admiten imágenes de cualquier https. Su código además evalúa texto ('unsafe-eval'): sin él
+// el anuncio falla. 'unsafe-inline' ya estaba permitido en script-src, así que 'unsafe-eval' suma poco riesgo; solo aplica a estas páginas.
+const cspConAnuncios = csp(cspDirectivas({ script: `${ads} 'unsafe-eval'`, img: " https:", connect: ads, frame: ads }));
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
