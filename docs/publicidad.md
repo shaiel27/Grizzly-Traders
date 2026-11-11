@@ -31,3 +31,11 @@ Con el interruptor encendido, las políticas de cookies y de privacidad: añaden
 3. Medir 7 días: LCP y CLS antes/después, ingresos y % que acepta. Si algo empeora, `NEXT_PUBLIC_ADS_ACTIVO` vacío + recompilar la apaga por completo (los textos legales vuelven solos).
 4. **Antes de activar:** revisión legal de los textos de cookies y privacidad.
 - Términos de Adsterra: política de privacidad y aviso de cookies a cada visitante (4.9), su código no va en un iframe nuestro ni se modifica (4.7), nada de tráfico inflado ni clics propios (6).
+
+## Política de seguridad (CSP) en las páginas con anuncios
+
+El código de Adsterra construye el anuncio dentro de un marco `about:blank`, que hereda la CSP de la página. Por eso, en las páginas con anuncios (listado y artículos, calendario y pivots) la CSP admite imágenes de cualquier `https:` (los anuncios usan servidores que rotan, p. ej. `cdn.storageimagedisplay.com` y el píxel `static.nresystems.com`) y `'unsafe-eval'` en `script-src` (su código evalúa texto). El resto del sitio conserva la política estricta. Se descubrió en producción: con la CSP anterior el anuncio llegaba pero salía con la imagen rota.
+
+## VPN y pruebas
+
+Adsterra (y su protección de Cloudflare) rechaza con 503/403 las IP de VPN y de centros de datos. Las pruebas de anuncios hay que hacerlas **sin VPN**; desde un servidor o con VPN siempre se verá el espacio vacío.
