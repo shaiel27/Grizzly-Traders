@@ -39,3 +39,9 @@ El código de Adsterra construye el anuncio dentro de un marco `about:blank`, qu
 ## VPN y pruebas
 
 Adsterra (y su protección de Cloudflare) rechaza con 503/403 las IP de VPN y de centros de datos. Las pruebas de anuncios hay que hacerlas **sin VPN**; desde un servidor o con VPN siempre se verá el espacio vacío.
+
+## Anuncios laterales en el artículo y anuncios en línea en pantallas pequeñas
+
+- El artículo lleva también las dos columnas laterales (`lateral-izq` y `lateral-der`, mismos códigos que en calendario y pivots) desde 1300 px de pantalla, además del anuncio de debajo del texto.
+- Calendario (por debajo de 1340 px) y pivots (por debajo de 1780 px), donde las columnas no caben, muestran un anuncio 300×250 dentro de la página (el espacio `articulo`). Con las columnas visibles, ese anuncio está oculto y no carga.
+- `AdSlot` ya no desmonta el espacio cuando no recibe anuncio: lo esconde, vigila el contenedor (`MutationObserver`) y lo vuelve a mostrar si el anuncio llega tarde. Si a los 8 s no hay anuncio, reintenta UNA vez la carga (fallos puntuales de red o 503 de Adsterra) antes de esconderlo.

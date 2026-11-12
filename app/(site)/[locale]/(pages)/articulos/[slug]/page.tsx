@@ -13,6 +13,7 @@ import { getRouteLocale } from '@/lib/i18n/route-locale'
 import { getDictionary, t } from '@/lib/i18n/get-dictionary'
 import Image from 'next/image'
 import { AdSlot } from '@/components/ads/AdSlot'
+import { AnunciosLaterales } from '@/components/ads/AnunciosLaterales'
 import { format, formatDistanceToNow } from 'date-fns'
 import { es, enUS } from 'date-fns/locale'
 
@@ -140,7 +141,8 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
       />
 
       <main id="main-content" tabIndex={-1} className="flex-1 pt-[var(--header-height-sin-ticker)] pb-24">
-        <article className="section-container max-w-4xl pt-8">
+        <article className="section-container relative max-w-4xl pt-8">
+          <AnunciosLaterales pantalla="articulo" />
           <Breadcrumbs
             items={[
               { label: dict.article.breadcrumbHome, href: '/' },

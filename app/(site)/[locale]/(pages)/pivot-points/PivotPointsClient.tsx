@@ -1,5 +1,6 @@
 'use client'
 
+import { AdSlot } from '@/components/ads/AdSlot'
 import { AnunciosLaterales } from '@/components/ads/AnunciosLaterales'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { clsx } from 'clsx'
@@ -402,6 +403,11 @@ export function PivotPointsClient({ initialQuotes }: PivotPointsClientProps) {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Pantallas donde no caben las columnas laterales: un anuncio dentro de la página */}
+        <div className="mb-10 flex justify-center min-[1780px]:hidden">
+          <AdSlot nombre="articulo" className="w-[302px] max-w-full" />
         </div>
 
         <section className="mb-10" aria-label={dict.calculatorAria}>
