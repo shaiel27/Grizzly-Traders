@@ -422,14 +422,15 @@
    Sin data-intro (reduced motion, segunda visita, navegacion interna) nada de esto existe. */
 :root {
   --intro-recorrido: 90svh;
-  --intro-globo: min(118svh, 105vw);
-  --intro-globo-y: 42svh;
+  --intro-globo: min(90svh, 105vw);
+  /* Altura del centro del globo: la deriva del TAMAÑO de la caja para que el anillo exterior del HUD (radio ~0.42 de la caja) quede siempre
+     dentro de la pantalla, con ~40px de margen arriba. Antes era un 42svh fijo con una caja de 118svh: el anillo salia ~190px por encima del borde. */
+  --intro-globo-y: calc(var(--intro-globo) * 0.43 + 24px + var(--header-height));
 }
 @media (max-width: 1023px) {
   :root {
     --intro-recorrido: 75svh;
     --intro-globo: min(175vw, 96svh);
-    --intro-globo-y: 40svh;
   }
 }
 
@@ -488,7 +489,11 @@ html:not([data-intro='activo']) [data-intro-solo] {
 }
 /* El titulo pasa por encima del globo durante la intro */
 html[data-intro='activo'] [data-intro-texto] {
-  text-shadow: 0 2px 28px rgb(0 0 0 / 0.85);
+  /* Por ENCIMA del globo (que va en z-index:1): sin esto los puntos brillantes tapaban letras del titular */
+  position: relative;
+  z-index: 2;
+  /* Con el brillo del globo activo, los puntos claros quedan justo detras del titular: sombra doble (halo ancho + contorno corto) para que se lea */
+  text-shadow: 0 2px 28px rgb(0 0 0 / 0.9), 0 0 10px rgb(0 0 0 / 0.75), 0 1px 2px rgb(0 0 0 / 0.6);
 }
 html[data-intro='activo'] [data-intro-resto] {
   opacity: var(--intro-resto, 0);
