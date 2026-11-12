@@ -1190,13 +1190,16 @@ function useFrameloopVisible(contenedorRef: React.RefObject<HTMLElement | null>)
   return visible
 }
 
-function AjusteDpr({ alta }: { alta: boolean }) {
+// Durante la intro el canvas ocupa casi toda la pantalla: a dpr 2 son ~4.5 millones de pixeles con Bloom, que una GPU integrada no sostiene.
+// Se limita a 1.5 solo mientras dura (el globo se ve igual de nitido: se encoge enseguida) y se restaura al terminar.
+const DPR_MAX_INTRO = 1.5
+function AjusteDpr({ alta, intro }: { alta: boolean; intro: boolean }) {
   const { gl, setDpr } = useThree()
   useEffect(() => {
-    const max = alta ? Math.min(2, window.devicePixelRatio || 1) : 1
+    const max = alta ? Math.min(intro ? DPR_MAX_INTRO : 2, window.devicePixelRatio || 1) : 1
     setDpr(max)
     gl.setPixelRatio(max)
-  }, [alta, gl, setDpr])
+  }, [alta, intro, gl, setDpr])
   return null
 }
 
@@ -1420,7 +1423,7 @@ export default function GloboHolografico({ datos, reducedMotion, ariaLabel, loca
   const marcadorSeleccionado = seleccionId ? MARCADORES.find((m) => m.id === seleccionId) : undefined
 
   return (
-    <div ref={contenedorRef} className="relative h-full w-full">
+    <div ref={contenedorRef} data-calidad={calidadAlta ? 'alta' : 'baja'} className="relative h-full w-full">
       <Canvas
         className="absolute inset-0"
         // P3 — el className de arriba NUNCA tuvo efecto: R3F escribe `position:relative` y
@@ -1476,8 +1479,15 @@ export default function GloboHolografico({ datos, reducedMotion, ariaLabel, loca
         // semi-alto es ~2.0, suficiente para encuadrar todo con margen.
         camera={{ position: [0, 0, 5.2], fov: 42 }}
       >
-        <PerformanceMonitor onDecline={() => setCalidadAlta(false)} onIncline={() => setCalidadAlta(true)} flipflops={2} />
-        <AjusteDpr alta={calidadAlta} />
+        {/* El monitor SOLO mide cuando el globo se ve y la intro ya termino. Antes medía siempre: durante la intro (canvas enorme) y
+            al volver a la pantalla tras un scroll (los primeros cuadros tras reanudar son lentos) los fps caian por debajo del umbral
+            por defecto (50) y la calidad bajaba sin que la GPU tuviera ningun problema real. Montar/desmontar reinicia la medida.
+            Bajar de calidad ya NO apaga el brillo (Bloom) ni el viñeteado: solo rebaja resolucion y cantidad de puntos, y solo si de
+            verdad se sostiene por debajo de 28 fps; vuelve a calidad alta por encima de 55. */}
+        {visible && !introActiva && (
+          <PerformanceMonitor bounds={() => [28, 55]} onDecline={() => setCalidadAlta(false)} onIncline={() => setCalidadAlta(true)} flipflops={2} />
+        )}
+        <AjusteDpr alta={calidadAlta} intro={introActiva} />
         <Escena
           datos={datos}
           reducedMotion={reducedMotion}
@@ -1498,10 +1508,11 @@ export default function GloboHolografico({ datos, reducedMotion, ariaLabel, loca
         />
         {/* Montado siempre, sin gate condicional: montar/desmontar el EffectComposer en
             runtime pisa el manejo interno de gl.autoClear de la libreria en la transicion
-            (lo prueba) y dejaba una estela/smear detras de lo que gira. El rectangulo blanco
+            (lo prueba) y dejaba una estela/smear detras de lo que gira. Tampoco se desactiva por calidad (`enabled={calidadAlta}` apagaba las
+            luces del globo en cuanto los fps bajaban un momento): el brillo es parte de su identidad, lo que se rebaja es dpr y puntos. El rectangulo blanco
             original durante la carga ya se soluciono por otro lado: NaN clamps en los shaders,
             renderOrder explicito y toneMapping/colorSpace fijos en el Canvas. */}
-        <EffectComposer enabled={calidadAlta}>
+        <EffectComposer>
           {/* El halo blanco no era la atmosfera (geometria, ya eliminada) — era el `radius` del
               propio Bloom (default 0.85, bastante ancho) esparciendo el brillo de los puntos/
               anillos hacia afuera, en el negro alrededor del globo. radius=0.2 lo mantiene
