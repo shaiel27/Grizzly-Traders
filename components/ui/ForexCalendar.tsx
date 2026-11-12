@@ -1,5 +1,6 @@
 'use client'
 
+import { AdSlot } from '@/components/ads/AdSlot'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { clsx } from 'clsx'
 import { descripcionDe } from '@/lib/calendar-descriptions'
@@ -112,7 +113,7 @@ function DeltaGlyph({ event }: { event: ForexEvent }) {
   )
 }
 
-export function ForexCalendar({ headingLevel = 'h2' }: { headingLevel?: 'h1' | 'h2' }) {
+export function ForexCalendar({ headingLevel = 'h2', anuncio = false }: { headingLevel?: 'h1' | 'h2'; anuncio?: boolean }) {
   const Heading = headingLevel
   const { locale, dictionary: dict } = useLocale()
   const [events, setEvents] = useState<ForexEvent[] | null>(null)
@@ -221,6 +222,13 @@ export function ForexCalendar({ headingLevel = 'h2' }: { headingLevel?: 'h1' | '
                   </span>
                 </li>
               </ul>
+            </div>
+          )}
+
+          {/* Pantallas donde no caben las columnas laterales (/calendario): un anuncio dentro de la página */}
+          {anuncio && !failed && (
+            <div className="mb-8 flex justify-center min-[1340px]:hidden">
+              <AdSlot nombre="articulo" className="w-[302px] max-w-full" />
             </div>
           )}
 

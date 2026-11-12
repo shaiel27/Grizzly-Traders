@@ -65,7 +65,7 @@ export function AdSlot({ nombre, etiqueta = 'Publicidad', className, enLista = f
   const estado = useEstadoPublicidad()
   const contenedor = useRef<HTMLDivElement>(null)
   const [cerca, setCerca] = useState(false)
-  // Sin anuncio (bloqueador, sin oferta, fallo de red): el espacio desaparece en vez de dejar una caja vacía con la etiqueta «Publicidad»
+  // Sin anuncio (bloqueador, sin oferta, fallo de red): el espacio se esconde en vez de dejar una caja vacía con la etiqueta «Publicidad». Sigue montado: si el anuncio llega tarde, reaparece
   const [vacio, setVacio] = useState(false)
   const mostrar = PUBLICIDAD_ACTIVA && espacio !== undefined && puedeMostrarAnuncios(true, estado)
 
@@ -90,28 +90,45 @@ export function AdSlot({ nombre, etiqueta = 'Publicidad', className, enLista = f
     if (!mostrar || !cerca || !el) return
     let activo = true
     let espera: number | undefined
-    void cargar(el, espacio).then(() => {
-      // El anuncio puede tardar en pintarse tras cargar su script: se da un margen antes de dar el espacio por vacío
-      espera = window.setTimeout(() => {
-        if (activo && !hayAnuncio(el)) setVacio(true)
-      }, 5000)
+    let intento = 0
+    // El anuncio puede llegar tarde (petición lenta, red congestionada): se vigila el contenedor y, si aparece algo, el espacio se vuelve a mostrar
+    const vigilante = new MutationObserver(() => {
+      if (activo && hayAnuncio(el)) setVacio(false)
     })
+    vigilante.observe(el, { childList: true })
+    const lanzar = () => {
+      void cargar(el, espacio).then(() => {
+        // Margen para que se pinte; si no hay anuncio se reintenta UNA vez (un fallo de red o un 503 puntual de Adsterra) y, si sigue sin haberlo, se esconde
+        espera = window.setTimeout(() => {
+          if (!activo || hayAnuncio(el)) return
+          if (intento === 0) {
+            intento = 1
+            el.replaceChildren()
+            lanzar()
+          } else {
+            setVacio(true)
+          }
+        }, 8000)
+      })
+    }
+    lanzar()
     // Al retirar el consentimiento o cambiar de página, el anuncio se quita
     return () => {
       activo = false
+      vigilante.disconnect()
       window.clearTimeout(espera)
       el.replaceChildren()
       el.removeAttribute('id')
     }
   }, [mostrar, cerca, espacio])
 
-  if (!mostrar || vacio) return null
+  if (!mostrar) return null
   const anuncio = (
-    <aside aria-label={etiqueta} className={className ?? (enLista ? '' : 'my-8 max-w-[68ch]')}>
+    <aside aria-label={etiqueta} hidden={vacio} className={className ?? (enLista ? '' : 'my-8 max-w-[68ch]')}>
       <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-ink-subtle">{etiqueta}</p>
       {/* Altura reservada: el anuncio al cargar no desplaza lo que hay debajo */}
       <div ref={contenedor} style={{ minHeight: espacio.tipo === 'banner' ? espacio.alto : 250 }} className="flex justify-center overflow-hidden rounded-lg border border-hairline-soft bg-surface-1" />
     </aside>
   )
-  return enLista ? <li className="col-span-full">{anuncio}</li> : anuncio
+  return enLista ? <li className={vacio ? 'hidden' : 'col-span-full'}>{anuncio}</li> : anuncio
 }

@@ -7,9 +7,9 @@ import { AdSlot } from '@/components/ads/AdSlot'
 // Ver docs/publicidad.md.
 const COLUMNA = 'pointer-events-auto sticky top-[calc(var(--header-height)+16px)]'
 
-export function AnunciosLaterales({ pantalla }: { pantalla: 'estrecho' | 'ancho' }) {
-  // Clases literales (Tailwind solo genera las que ve escritas). `estrecho`: contenido de 900 px; `ancho`: contenido de 1400 px.
-  const visible = pantalla === 'estrecho' ? 'hidden min-[1340px]:block' : 'hidden min-[1780px]:block'
+export function AnunciosLaterales({ pantalla }: { pantalla: 'articulo' | 'estrecho' | 'ancho' }) {
+  // Clases literales (Tailwind solo genera las que ve escritas). `articulo`: contenido de 896 px; `estrecho`: 900 px; `ancho`: 1400 px.
+  const visible = { articulo: 'hidden min-[1300px]:block', estrecho: 'hidden min-[1340px]:block', ancho: 'hidden min-[1780px]:block' }[pantalla]
   return (
     <>
       <div className={`pointer-events-none absolute inset-y-0 right-full mr-4 w-[164px] ${visible}`}>
