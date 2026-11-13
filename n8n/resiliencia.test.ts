@@ -25,16 +25,25 @@ describe('cableado', () => {
     expect(destinos('Contar publicado')).toEqual([['Loop Over Items']])
   })
 
-  it('la lectura de la página: resumen suficiente, Firecrawl o lectura directa; si Firecrawl no sirve, lectura directa', () => {
+  it('la lectura de la página: primero la directa (gratuita); Firecrawl solo si esa no basta y hay saldo', () => {
     expect(destinos('Es EDGAR?')[1]).toEqual(['Decidir lectura'])
     expect(destinos('Decidir lectura')).toEqual([['¿Basta el resumen?']])
-    expect(destinos('¿Basta el resumen?')).toEqual([['Extraer contenido completo'], ['¿Usar Firecrawl?']])
-    expect(destinos('¿Usar Firecrawl?')).toEqual([['Obtener articulo completo'], ['Lectura directa']])
-    expect(destinos('Obtener articulo completo')).toEqual([['Evaluar Firecrawl']])
-    expect(destinos('Evaluar Firecrawl')).toEqual([['¿Firecrawl leyó la página?']])
-    expect(destinos('¿Firecrawl leyó la página?')).toEqual([['Extraer contenido completo'], ['Lectura directa']])
+    expect(destinos('¿Basta el resumen?')).toEqual([['Extraer contenido completo'], ['Lectura directa']])
     expect(destinos('Lectura directa')).toEqual([['Texto de lectura directa']])
-    expect(destinos('Texto de lectura directa')).toEqual([['Extraer contenido completo']])
+    expect(destinos('Texto de lectura directa')).toEqual([['¿La lectura directa bastó?']])
+    expect(destinos('¿La lectura directa bastó?')).toEqual([['Extraer contenido completo'], ['¿Hay saldo en Firecrawl?']])
+    expect(destinos('¿Hay saldo en Firecrawl?')).toEqual([['Obtener articulo completo'], ['Extraer contenido completo']])
+    expect(destinos('Obtener articulo completo')).toEqual([['Evaluar Firecrawl']])
+    expect(destinos('Evaluar Firecrawl')).toEqual([['Extraer contenido completo']])
+  })
+
+  it('Firecrawl solo se alcanza por la rama «la lectura directa NO bastó» y «hay saldo»: ninguna otra ruta gasta créditos', () => {
+    const entradas = (destino: string) => Object.entries(flujo.connections).flatMap(([o, v]) => v.main.flatMap((s, i) => (s ?? []).filter((c) => c.node === destino).map(() => o + ':' + i)))
+    expect(entradas('Obtener articulo completo')).toEqual(['¿Hay saldo en Firecrawl?:0'])
+    expect(entradas('¿Hay saldo en Firecrawl?')).toEqual(['¿La lectura directa bastó?:1'])
+    expect(nodo('¿La lectura directa bastó?').parameters.conditions.conditions[0].leftValue).toContain('>= 600')
+    expect(nodo('¿Hay saldo en Firecrawl?').parameters.conditions.conditions[0].leftValue).toContain('sinSaldo !== true')
+    expect(flujo.nodes.some((n) => n.name === '¿Usar Firecrawl?' || n.name === '¿Firecrawl leyó la página?')).toBe(false)
   })
 
   it('la lectura directa y la liberación de reserva no detienen la vuelta si fallan', () => {
@@ -100,23 +109,21 @@ describe('Control de cupo y Contar publicado', () => {
 })
 
 describe('Decidir lectura (ahorro de créditos)', () => {
-  const decidir = (snippet: string, est: Estatico = {}) =>
-    (new Function('$json', '$', '$getWorkflowStaticData', codigo('Decidir lectura'))({ reserva: 1 }, () => ({ item: { json: { contentSnippet: snippet } } }), () => est) as { json: { modo: string; reserva: number } }).json
+  const decidir = (snippet: string) =>
+    (new Function('$json', '$', codigo('Decidir lectura'))({ reserva: 1 }, () => ({ item: { json: { contentSnippet: snippet } } })) as { json: { modo: string; reserva: number } }).json
 
-  it('lee con Firecrawl por defecto y conserva los datos que traía', () => {
-    expect(decidir('x'.repeat(300))).toEqual({ reserva: 1, modo: 'firecrawl' })
+  it('por defecto se lee la página (primero la lectura gratuita) y conserva los datos que traía', () => {
+    expect(decidir('x'.repeat(300))).toEqual({ reserva: 1, modo: 'leer' })
   })
-  it('si el resumen del feed ya trae 2500+ caracteres no gasta un crédito', () => {
+  it('si el resumen del feed ya trae 2500+ caracteres no se lee la página: ni Firecrawl ni nada', () => {
     expect(decidir('x'.repeat(2500)).modo).toBe('rss')
-    expect(decidir('x'.repeat(2499)).modo).toBe('firecrawl')
-  })
-  it('con Firecrawl sin saldo en esta vuelta salta directo a la lectura directa', () => {
-    expect(decidir('x'.repeat(300), { sinSaldo: true }).modo).toBe('directa')
+    expect(decidir('x'.repeat(2499)).modo).toBe('leer')
   })
 })
 
 describe('Evaluar Firecrawl', () => {
-  const evaluar = (json: unknown, est: Estatico) => (new Function('$json', '$getWorkflowStaticData', codigo('Evaluar Firecrawl'))(json, () => est) as { json: { fcOk: boolean; fcError: string } }).json
+  const evaluar = (json: unknown, est: Estatico, directo = '') =>
+    (new Function('$json', '$', '$getWorkflowStaticData', codigo('Evaluar Firecrawl'))(json, () => ({ item: { json: { data: { markdown: directo } } } }), () => est) as { json: { fcOk: boolean; fcError: string; data: { markdown: string } } }).json
 
   it('un 402 («Payment required») marca la cuenta sin saldo para el resto de la vuelta', () => {
     const est: Estatico = {}
@@ -129,9 +136,14 @@ describe('Evaluar Firecrawl', () => {
     expect(evaluar({ error: 'Request failed with status code 403' }, est).fcOk).toBe(false)
     expect(est.sinSaldo).toBeUndefined()
   })
-  it('una lectura buena pasa; una demasiado corta cae a la lectura directa', () => {
-    expect(evaluar({ data: { markdown: 'a'.repeat(400) } }, {}).fcOk).toBe(true)
-    expect(evaluar({ data: { markdown: 'a'.repeat(50) } }, {}).fcOk).toBe(false)
+  it('una lectura buena de Firecrawl se usa tal cual', () => {
+    const r = evaluar({ data: { markdown: 'a'.repeat(400) } }, {}, 'texto corto de la lectura directa')
+    expect(r.fcOk).toBe(true)
+    expect(r.data.markdown).toBe('a'.repeat(400))
+  })
+  it('si Firecrawl falla o trae poco, se conserva lo que dio la lectura directa (aunque sea corto)', () => {
+    expect(evaluar({ error: 'Payment required' }, {}, 'texto de la lectura directa').data.markdown).toBe('texto de la lectura directa')
+    expect(evaluar({ data: { markdown: 'a'.repeat(50) } }, {}, 'texto de la lectura directa').data.markdown).toBe('texto de la lectura directa')
   })
 })
 
