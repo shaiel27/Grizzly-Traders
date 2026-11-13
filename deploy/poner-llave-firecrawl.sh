@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Cambia la clave de Firecrawl de la credencial de n8n SIN mostrarla ni guardarla en el historial, y comprueba cuantos creditos tiene.
-# Uso (en tu PC, en una terminal normal; pide la clave oculta):
+# Uso desde tu PC (PowerShell): copia la clave y ejecuta
+#   Get-Clipboard | ssh grizzly@179.236.75.184 bash /srv/grizzly/web/deploy/poner-llave-firecrawl.sh
+# o, sin portapapeles (pide la clave oculta):
 #   ssh -t grizzly@179.236.75.184 bash /srv/grizzly/web/deploy/poner-llave-firecrawl.sh
 # Antes de cambiar nada guarda un respaldo de la credencial actual (cifrada) en /srv/grizzly/n8n/import/. La clave nueva solo pasa por la memoria de
 # este script y por un archivo temporal con permisos 600 que se borra al terminar.
@@ -10,9 +12,17 @@ CRED_ID="${1:-FcA9kQm2XbT7wPzL}" # id de la credencial «Firecrawl API» en el f
 CONTENEDOR=n8n-n8n-1
 RESPALDO="/srv/grizzly/n8n/import/respaldo-credencial-firecrawl-$(date +%Y%m%d-%H%M).json"
 
-read -rsp "Pega la clave de Firecrawl (no se ve al pegar) y pulsa Enter: " VALOR; echo
+read -rsp "Pega la clave de Firecrawl (no se ve al pegar) y pulsa Enter: " VALOR || true; echo
 [ -n "$VALOR" ] || { echo "Vacío: no se cambió nada"; exit 1; }
-case "$VALOR" in fc-*) ;; *) echo "No parece una clave de Firecrawl (debe empezar por fc-): no se cambió nada"; exit 1 ;; esac
+# PowerShell puede añadir caracteres invisibles (marca de codificacion, saltos de linea de Windows) al pasar el portapapeles:
+# se quitan los caracteres de control y se busca la clave dentro del texto recibido.
+LARGO_RECIBIDO=${#VALOR}
+VALOR=$(printf '%s' "$VALOR" | tr -d '\000-\037' | grep -o 'fc-[A-Za-z0-9]\{16,\}' | head -n1 || true)
+if [ -z "$VALOR" ]; then
+  echo "No encontré una clave de Firecrawl (fc-...) en lo recibido ($LARGO_RECIBIDO caracteres): no se cambió nada."
+  echo "Comprueba que lo copiado sea la clave y no otro texto."
+  exit 1
+fi
 
 # 1) la clave debe funcionar ANTES de tocar nada
 RESP=$(curl -s -m 20 -w '\n%{http_code}' -H "Authorization: Bearer $VALOR" https://api.firecrawl.dev/v2/team/credit-usage || true)
