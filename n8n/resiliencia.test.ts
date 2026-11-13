@@ -18,9 +18,10 @@ const destinos = (origen: string) => flujo.connections[origen].main.map((s) => (
 type Estatico = Record<string, any> // eslint-disable-line @typescript-eslint/no-explicit-any
 
 describe('cableado', () => {
-  it('cada noticia pasa por el Control de cupo antes de procesarse, y al publicarse se cuenta', () => {
-    expect(destinos('Loop Over Items')).toEqual([[], ['Control de cupo']])
-    expect(destinos('Control de cupo')).toEqual([['Titulares recientes']])
+  it('cada noticia pasa por el Control de cupo antes de procesarse; al publicarse se cuenta; el fin de la tanda (cupo lleno o sin más candidatas) lleva a X', () => {
+    expect(destinos('Loop Over Items')).toEqual([['Elegir artículo para X'], ['Control de cupo']])
+    expect(destinos('Control de cupo')).toEqual([['¿Fin de la tanda?']])
+    expect(destinos('¿Fin de la tanda?')).toEqual([['Elegir artículo para X'], ['Titulares recientes']])
     expect(destinos('Log ejecucion')).toEqual([['Contar publicado']])
     expect(destinos('Contar publicado')).toEqual([['Loop Over Items']])
   })
@@ -70,21 +71,29 @@ describe('cableado', () => {
 })
 
 describe('Control de cupo y Contar publicado', () => {
-  const control = (id: string, est: Estatico) => new Function('$input', '$execution', '$getWorkflowStaticData', codigo('Control de cupo'))({ all: () => [{ json: { n: 1 } }] }, { id }, () => est) as unknown[]
-  const contar = (id: string, est: Estatico) => new Function('$input', '$execution', '$getWorkflowStaticData', codigo('Contar publicado'))({ all: () => [{ json: {} }] }, { id }, () => est) as unknown[]
+  const control = (id: string, est: Estatico) => new Function('$input', '$execution', '$getWorkflowStaticData', codigo('Control de cupo'))({ all: () => [{ json: { n: 1 } }] }, { id }, () => est) as { json: Record<string, unknown> }[]
+  const FIN = [{ json: { fin: true } }]
+  const parsear = { title: 'Titular', meta_description: 'Contexto', category_id: 4, cover_assets: ['BTC'], fuente: 'EDGAR', relevancia: 8 }
+  const contar = (id: string, est: Estatico, p: Record<string, unknown> = parsear) =>
+    new Function('$json', '$', '$execution', '$getWorkflowStaticData', codigo('Contar publicado'))(
+      { z: 1 },
+      (n: string) => ({ item: { json: n === 'Parsear JSON' ? p : { body: [{ id: 'post-1' }] } } }),
+      { id },
+      () => est
+    ) as { json: unknown }
 
-  it('una vuelta nueva reinicia el contador y deja pasar la noticia', () => {
-    const est: Estatico = { ejec: 'vieja', publicados: 3, sinSaldo: true, inicio: 1 }
-    expect(control('1001', est)).toHaveLength(1)
-    expect(est).toMatchObject({ ejec: '1001', publicados: 0, sinSaldo: false })
+  it('una vuelta nueva reinicia el contador y la lista para X, y deja pasar la noticia', () => {
+    const est: Estatico = { ejec: 'vieja', publicados: 3, sinSaldo: true, inicio: 1, articulosX: [{ postId: 'viejo' }] }
+    expect(control('1001', est)).toEqual([{ json: { n: 1 } }])
+    expect(est).toMatchObject({ ejec: '1001', publicados: 0, sinSaldo: false, articulosX: [] })
   })
 
-  it('con 3 publicadas en esta vuelta no se lanza ninguna más', () => {
+  it('con 3 publicadas en esta vuelta no se lanza ninguna más: emite la señal de fin de tanda', () => {
     const est: Estatico = {}
     control('1001', est)
     for (let i = 0; i < 3; i++) contar('1001', est)
     expect(est.publicados).toBe(3)
-    expect(control('1001', est)).toEqual([])
+    expect(control('1001', est)).toEqual(FIN)
   })
 
   it('con 2 publicadas y otras candidatas, sigue probando hasta completar las 3', () => {
@@ -92,22 +101,34 @@ describe('Control de cupo y Contar publicado', () => {
     control('1001', est)
     contar('1001', est)
     contar('1001', est)
-    expect(control('1001', est)).toHaveLength(1)
+    expect(control('1001', est)).toEqual([{ json: { n: 1 } }])
     contar('1001', est)
-    expect(control('1001', est)).toEqual([])
+    expect(control('1001', est)).toEqual(FIN)
   })
 
   it('pasados 9 minutos no se lanza ninguna más, aunque falte cupo (el flujo se corta a los 14)', () => {
     const est: Estatico = {}
     control('1001', est)
     est.inicio = Date.now() - 9 * 60 * 1000 - 1000
-    expect(control('1001', est)).toEqual([])
+    expect(control('1001', est)).toEqual(FIN)
   })
 
-  it('una publicación de otra vuelta no cuenta para esta', () => {
-    const est: Estatico = { ejec: '1001', publicados: 1 }
+  it('una publicación de otra vuelta no cuenta para esta ni entra en la lista de X', () => {
+    const est: Estatico = { ejec: '1001', publicados: 1, articulosX: [] }
     contar('2002', est)
     expect(est.publicados).toBe(1)
+    expect(est.articulosX).toEqual([])
+  })
+
+  it('al contar un artículo lo deja como candidato a X con sus datos y la prioridad de su fuente', () => {
+    const est: Estatico = {}
+    control('1001', est)
+    contar('1001', est)
+    contar('1001', est, { ...parsear, fuente: 'CNBC', relevancia: undefined, cover_assets: undefined })
+    expect(est.articulosX).toEqual([
+      { postId: 'post-1', titulo: 'Titular', resumen: 'Contexto', categoria: 4, activos: ['BTC'], fuente: 'EDGAR', relevancia: 8, prioridad: 2 },
+      { postId: 'post-1', titulo: 'Titular', resumen: 'Contexto', categoria: 4, activos: [], fuente: 'CNBC', relevancia: 5, prioridad: 0 },
+    ])
   })
 })
 
