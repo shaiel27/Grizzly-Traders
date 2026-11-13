@@ -155,6 +155,10 @@ describe('Texto de lectura directa', () => {
     const r = leer({ statusCode: 200, body: `<html><body>${'<div>x</div>'.repeat(60)}<article><p>Skip Navigation</p><p>Markets</p><p>${largo}</p></article></body></html>` })
     expect(r.data.markdown).toBe("Clear Secure's efforts to move beyond the airport are being noticed by investors across the sector.")
   })
+  it('lee la página del campo `data`, que es donde la entrega el nodo HTTP de n8n (con `body` por compatibilidad)', () => {
+    expect(leer({ statusCode: 200, data: html, headers: {}, statusMessage: 'OK' }).data.markdown).toContain(parrafo)
+    expect(leer({ statusCode: 200, body: html }).data.markdown).toContain(parrafo)
+  })
   it('si la página bloquea (403) o viene casi vacía, devuelve vacío en vez de basura', () => {
     expect(leer({ statusCode: 403, body: '' }).data.markdown).toBe('')
     expect(leer({ statusCode: 200, body: '<p>hola</p>' }).data.markdown).toBe('')
