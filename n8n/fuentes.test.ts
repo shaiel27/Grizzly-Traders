@@ -14,7 +14,7 @@ const flujo = JSON.parse(texto) as { nodes: Nodo[]; connections: Record<string, 
 const nodo = (name: string) => flujo.nodes.find((n) => n.name === name)!
 const rss = flujo.nodes.filter((n) => n.type.endsWith('rssFeedRead'))
 
-const DOMINIOS = ['cftc.gov', 'cftc.gov', 'investing.com', 'federalreserve.gov', 'sec.gov', 'ecb.europa.eu', 'eia.gov', 'bea.gov', 'occ.gov', 'fdic.gov']
+const DOMINIOS = ['cftc.gov', 'cftc.gov', 'investing.com', 'search.cnbc.com', 'prnewswire.com', 'federalreserve.gov', 'sec.gov', 'ecb.europa.eu', 'eia.gov', 'bea.gov', 'occ.gov', 'fdic.gov']
 const OFICIALES = ['CFTC', 'Reserva Federal', 'SEC', 'BCE', 'EIA', 'BEA', 'OCC', 'FDIC', 'EDGAR']
 
 describe('fuentes del pipeline', () => {
@@ -22,8 +22,9 @@ describe('fuentes del pipeline', () => {
     expect(rss.map((n) => new URL(n.parameters.url).hostname.replace(/^www\./, '')).sort()).toEqual([...DOMINIOS].sort())
   })
 
+  // CNBC y PR Newswire entraron el 12-nov-2026 por decisión informada del usuario (ver docs/fuentes.md); el resto de comerciales sigue fuera.
   it('siguen fuera las demás fuentes comerciales cuyos términos prohíben copiar, raspar o reescribir su contenido', () => {
-    expect(texto).not.toMatch(/cointelegraph|coindesk|fxstreet|cnbc|seekingalpha|oilprice/i)
+    expect(texto).not.toMatch(/cointelegraph|coindesk|fxstreet|seekingalpha|oilprice/i)
   })
 
   it('todas las fuentes entran al Merge, cada una en su propia entrada, y el Merge tiene exactamente esas entradas', () => {
@@ -61,6 +62,8 @@ describe('Normalizar Item', () => {
     ])
     expect(r.map((x) => x.json.fuente)).toEqual(OFICIALES)
     expect(correr(['https://www.investing.com/news/stock-market-news/x-123'])[0].json.fuente).toBe('Investing.com')
+    expect(correr(['https://www.cnbc.com/2026/11/12/x.html'])[0].json.fuente).toBe('CNBC')
+    expect(correr(['https://www.prnewswire.com/news-releases/x-302000000.html'])[0].json.fuente).toBe('PR Newswire')
   })
 
   it('del BCE solo entran los comunicados: discursos, entrevistas y blog llevan nombre de autor y piden permiso escrito', () => {
@@ -137,12 +140,12 @@ describe('Priorizar y limitar: reparto entre fuentes', () => {
 })
 
 describe('atribución estructurada (source_id)', () => {
-  const migracion = readFileSync('supabase/migrations/0011_fuentes_publicas.sql', 'utf8') + readFileSync('supabase/migrations/0012_fuentes_edgar_y_otras.sql', 'utf8')
+  const migracion = readFileSync('supabase/migrations/0011_fuentes_publicas.sql', 'utf8') + readFileSync('supabase/migrations/0012_fuentes_edgar_y_otras.sql', 'utf8') + readFileSync('supabase/migrations/0016_fuentes_cnbc_prnewswire.sql', 'utf8')
   const mapaDe = (codigo: string) => {
     const m = codigo.match(/\{\s*'CFTC': \d+[^}]*\}/)!
     return Object.fromEntries([...m[0].matchAll(/'([^']+)':\s*(\d+)/g)].map((x) => [x[1], Number(x[2])]))
   }
-  const esperado = { CFTC: 11, 'Investing.com': 4, 'Reserva Federal': 9, SEC: 10, BCE: 12, EIA: 13, BEA: 14, EDGAR: 15, OCC: 16, FDIC: 17, GlobeNewswire: 18 }
+  const esperado = { CFTC: 11, 'Investing.com': 4, 'Reserva Federal': 9, SEC: 10, BCE: 12, EIA: 13, BEA: 14, EDGAR: 15, OCC: 16, FDIC: 17, GlobeNewswire: 18, CNBC: 19, 'PR Newswire': 20 }
 
   it('los sitios del flujo que traducen fuente -> id usan el mismo mapa (los duplicados ya no crean fila, no lo necesitan)', () => {
     expect(mapaDe(nodo('Parsear JSON').parameters.jsCode)).toEqual(esperado)
@@ -150,7 +153,7 @@ describe('atribución estructurada (source_id)', () => {
   })
 
   it('la migración crea exactamente los ids nuevos que usa el flujo', () => {
-    for (const id of [12, 13, 14, 15, 16, 17, 18]) expect(migracion).toMatch(new RegExp(`\\(${id}, '`))
+    for (const id of [12, 13, 14, 15, 16, 17, 18, 19, 20]) expect(migracion).toMatch(new RegExp(`\\(${id}, '`))
     expect(migracion).toContain('on conflict (id) do nothing')
   })
 })
