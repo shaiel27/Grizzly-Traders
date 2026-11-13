@@ -2340,7 +2340,7 @@
           "conditions": [
             {
               "id": "c1",
-              "leftValue": "={{ $getWorkflowStaticData('global').sinSaldo !== true }}",
+              "leftValue": "={{ $json.firecrawlConSaldo === true }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -2352,6 +2352,20 @@
           "combinator": "and"
         },
         "options": {}
+      }
+    },
+    {
+      "id": "301d120d-f94d-4e35-8a8a-aaaf4f02b439",
+      "name": "Estado de Firecrawl",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        2230
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ¿Se puede pedir a Firecrawl en esta vuelta? Falso solo si ya respondio 402 (sin saldo) a una nota anterior de esta misma vuelta.\n// Se calcula aqui, en un nodo de codigo: los datos estaticos del flujo no se leen bien dentro de la expresion de un nodo IF (en la vuelta del\n// 13-nov una nota que necesitaba Firecrawl salio por «sin saldo» sin haberlo intentado).\nreturn { json: { ...$json, firecrawlConSaldo: $getWorkflowStaticData('global').sinSaldo !== true } };"
       }
     }
   ],
@@ -3480,7 +3494,7 @@
       "main": [
         [
           {
-            "node": "¿La lectura directa bastó?",
+            "node": "Estado de Firecrawl",
             "type": "main",
             "index": 0
           }
@@ -3546,6 +3560,17 @@
         [
           {
             "node": "Extraer contenido completo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Estado de Firecrawl": {
+      "main": [
+        [
+          {
+            "node": "¿La lectura directa bastó?",
             "type": "main",
             "index": 0
           }
