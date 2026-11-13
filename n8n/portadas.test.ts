@@ -17,8 +17,9 @@ const nodo = (n: string) => flujo.nodes.find((x) => x.name === n)!
 const destinos = (n: string, salida = 0) => (flujo.connections[n]?.main[salida] ?? []).map((x) => x.node)
 
 describe('ritmo del pipeline: 3 notas cada 45 minutos', () => {
-  it('toma 3 notas por vuelta', () => {
-    expect(nodo('Priorizar y limitar').parameters.jsCode).toContain('const N = 3;')
+  it('publica 3 notas por vuelta: prueba hasta 9 candidatas y el Control de cupo se detiene al llegar a 3', () => {
+    expect(nodo('Priorizar y limitar').parameters.jsCode).toContain('const N = 9;')
+    expect(nodo('Control de cupo').parameters.jsCode).toContain('const CUPO = 3;')
   })
 
   it('el disparador sigue cada 15 min y la compuerta deja pasar exactamente 1 de cada 3: 32 ciclos al día, separados 45 min', () => {

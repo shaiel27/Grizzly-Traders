@@ -79,7 +79,9 @@ describe('flujo de noticias: cableado de las comunidades', () => {
   it('se avisa a la comunidad después de revalidar el sitio, no antes', () => {
     expect(flujo.connections['Revalidar sitio'].main[0].map((c) => c.node)).toEqual(['Armar mensaje comunidades'])
     expect(flujo.connections['Armar mensaje comunidades'].main[0].map((c) => c.node)).toEqual(['Discord - Difundir'])
-    expect(flujo.connections['Log ejecucion'].main[0].map((c) => c.node)).toEqual(['Loop Over Items'])
+    // Log ejecucion -> Contar publicado (cupo de la vuelta) -> siguiente noticia
+    expect(flujo.connections['Log ejecucion'].main[0].map((c) => c.node)).toEqual(['Contar publicado'])
+    expect(flujo.connections['Contar publicado'].main[0].map((c) => c.node)).toEqual(['Loop Over Items'])
   })
 
   it('un fallo de Discord no detiene el pipeline', () => {

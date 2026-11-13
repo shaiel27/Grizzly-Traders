@@ -101,22 +101,23 @@ describe('Priorizar y limitar: reparto entre fuentes', () => {
       { fuente: 'CFTC', h: 10 },
       { fuente: 'BCE', h: 20 },
     ])
-    expect(r).toHaveLength(3)
-    expect(new Set(r.map((t) => t.split('-')[0]))).toEqual(new Set(['EIA', 'CFTC', 'BCE']))
+    // devuelve todas (son menos de 9) y las 3 primeras, que son las que se publican primero, salen de fuentes distintas
+    expect(r).toHaveLength(5)
+    expect(new Set(r.slice(0, 3).map((t) => t.split('-')[0]))).toEqual(new Set(['EIA', 'CFTC', 'BCE']))
   })
 
   it('Investing.com no desplaza a las oficiales: con muchas notas suyas y una oficial, entran las dos', () => {
     const r = elegir(
       [{ fuente: 'Investing.com', h: 0.1 }, { fuente: 'Investing.com', h: 0.2 }, { fuente: 'Investing.com', h: 0.3 }, { fuente: 'Investing.com', h: 0.4 }, { fuente: 'CFTC', h: 30 }],
       { 'Investing.com': 20 }
-    )
+    ).slice(0, 3)
     expect(r).toHaveLength(3)
     expect(r[0]).toBe('CFTC-4')
     expect(r.filter((t) => t.startsWith('Investing.com')).length).toBe(2)
   })
 
   it('cuando las oficiales no tienen nada, Investing.com llena las plazas (el volumen no se hunde)', () => {
-    expect(elegir([{ fuente: 'Investing.com', h: 1 }, { fuente: 'Investing.com', h: 2 }, { fuente: 'Investing.com', h: 3 }, { fuente: 'Investing.com', h: 4 }])).toHaveLength(3)
+    expect(elegir([{ fuente: 'Investing.com', h: 1 }, { fuente: 'Investing.com', h: 2 }, { fuente: 'Investing.com', h: 3 }, { fuente: 'Investing.com', h: 4 }]).slice(0, 3)).toHaveLength(3)
   })
 
   it('va primero la fuente que menos ha publicado en las últimas 24 h', () => {
@@ -124,12 +125,16 @@ describe('Priorizar y limitar: reparto entre fuentes', () => {
       [{ fuente: 'EIA', h: 1 }, { fuente: 'CFTC', h: 5 }, { fuente: 'BEA', h: 9 }, { fuente: 'SEC', h: 12 }],
       { EIA: 4, CFTC: 2, BEA: 0, SEC: 1 }
     )
-    expect(r.map((t) => t.split('-')[0])).toEqual(['BEA', 'SEC', 'CFTC'])
+    expect(r.slice(0, 3).map((t) => t.split('-')[0])).toEqual(['BEA', 'SEC', 'CFTC'])
   })
 
   it('si hay menos fuentes que plazas, se completa con las más recientes', () => {
     const r = elegir([{ fuente: 'EIA', h: 3 }, { fuente: 'EIA', h: 1 }, { fuente: 'EIA', h: 2 }, { fuente: 'EIA', h: 9 }])
-    expect(r).toEqual(['EIA-1', 'EIA-2', 'EIA-0'])
+    expect(r).toEqual(['EIA-1', 'EIA-2', 'EIA-0', 'EIA-3'])
+  })
+
+  it('devuelve como mucho 9 candidatas por vuelta (las que fallan pasan a la siguiente; el cupo lo corta el flujo al llegar a 3 publicadas)', () => {
+    expect(elegir(Array.from({ length: 12 }, (_, i) => ({ fuente: 'EIA', h: i + 1 })))).toHaveLength(9)
   })
 
   it('sin candidatas no devuelve nada, y sin la lista de publicados reparte igual (por fecha)', () => {
@@ -204,7 +209,7 @@ describe('EDGAR (filings 8-K)', () => {
 
   it('los filings no pasan por Firecrawl: la SEC exige identificarse y no admite bots sin clasificar', () => {
     expect(flujo.connections['Es EDGAR?'].main[0].map((c) => c.node)).toEqual(['EDGAR - Indice'])
-    expect(flujo.connections['Es EDGAR?'].main[1].map((c) => c.node)).toEqual(['Obtener articulo completo'])
+    expect(flujo.connections['Es EDGAR?'].main[1].map((c) => c.node)).toEqual(['Decidir lectura'])
     expect(flujo.connections['EDGAR - Texto'].main[0].map((c) => c.node)).toEqual(['Extraer contenido completo'])
     for (const n of ['EDGAR 8-K', 'EDGAR - Indice', 'EDGAR - Documento']) {
       const ua = nodo(n).parameters.headerParameters.parameters.find((h: { name: string }) => h.name === 'User-Agent')
