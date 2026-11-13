@@ -17,13 +17,17 @@ Para más noticias, visita el enlace de la bio.
 - **Nunca lleva enlaces.** X cobra una publicación con enlace a US$0.20 y sin enlace a US$0.015 (13 veces más). El código quita URL, `www.` y dominios sueltos (`Nasdaq.com` → `Nasdaq`), y también `@` y `#` sueltos.
 - Un contexto de menos de 20 letras, o igual al titular, no se pone.
 
+## La portada
+La imagen es la misma que se publica en el sitio (WebP de 1536×1024, unos 500 KB; el límite de X para imágenes es 5 MB). Su dirección sale de la fila del artículo (`cover_image_url`); si no está, se reconstruye con la misma fórmula con que el flujo la sube al almacenamiento. Una publicación con imagen sin enlace entra, según las fuentes consultadas, en la tarifa de US$0.015 (sin confirmar un precio aparte por la subida: verificar en la consola de X). El permiso `media.write` ya va en la credencial.
+
 ## Cómo se elige el artículo
 GPT puntúa cada artículo del 1 al 10 (`relevancia`, en el mismo análisis que ya hacía). Al final de la tanda gana el de mayor puntuación; a igualdad, el de fuente con más prioridad (oficiales 2, GlobeNewswire y PR Newswire 1, resto 0). Máximo uno por tanda y al menos 30 minutos entre publicaciones. La publicación sale unos 3 minutos después del último artículo de la tanda.
 
 ## Flujo (n8n)
 `Loop Over Items` (sin más candidatas) o `Control de cupo` → `¿Fin de la tanda?` → `Elegir artículo para X` → `Armar texto X` → `¿Publicar en X?`:
 - **Modo de prueba** (por defecto): `X - Registrar prueba` guarda el texto en `pipeline_logs` con la fuente «X (prueba)». No se llama a X ni se gasta saldo.
-- **Publicar**: `X - Publicar` (POST `https://api.x.com/2/tweets`, sin reintentos para no publicar dos veces) → `X - Resultado` → `¿X publicó?` → `X - Guardar id` (columnas `posts.x_post_id` y `x_publicado_at`) → `X - Log`.
+- **Publicar**: `X - Descargar portada` → `X - Subir portada` (POST `https://api.x.com/2/media/upload`, permiso `media.write`) → `X - Media id` → `X - Publicar` (POST `https://api.x.com/2/tweets`, sin reintentos para no publicar dos veces) → `X - Resultado` → `¿X publicó?` → `X - Guardar id` (columnas `posts.x_post_id` y `x_publicado_at`) → `X - Log`.
+- **La publicación lleva la portada del artículo.** **Respaldo a solo texto:** si la descarga o la subida de la imagen fallan por lo que sea (permiso, formato, saldo, red), `X - Media id` deja el identificador vacío y se publica igual el texto; el motivo queda en `pipeline_logs` («solo texto: portada no subida (X respondió …)»). La portada nunca impide una publicación. En modo de prueba, el registro «X (prueba)» anota la dirección de la portada que se habría subido.
 - Ningún nodo de esta rama detiene el pipeline si falla. Un 402 (sin saldo), 401/403 (credencial) o 429 quedan en `pipeline_logs` con fuente «X» y estado `failed`.
 
 ## Costos (API de X, pago por uso)

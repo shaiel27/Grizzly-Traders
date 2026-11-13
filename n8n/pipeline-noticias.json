@@ -2097,7 +2097,7 @@
       ],
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "// Un articulo se publico: cuenta para el cupo de esta vuelta (ver «Control de cupo») y queda como candidato a publicarse en X al final de la tanda.\nconst est = $getWorkflowStaticData('global');\nif (est.ejec === String($execution.id)) {\n  est.publicados = (est.publicados || 0) + 1;\n  try {\n    const p = $('Parsear JSON').item.json;\n    const OFICIALES = ['Reserva Federal', 'SEC', 'CFTC', 'BCE', 'EIA', 'BEA', 'OCC', 'FDIC', 'EDGAR'];\n    (est.articulosX = est.articulosX || []).push({\n      postId: $('Reservar URL').item.json.body[0].id,\n      titulo: p.title,\n      resumen: p.meta_description,\n      categoria: p.category_id,\n      activos: p.cover_assets || [],\n      fuente: p.fuente,\n      relevancia: p.relevancia || 5,\n      prioridad: OFICIALES.includes(p.fuente) ? 2 : (p.fuente === 'GlobeNewswire' || p.fuente === 'PR Newswire' ? 1 : 0),\n    });\n  } catch (_) {\n    // si falta algun dato el articulo se publico igual en el sitio: solo se queda fuera de la eleccion para X\n  }\n}\nreturn { json: $json };"
+        "jsCode": "// Un articulo se publico: cuenta para el cupo de esta vuelta (ver «Control de cupo») y queda como candidato a publicarse en X al final de la tanda.\nconst est = $getWorkflowStaticData('global');\nif (est.ejec === String($execution.id)) {\n  est.publicados = (est.publicados || 0) + 1;\n  try {\n    const p = $('Parsear JSON').item.json;\n    const OFICIALES = ['Reserva Federal', 'SEC', 'CFTC', 'BCE', 'EIA', 'BEA', 'OCC', 'FDIC', 'EDGAR'];\n    const postId = $('Reservar URL').item.json.body[0].id;\n    // portada: la que guardo «Publicar post» (fila completa del articulo); si no esta, la misma direccion con la que el flujo la subio al almacenamiento\n    let portada = '';\n    try { portada = String($('Publicar post').item.json.cover_image_url || ''); } catch (_) { portada = ''; }\n    if (!portada) portada = 'https://pudzvatuubywmwdmboiq.supabase.co/storage/v1/object/public/post-images/' + p.slug + '-' + String(postId).slice(0, 8) + '.webp';\n    (est.articulosX = est.articulosX || []).push({\n      postId: postId,\n      portada: portada,\n      titulo: p.title,\n      resumen: p.meta_description,\n      categoria: p.category_id,\n      activos: p.cover_assets || [],\n      fuente: p.fuente,\n      relevancia: p.relevancia || 5,\n      prioridad: OFICIALES.includes(p.fuente) ? 2 : (p.fuente === 'GlobeNewswire' || p.fuente === 'PR Newswire' ? 1 : 0),\n    });\n  } catch (_) {\n    // si falta algun dato el articulo se publico igual en el sitio: solo se queda fuera de la eleccion para X\n  }\n}\nreturn { json: $json };"
       }
     },
     {
@@ -2489,7 +2489,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ timestamp: $now.toISO(), fuente: 'X (prueba)', titulo: $json.texto, status: 'success', error_message: null }) }}",
+        "jsonBody": "={{ JSON.stringify({ timestamp: $now.toISO(), fuente: 'X (prueba)', titulo: $json.texto, status: 'success', error_message: 'portada: ' + ($json.portada || 'sin dato') }) }}",
         "options": {}
       },
       "onError": "continueRegularOutput",
@@ -2526,7 +2526,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ text: $json.texto }) }}",
+        "jsonBody": "={{ JSON.stringify($json.mediaId ? { text: $json.texto, media: { media_ids: [$json.mediaId] } } : { text: $json.texto }) }}",
         "options": {
           "response": {
             "response": {
@@ -2555,7 +2555,7 @@
         1250
       ],
       "parameters": {
-        "jsCode": "// Resultado de la publicacion: 201 + id = publicada. Cualquier otra cosa es un fallo con motivo legible (el flujo del sitio no se ve afectado).\nconst r = $json || {};\nconst previo = $('Armar texto X').item.json;\nconst estado = Number(r.statusCode || 0);\nlet cuerpo = r.body !== undefined ? r.body : r.data;\nif (typeof cuerpo === 'string') { try { cuerpo = JSON.parse(cuerpo); } catch (_) { /* queda como texto */ } }\nconst id = cuerpo && cuerpo.data && cuerpo.data.id ? String(cuerpo.data.id) : null;\nlet error = '';\nif (!(estado === 201 && id)) {\n  const detalle = (cuerpo && (cuerpo.detail || cuerpo.title)) || r.error || '';\n  error = 'X respondio ' + (estado || 'sin respuesta') + (detalle ? ': ' + String(detalle).slice(0, 160) : '');\n  if (estado === 402) error += ' (sin saldo en la cuenta de desarrollador de X)';\n  else if (estado === 401 || estado === 403) error += ' (credencial sin permiso o caducada)';\n  else if (estado === 429) error += ' (limite de frecuencia)';\n}\nreturn { json: { ok: !error, xId: id, error, texto: previo.texto, postId: previo.postId } };",
+        "jsCode": "// Resultado de la publicacion: 201 + id = publicada. Cualquier otra cosa es un fallo con motivo legible (el flujo del sitio no se ve afectado).\nconst r = $json || {};\nconst previo = $('X - Media id').item.json;\nconst estado = Number(r.statusCode || 0);\nlet cuerpo = r.body !== undefined ? r.body : r.data;\nif (typeof cuerpo === 'string') { try { cuerpo = JSON.parse(cuerpo); } catch (_) { /* queda como texto */ } }\nconst id = cuerpo && cuerpo.data && cuerpo.data.id ? String(cuerpo.data.id) : null;\nlet error = '';\nif (!(estado === 201 && id)) {\n  const detalle = (cuerpo && (cuerpo.detail || cuerpo.title)) || r.error || '';\n  error = 'X respondio ' + (estado || 'sin respuesta') + (detalle ? ': ' + String(detalle).slice(0, 160) : '');\n  if (estado === 402) error += ' (sin saldo en la cuenta de desarrollador de X)';\n  else if (estado === 401 || estado === 403) error += ' (credencial sin permiso o caducada)';\n  else if (estado === 429) error += ' (limite de frecuencia)';\n}\nreturn { json: { ok: !error, xId: id, error, texto: previo.texto, postId: previo.postId, conImagen: !!previo.conImagen, errorImagen: previo.errorImagen || '' } };",
         "mode": "runOnceForEachItem"
       }
     },
@@ -2658,7 +2658,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ timestamp: $now.toISO(), fuente: 'X', titulo: String($('X - Resultado').item.json.texto || '').slice(0, 280), status: $('X - Resultado').item.json.ok ? 'success' : 'failed', error_message: $('X - Resultado').item.json.ok ? null : $('X - Resultado').item.json.error }) }}",
+        "jsonBody": "={{ JSON.stringify({ timestamp: $now.toISO(), fuente: 'X', titulo: String($('X - Resultado').item.json.texto || '').slice(0, 280), status: $('X - Resultado').item.json.ok ? 'success' : 'failed', error_message: $('X - Resultado').item.json.ok ? ($('X - Resultado').item.json.conImagen ? null : ('solo texto: ' + $('X - Resultado').item.json.errorImagen)) : $('X - Resultado').item.json.error }) }}",
         "options": {}
       },
       "onError": "continueRegularOutput",
@@ -2667,6 +2667,93 @@
           "id": "WZ5kOBX6Ia6HMoQs",
           "name": "Supabase account 2"
         }
+      }
+    },
+    {
+      "id": "c2be10ef-bde2-4a51-92ae-3f0a78482271",
+      "name": "X - Descargar portada",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        740,
+        1120
+      ],
+      "parameters": {
+        "url": "={{ $json.portada }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Baja la portada del almacenamiento publico del sitio. Si falla, la publicacion sale solo con texto."
+    },
+    {
+      "id": "719da856-8743-4525-beb9-3531241ea34d",
+      "name": "X - Subir portada",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        1120
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.x.com/2/media/upload",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "media",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "media_category",
+              "value": "tweet_image"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "XcredGrizzly0001",
+          "name": "X (grizzlytraders)"
+        }
+      },
+      "notes": "Sin reintentos. Si la subida falla (por permiso media.write, formato o saldo) se publica solo el texto."
+    },
+    {
+      "id": "3eb8f3fe-d922-4dbd-9e9f-63d4d32ba4f6",
+      "name": "X - Media id",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1180,
+        1120
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Resultado de la subida de la portada. Con id de imagen, la publicacion lleva portada; SIN id (cualquier fallo) se publica solo el texto: la portada nunca\n// debe impedir una publicacion. Se recuperan los datos del articulo del nodo «Armar texto X».\nconst previo = $('Armar texto X').item.json;\nconst r = $json || {};\nconst estado = Number(r.statusCode || 0);\nlet cuerpo = r.body !== undefined ? r.body : r.data;\nif (typeof cuerpo === 'string') { try { cuerpo = JSON.parse(cuerpo); } catch (_) { /* queda como texto */ } }\nconst id = cuerpo && cuerpo.data && cuerpo.data.id ? String(cuerpo.data.id) : '';\nlet errorImagen = '';\nif (!id) {\n  let detalle = (cuerpo && typeof cuerpo === 'object' && (cuerpo.detail || cuerpo.title)) || r.error || '';\n  if (detalle && typeof detalle !== 'string') detalle = JSON.stringify(detalle);\n  errorImagen = 'portada no subida (X respondio ' + (estado || 'sin respuesta') + (detalle ? ': ' + String(detalle).slice(0, 120) : '') + ')';\n}\nreturn { json: { ...previo, mediaId: id, conImagen: id !== '', errorImagen } };"
       }
     }
   ],
@@ -3928,7 +4015,7 @@
       "main": [
         [
           {
-            "node": "X - Publicar",
+            "node": "X - Descargar portada",
             "type": "main",
             "index": 0
           }
@@ -3987,6 +4074,39 @@
         [
           {
             "node": "X - Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "X - Descargar portada": {
+      "main": [
+        [
+          {
+            "node": "X - Subir portada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "X - Subir portada": {
+      "main": [
+        [
+          {
+            "node": "X - Media id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "X - Media id": {
+      "main": [
+        [
+          {
+            "node": "X - Publicar",
             "type": "main",
             "index": 0
           }

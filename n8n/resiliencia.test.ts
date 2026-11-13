@@ -73,11 +73,12 @@ describe('cableado', () => {
 describe('Control de cupo y Contar publicado', () => {
   const control = (id: string, est: Estatico) => new Function('$input', '$execution', '$getWorkflowStaticData', codigo('Control de cupo'))({ all: () => [{ json: { n: 1 } }] }, { id }, () => est) as { json: Record<string, unknown> }[]
   const FIN = [{ json: { fin: true } }]
-  const parsear = { title: 'Titular', meta_description: 'Contexto', category_id: 4, cover_assets: ['BTC'], fuente: 'EDGAR', relevancia: 8 }
+  const parsear = { title: 'Titular', slug: 'mi-slug', meta_description: 'Contexto', category_id: 4, cover_assets: ['BTC'], fuente: 'EDGAR', relevancia: 8 }
+  let publicado: Record<string, unknown> = {}
   const contar = (id: string, est: Estatico, p: Record<string, unknown> = parsear) =>
     new Function('$json', '$', '$execution', '$getWorkflowStaticData', codigo('Contar publicado'))(
       { z: 1 },
-      (n: string) => ({ item: { json: n === 'Parsear JSON' ? p : { body: [{ id: 'post-1' }] } } }),
+      (n: string) => ({ item: { json: n === 'Parsear JSON' ? p : n === 'Publicar post' ? publicado : { body: [{ id: 'post-1' }] } } }),
       { id },
       () => est
     ) as { json: unknown }
@@ -120,14 +121,16 @@ describe('Control de cupo y Contar publicado', () => {
     expect(est.articulosX).toEqual([])
   })
 
-  it('al contar un artículo lo deja como candidato a X con sus datos y la prioridad de su fuente', () => {
+  it('al contar un artículo lo deja como candidato a X con sus datos, la prioridad de su fuente y la dirección de su portada', () => {
     const est: Estatico = {}
     control('1001', est)
+    publicado = { cover_image_url: 'https://cdn.example/portada-real.webp' }
     contar('1001', est)
+    publicado = {} // sin la fila del artículo: se usa la misma dirección con la que el flujo subió la imagen al almacenamiento
     contar('1001', est, { ...parsear, fuente: 'CNBC', relevancia: undefined, cover_assets: undefined })
     expect(est.articulosX).toEqual([
-      { postId: 'post-1', titulo: 'Titular', resumen: 'Contexto', categoria: 4, activos: ['BTC'], fuente: 'EDGAR', relevancia: 8, prioridad: 2 },
-      { postId: 'post-1', titulo: 'Titular', resumen: 'Contexto', categoria: 4, activos: [], fuente: 'CNBC', relevancia: 5, prioridad: 0 },
+      { postId: 'post-1', portada: 'https://cdn.example/portada-real.webp', titulo: 'Titular', resumen: 'Contexto', categoria: 4, activos: ['BTC'], fuente: 'EDGAR', relevancia: 8, prioridad: 2 },
+      { postId: 'post-1', portada: 'https://pudzvatuubywmwdmboiq.supabase.co/storage/v1/object/public/post-images/mi-slug-post-1.webp', titulo: 'Titular', resumen: 'Contexto', categoria: 4, activos: [], fuente: 'CNBC', relevancia: 5, prioridad: 0 },
     ])
   })
 })

@@ -23,7 +23,10 @@ describe('cableado de la publicación en X', () => {
   it('fin de tanda -> elegir -> armar texto -> (publicar | prueba); publicar -> resultado -> guardar id -> log', () => {
     expect(destinos('Elegir artículo para X')).toEqual([['Armar texto X']])
     expect(destinos('Armar texto X')).toEqual([['¿Publicar en X?']])
-    expect(destinos('¿Publicar en X?')).toEqual([['X - Publicar'], ['X - Registrar prueba']])
+    expect(destinos('¿Publicar en X?')).toEqual([['X - Descargar portada'], ['X - Registrar prueba']])
+    expect(destinos('X - Descargar portada')).toEqual([['X - Subir portada']])
+    expect(destinos('X - Subir portada')).toEqual([['X - Media id']])
+    expect(destinos('X - Media id')).toEqual([['X - Publicar']])
     expect(destinos('X - Publicar')).toEqual([['X - Resultado']])
     expect(destinos('X - Resultado')).toEqual([['¿X publicó?']])
     expect(destinos('¿X publicó?')).toEqual([['X - Guardar id'], ['X - Log']])
@@ -31,7 +34,7 @@ describe('cableado de la publicación en X', () => {
   })
 
   it('nada de la rama de X puede detener el pipeline: todo lo que llama a la red continúa si falla', () => {
-    for (const n of ['X - Publicar', 'X - Registrar prueba', 'X - Guardar id', 'X - Log']) expect(nodo(n).onError).toBe('continueRegularOutput')
+    for (const n of ['X - Descargar portada', 'X - Subir portada', 'X - Publicar', 'X - Registrar prueba', 'X - Guardar id', 'X - Log']) expect(nodo(n).onError).toBe('continueRegularOutput')
   })
 
   it('«X - Publicar» no reintenta (podría publicar dos veces), responde sin lanzar y usa la credencial OAuth2 de X', () => {
@@ -40,12 +43,71 @@ describe('cableado de la publicación en X', () => {
     expect(p.options.response.response).toMatchObject({ fullResponse: true, neverError: true })
     expect(nodo('X - Publicar')).not.toHaveProperty('retryOnFail')
     expect(nodo('X - Publicar').credentials!.oAuth2Api.id).toBe('XcredGrizzly0001')
-    expect(p.jsonBody).toBe('={{ JSON.stringify({ text: $json.texto }) }}')
+    // con id de imagen lleva la portada; sin él, solo el texto (respaldo)
+    expect(p.jsonBody).toBe('={{ JSON.stringify($json.mediaId ? { text: $json.texto, media: { media_ids: [$json.mediaId] } } : { text: $json.texto }) }}')
   })
 
   it('en modo de prueba no se llama a X: el texto queda en pipeline_logs con la fuente «X (prueba)»', () => {
     expect(nodo('X - Registrar prueba').parameters.url).toContain('/pipeline_logs')
     expect(nodo('X - Registrar prueba').parameters.jsonBody).toContain('X (prueba)')
+  })
+})
+
+describe('portada en la publicación', () => {
+  it('descarga la portada de la dirección del candidato, sin lanzar si falla', () => {
+    const p = nodo('X - Descargar portada').parameters
+    expect(p.url).toBe('={{ $json.portada }}')
+    expect(p.options.response.response).toMatchObject({ neverError: true, responseFormat: 'file', outputPropertyName: 'data' })
+  })
+
+  it('la sube con la API de medios de X, como imagen de publicación, sin reintentos y con la misma credencial OAuth2', () => {
+    const p = nodo('X - Subir portada').parameters
+    expect(p.url).toBe('https://api.x.com/2/media/upload')
+    expect(p.contentType).toBe('multipart-form-data')
+    expect(p.bodyParameters.parameters).toEqual([
+      { parameterType: 'formBinaryData', name: 'media', inputDataFieldName: 'data' },
+      { name: 'media_category', value: 'tweet_image' },
+    ])
+    expect(p.options.response.response).toMatchObject({ fullResponse: true, neverError: true })
+    expect(nodo('X - Subir portada')).not.toHaveProperty('retryOnFail')
+    expect(nodo('X - Subir portada').credentials!.oAuth2Api.id).toBe('XcredGrizzly0001')
+  })
+
+  const media = (r: unknown) =>
+    (new Function('$json', '$', codigo('X - Media id'))(r, () => ({ item: { json: { texto: 'texto', postId: 'p1', portada: 'https://e.com/p.webp' } } })) as { json: { mediaId: string; conImagen: boolean; errorImagen: string; texto: string; postId: string; portada: string } }).json
+
+  it('con id de imagen, la publicación lleva portada y conserva los datos del artículo', () => {
+    expect(media({ statusCode: 200, body: { data: { id: '1234567890' } } })).toEqual({ texto: 'texto', postId: 'p1', portada: 'https://e.com/p.webp', mediaId: '1234567890', conImagen: true, errorImagen: '' })
+  })
+
+  it('RESPALDO A SOLO TEXTO: cualquier fallo de la subida deja mediaId vacío y explica el motivo, sin romper nada', () => {
+    for (const r of [
+      { statusCode: 403, body: { detail: 'Forbidden' } },
+      { statusCode: 400, body: { title: 'Invalid Request' } },
+      { statusCode: 402, body: {} },
+      { statusCode: 200, body: {} },
+      { error: { message: 'no binary data' } },
+      { error: 'timeout' },
+      {},
+    ]) {
+      const m = media(r)
+      expect(m.mediaId).toBe('')
+      expect(m.conImagen).toBe(false)
+      expect(m.errorImagen).toContain('portada no subida')
+      expect(m.texto).toBe('texto') // el texto sigue ahí: se publicará igual
+    }
+  })
+
+  it('«X - Resultado» recuerda si salió con portada, para el registro', () => {
+    const resultado = (r: unknown, previo: Record<string, unknown>) =>
+      (new Function('$json', '$', codigo('X - Resultado'))(r, () => ({ item: { json: previo } })) as { json: { ok: boolean; conImagen: boolean; errorImagen: string } }).json
+    expect(resultado({ statusCode: 201, body: { data: { id: '5' } } }, { texto: 't', postId: 'p', conImagen: true })).toMatchObject({ ok: true, conImagen: true, errorImagen: '' })
+    expect(resultado({ statusCode: 201, body: { data: { id: '5' } } }, { texto: 't', postId: 'p', conImagen: false, errorImagen: 'portada no subida (X respondio 403)' })).toMatchObject({ ok: true, conImagen: false, errorImagen: 'portada no subida (X respondio 403)' })
+  })
+
+  it('los registros dicen si salió solo con texto, y la prueba muestra la portada que se habría subido', () => {
+    expect(nodo('X - Log').parameters.jsonBody).toContain("'solo texto: '")
+    expect(nodo('X - Registrar prueba').parameters.jsonBody).toContain("'portada: '")
   })
 })
 
@@ -157,7 +219,7 @@ describe('X - Resultado', () => {
     (new Function('$json', '$', codigo('X - Resultado'))(r, () => ({ item: { json: { texto: 'texto', postId: 'p1' } } })) as { json: { ok: boolean; xId: string | null; error: string; postId: string } }).json
 
   it('201 con id = publicada', () => {
-    expect(resultado({ statusCode: 201, body: { data: { id: '12345', text: 't' } } })).toEqual({ ok: true, xId: '12345', error: '', texto: 'texto', postId: 'p1' })
+    expect(resultado({ statusCode: 201, body: { data: { id: '12345', text: 't' } } })).toEqual({ ok: true, xId: '12345', error: '', texto: 'texto', postId: 'p1', conImagen: false, errorImagen: '' })
   })
   it('lee el cuerpo aunque llegue como texto o en el campo data', () => {
     expect(resultado({ statusCode: 201, data: '{"data":{"id":"99"}}' }).xId).toBe('99')
