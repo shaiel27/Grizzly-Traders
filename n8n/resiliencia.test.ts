@@ -30,7 +30,8 @@ describe('cableado', () => {
     expect(destinos('Decidir lectura')).toEqual([['¿Basta el resumen?']])
     expect(destinos('¿Basta el resumen?')).toEqual([['Extraer contenido completo'], ['Lectura directa']])
     expect(destinos('Lectura directa')).toEqual([['Texto de lectura directa']])
-    expect(destinos('Texto de lectura directa')).toEqual([['¿La lectura directa bastó?']])
+    expect(destinos('Texto de lectura directa')).toEqual([['Estado de Firecrawl']])
+    expect(destinos('Estado de Firecrawl')).toEqual([['¿La lectura directa bastó?']])
     expect(destinos('¿La lectura directa bastó?')).toEqual([['Extraer contenido completo'], ['¿Hay saldo en Firecrawl?']])
     expect(destinos('¿Hay saldo en Firecrawl?')).toEqual([['Obtener articulo completo'], ['Extraer contenido completo']])
     expect(destinos('Obtener articulo completo')).toEqual([['Evaluar Firecrawl']])
@@ -42,7 +43,9 @@ describe('cableado', () => {
     expect(entradas('Obtener articulo completo')).toEqual(['¿Hay saldo en Firecrawl?:0'])
     expect(entradas('¿Hay saldo en Firecrawl?')).toEqual(['¿La lectura directa bastó?:1'])
     expect(nodo('¿La lectura directa bastó?').parameters.conditions.conditions[0].leftValue).toContain('>= 600')
-    expect(nodo('¿Hay saldo en Firecrawl?').parameters.conditions.conditions[0].leftValue).toContain('sinSaldo !== true')
+    // el dato sale de un nodo de codigo (los datos estaticos no se leen bien en la expresion de un IF): la pregunta solo mira el campo
+    expect(nodo('¿Hay saldo en Firecrawl?').parameters.conditions.conditions[0].leftValue).toBe('={{ $json.firecrawlConSaldo === true }}')
+    expect(nodo('¿Hay saldo en Firecrawl?').parameters.conditions.conditions[0].leftValue).not.toContain('$getWorkflowStaticData')
     expect(flujo.nodes.some((n) => n.name === '¿Usar Firecrawl?' || n.name === '¿Firecrawl leyó la página?')).toBe(false)
   })
 
@@ -118,6 +121,17 @@ describe('Decidir lectura (ahorro de créditos)', () => {
   it('si el resumen del feed ya trae 2500+ caracteres no se lee la página: ni Firecrawl ni nada', () => {
     expect(decidir('x'.repeat(2500)).modo).toBe('rss')
     expect(decidir('x'.repeat(2499)).modo).toBe('leer')
+  })
+})
+
+describe('Estado de Firecrawl', () => {
+  const estado = (est: Estatico) => (new Function('$json', '$getWorkflowStaticData', codigo('Estado de Firecrawl'))({ data: { markdown: 'x' } }, () => est) as { json: { firecrawlConSaldo: boolean; data: unknown } }).json
+  it('en una vuelta nueva (sin 402 previo) se puede pedir a Firecrawl, y conserva los datos de la nota', () => {
+    expect(estado({})).toEqual({ data: { markdown: 'x' }, firecrawlConSaldo: true })
+    expect(estado({ sinSaldo: false }).firecrawlConSaldo).toBe(true)
+  })
+  it('tras un 402 en esta vuelta ya no se pide', () => {
+    expect(estado({ sinSaldo: true }).firecrawlConSaldo).toBe(false)
   })
 })
 
