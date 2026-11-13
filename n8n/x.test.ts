@@ -120,6 +120,25 @@ describe('Armar texto X', () => {
     expect(r.texto.endsWith(FRASE_FINAL)).toBe(true)
   })
 
+  it('al recortar corta por palabras completas, nunca a media palabra', () => {
+    const palabras = 'Inversores de Anavex Life Sciences deben asegurarse representación legal antes del treinta de noviembre para una posible demanda colectiva contra la compañía por declaraciones engañosas sobre su fármaco'
+    const r = armar({ ...base, titulo: 'Advertencia para inversores de Anavex: plazo final para representación legal se aproxima hoy mismo', resumen: palabras })
+    const contexto = r.texto.split('\n\n')[1]
+    if (contexto.endsWith('…')) {
+      const cortado = contexto.slice(0, -1)
+      expect(palabras.startsWith(cortado)).toBe(true)
+      expect(/\s/.test(palabras[cortado.length])).toBe(true) // el corte cae justo en un espacio del original
+    }
+    expect(r.largo).toBeLessThanOrEqual(275)
+  })
+
+  it('un contexto que tras recortarse queda en menos de 40 caracteres se quita en vez de dejar un trozo', () => {
+    const titulo = 'Titular largo '.repeat(9).trim()
+    const r = armar({ ...base, titulo, resumen: 'Esta es una frase de contexto bastante larga que no cabe' })
+    expect(r.largo).toBeLessThanOrEqual(275)
+    for (const bloque of r.texto.split('\n\n')) if (bloque.endsWith('…')) expect(bloque.length).toBeGreaterThanOrEqual(40)
+  })
+
   it('si el contexto repite el titular o es casi vacío, no lo pone', () => {
     expect(armar({ ...base, resumen: base.titulo }).texto).not.toMatch(/sin cambios\n\nLa Fed mantiene/)
     expect(armar({ ...base, resumen: '' }).texto.split('\n\n')).toHaveLength(3)
@@ -159,7 +178,10 @@ describe('X - Resultado', () => {
 
 describe('relevancia en el análisis de GPT', () => {
   it('el prompt pide «relevancia» de 1 a 10 y Parsear JSON la acota (por defecto 5)', () => {
-    expect(nodo('OpenAI - Analisis GPT').parameters.responses.values[0].content).toContain('relevancia (entero de 1 a 10')
+    const prompt = nodo('OpenAI - Analisis GPT').parameters.responses.values[0].content as string
+    expect(prompt).toContain('relevancia (entero de 1 a 10')
+    // los avisos de despachos de abogados no son noticias de mercado: 1-3
+    expect(prompt).toContain('SIEMPRE los avisos de despachos de abogados')
     const f = new Function('$json', '$', codigo('Parsear JSON'))
     const correr = (relevancia: unknown) =>
       (f(
