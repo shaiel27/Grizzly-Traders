@@ -55,7 +55,10 @@ describe('el pipeline recuerda lo visto sin dejar filas de error', () => {
     expect(texto).not.toContain("'duplicado-'")
     expect(texto).not.toMatch(/pipeline_error: \$json\.pipeline_error/)
     // las conexiones no cambian: el fallo sigue pasando por Marcar fallo → Log fallo → siguiente noticia
-    expect(flujo.connections['Registrar fallo'].main[0].map((c) => c.node)).toEqual(['Marcar fallo en post'])
+    // un fallo de la nota se marca; un fallo de infraestructura (Firecrawl sin saldo) libera la reserva sin gastar intentos; los dos acaban en Log fallo
+    expect(flujo.connections['Registrar fallo'].main[0].map((c) => c.node)).toEqual(['¿Fallo de infraestructura?'])
+    expect(flujo.connections['¿Fallo de infraestructura?'].main.map((s) => s.map((c) => c.node))).toEqual([['Liberar reserva'], ['Marcar fallo en post']])
+    expect(flujo.connections['Liberar reserva'].main[0].map((c) => c.node)).toEqual(['Log fallo'])
     expect(flujo.connections['Marcar fallo en post'].main[0].map((c) => c.node)).toEqual(['Log fallo'])
     expect(flujo.connections['Guardar duplicado'].main[0].map((c) => c.node)).toEqual(['Loop Over Items'])
   })
