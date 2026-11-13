@@ -1235,7 +1235,7 @@
     },
     {
       "parameters": {
-        "content": "## 1 · Disparo, fuentes y seleccion\nFuentes: oficiales (CFTC, Reserva Federal, SEC, BCE solo comunicados, EIA, BEA, OCC, FDIC y los filings 8-K de EDGAR), Investing.com, CNBC y PR Newswire (riesgo aceptado por el usuario, ver docs/fuentes.md) y, con interruptor (MASSIVE_NEWS_ACTIVO), los comunicados de GlobeNewswire via Massive. Cada vuelta elige 3 notas repartidas: primero la fuente que menos publico en las ultimas 24 h.  El disparador corre cada 15 min y la compuerta deja pasar 1 de cada 3 (cada 45 min exactos).\n\nResiliencia (nov-2026): cada vuelta prueba hasta 9 candidatas y se detiene al publicar 3 (Control de cupo). Si Firecrawl falla se lee la pagina directamente; con un 402 (sin saldo) se salta Firecrawl el resto de la vuelta y la nota no gasta intentos (Liberar reserva). Si el resumen del feed ya trae 2500+ caracteres no se llama a Firecrawl.",
+        "content": "## 1 · Disparo, fuentes y seleccion\nFuentes: oficiales (CFTC, Reserva Federal, SEC, BCE solo comunicados, EIA, BEA, OCC, FDIC y los filings 8-K de EDGAR), Investing.com, CNBC y PR Newswire (riesgo aceptado por el usuario, ver docs/fuentes.md) y, con interruptor (MASSIVE_NEWS_ACTIVO), los comunicados de GlobeNewswire via Massive. Cada vuelta elige 3 notas repartidas: primero la fuente que menos publico en las ultimas 24 h.  El disparador corre cada 15 min y la compuerta deja pasar 1 de cada 3 (cada 45 min exactos).\n\nLectura de paginas (nov-2026): primero la lectura directa, gratuita; Firecrawl (1 credito por pagina) solo si esa lectura no basta (menos de 600 caracteres) y la cuenta tiene saldo. Si el resumen del feed ya trae 2500+ caracteres no se lee la pagina. Cada vuelta prueba hasta 9 candidatas y se detiene al publicar 3 (Control de cupo). Con un 402 de Firecrawl se le deja de pedir el resto de la vuelta y la nota no gasta intentos (Liberar reserva).",
         "height": 1300,
         "width": 2350,
         "color": 4
@@ -2109,7 +2109,7 @@
         1900
       ],
       "parameters": {
-        "jsCode": "// Como leer la pagina de la nota (cada lectura de Firecrawl gasta 1 credito):\n//  - rss:       el resumen del feed ya trae casi todo lo que se usa (el limite es 4000 caracteres): no se lee la pagina\n//  - directa:   Firecrawl se quedo sin saldo en esta vuelta (402): se salta y se lee la pagina directamente, sin costo\n//  - firecrawl: el camino de siempre\nconst est = $getWorkflowStaticData('global');\nconst feed = $('Normalizar Item').item.json || {};\nconst largo = String(feed.contentSnippet || '').length;\nlet modo = 'firecrawl';\nif (largo >= 2500) modo = 'rss';\nelse if (est.sinSaldo) modo = 'directa';\nreturn { json: { ...$json, modo } };",
+        "jsCode": "// Como se lee la pagina de la nota. Los creditos de Firecrawl (1 por pagina) se gastan SOLO donde hace falta:\n//  - rss:  el resumen del feed ya trae casi todo lo que se usa (el limite es 4000 caracteres): no se lee la pagina\n//  - leer: primero la lectura directa (gratuita); Firecrawl solo entra si esa lectura no basta\nconst feed = $('Normalizar Item').item.json || {};\nconst largo = String(feed.contentSnippet || '').length;\nreturn { json: { ...$json, modo: largo >= 2500 ? 'rss' : 'leer' } };",
         "mode": "runOnceForEachItem"
       }
     },
@@ -2148,40 +2148,6 @@
       }
     },
     {
-      "id": "6a426696-d586-4649-87b7-51490f35b57d",
-      "name": "¿Usar Firecrawl?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        -230,
-        2080
-      ],
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose",
-            "version": 1
-          },
-          "conditions": [
-            {
-              "id": "c1",
-              "leftValue": "={{ $json.modo === 'firecrawl' }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      }
-    },
-    {
       "id": "024815d8-5e45-44b9-8173-8b7b03824c8a",
       "name": "Evaluar Firecrawl",
       "type": "n8n-nodes-base.code",
@@ -2191,42 +2157,8 @@
         2200
       ],
       "parameters": {
-        "jsCode": "// Resultado de Firecrawl. Un 402 («Payment required») es de la cuenta (sin creditos o pago pendiente), no de la nota: se avisa al resto de la vuelta\n// para no gastar 3 reintentos por nota, y esta nota pasa a la lectura directa.\nconst j = $json || {};\nconst md = String((j.data && (j.data.markdown || j.data.content)) || j.markdown || '');\nlet err = '';\nif (j.error) err = typeof j.error === 'string' ? j.error : (j.error.message || j.error.description || JSON.stringify(j.error));\nif (/payment required|\\b402\\b|insufficient credits|out of credits/i.test(err)) {\n  $getWorkflowStaticData('global').sinSaldo = true;\n}\nreturn { json: { ...j, fcOk: !err && md.trim().length >= 200, fcError: String(err).slice(0, 200) } };",
+        "jsCode": "// Resultado de Firecrawl (solo se llega aqui cuando la lectura directa no bastaba). Un 402 («Payment required») es de la cuenta (sin creditos o pago\n// pendiente), no de la nota: se avisa al resto de la vuelta para no pedirle mas, y esta nota sigue con lo que haya.\nconst j = $json || {};\nconst md = String((j.data && (j.data.markdown || j.data.content)) || j.markdown || '');\nlet err = '';\nif (j.error) err = typeof j.error === 'string' ? j.error : (j.error.message || j.error.description || JSON.stringify(j.error));\nif (/payment required|\\b402\\b|insufficient credits|out of credits/i.test(err)) {\n  $getWorkflowStaticData('global').sinSaldo = true;\n}\n// Si Firecrawl no aporto texto suficiente se conserva el de la lectura directa (aunque fuera corto): «Extraer contenido completo» decide con lo mejor que haya\nlet directo = '';\ntry { directo = String($('Texto de lectura directa').item.json.data.markdown || ''); } catch (_) { directo = ''; }\nconst usable = !err && md.trim().length >= 200;\nreturn { json: { ...j, data: { markdown: usable ? md : directo }, fcOk: usable, fcError: String(err).slice(0, 200) } };",
         "mode": "runOnceForEachItem"
-      }
-    },
-    {
-      "id": "e96a92d3-bc75-4d64-9edb-14f5dd2e94eb",
-      "name": "¿Firecrawl leyó la página?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        120,
-        2200
-      ],
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose",
-            "version": 1
-          },
-          "conditions": [
-            {
-              "id": "c1",
-              "leftValue": "={{ $json.fcOk === true }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
       }
     },
     {
@@ -2271,7 +2203,7 @@
         }
       },
       "onError": "continueRegularOutput",
-      "notes": "Lectura gratuita de respaldo cuando Firecrawl falla. Se identifica con su propio User-Agent (no se hace pasar por un navegador) y no intenta saltarse ninguna proteccion: si el sitio bloquea clientes identificados, esa nota simplemente no se lee por esta via."
+      "notes": "Primera via de lectura (gratuita). Se identifica con su propio User-Agent (no se hace pasar por un navegador) y no intenta saltarse ninguna proteccion: si el sitio bloquea clientes identificados, la nota pasa a Firecrawl."
     },
     {
       "id": "41e24c96-715b-4c2e-8f6c-e126483b6296",
@@ -2352,6 +2284,74 @@
           "id": "WZ5kOBX6Ia6HMoQs",
           "name": "Supabase account 2"
         }
+      }
+    },
+    {
+      "id": "d48ffd91-e297-46d4-8ba5-b4cdeddf3be3",
+      "name": "¿La lectura directa bastó?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        400,
+        2300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ String(($json.data && $json.data.markdown) || '').length >= 600 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "d3d1a9c9-5752-4202-bcc0-292d4d34204b",
+      "name": "¿Hay saldo en Firecrawl?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        540,
+        2380
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $getWorkflowStaticData('global').sinSaldo !== true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       }
     }
   ],
@@ -3447,24 +3447,6 @@
         ],
         [
           {
-            "node": "¿Usar Firecrawl?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "¿Usar Firecrawl?": {
-      "main": [
-        [
-          {
-            "node": "Obtener articulo completo",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
             "node": "Lectura directa",
             "type": "main",
             "index": 0
@@ -3476,25 +3458,7 @@
       "main": [
         [
           {
-            "node": "¿Firecrawl leyó la página?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "¿Firecrawl leyó la página?": {
-      "main": [
-        [
-          {
             "node": "Extraer contenido completo",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Lectura directa",
             "type": "main",
             "index": 0
           }
@@ -3516,7 +3480,7 @@
       "main": [
         [
           {
-            "node": "Extraer contenido completo",
+            "node": "¿La lectura directa bastó?",
             "type": "main",
             "index": 0
           }
@@ -3546,6 +3510,42 @@
         [
           {
             "node": "Log fallo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿La lectura directa bastó?": {
+      "main": [
+        [
+          {
+            "node": "Extraer contenido completo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "¿Hay saldo en Firecrawl?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Hay saldo en Firecrawl?": {
+      "main": [
+        [
+          {
+            "node": "Obtener articulo completo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extraer contenido completo",
             "type": "main",
             "index": 0
           }
