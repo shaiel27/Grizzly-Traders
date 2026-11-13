@@ -13,6 +13,7 @@ import { getRouteLocale } from '@/lib/i18n/route-locale'
 import { getDictionary, t } from '@/lib/i18n/get-dictionary'
 import Image from 'next/image'
 import { AdSlot } from '@/components/ads/AdSlot'
+import { FechaPublicacion } from '@/components/ui/FechaPublicacion'
 import { AnunciosLaterales } from '@/components/ads/AnunciosLaterales'
 import { format, formatDistanceToNow } from 'date-fns'
 import { es, enUS } from 'date-fns/locale'
@@ -209,7 +210,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
                   )}
                 </Link>
               )}
-              <time dateTime={publishedDate.toISOString()} title={timeAgo}>{absoluteDate}</time>
+              <FechaPublicacion iso={publishedDate.toISOString()} fecha={absoluteDate} ago={timeAgo} locale={locale} />
               {post.reading_time_minutes && (
                 <>
                   <span>•</span>

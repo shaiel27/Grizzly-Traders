@@ -68,7 +68,7 @@
         560
       ],
       "parameters": {
-        "numberInputs": 12
+        "numberInputs": 14
       }
     },
     {
@@ -81,7 +81,7 @@
         255
       ],
       "parameters": {
-        "jsCode": "// Del BCE solo los comunicados (/press/pr/): discursos, entrevistas y blog llevan nombre de autor y sus terminos piden permiso escrito\nconst PERMITIDO = (link) => !/ecb\\.europa\\.eu/i.test(link) || /ecb\\.europa\\.eu\\/+press\\/pr\\//i.test(link);\nreturn $input.all().filter((item) => PERMITIDO((item.json || {}).link || '')).map(item => {\n  const j = item.json || {};\n  const raw = j.contentSnippet || j.content || j.description || j.summary || j.title || '';\n  const contentSnippet = String(raw).replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\n  const pubDate = j.isoDate || j.pubDate || j.pubdate || j.date || '';\n  const link = j.link || '';\n  // R1 -- ninguno de los nodos RSS etiquetaba su fuente,\n  // asi que las dos llegaban como 'RSS' generico y la atribucion visible que exige la\n  // auditoria legal no podia decir CUAL fuente. Se deriva del dominio del propio link, sin\n  // anadir un nodo nuevo al canvas.\n  let fuente = j.fuente || '';\n  if (!fuente) {\n    if (/cftc\\.gov/i.test(link)) fuente = 'CFTC';\n    else if (/investing\\.com/i.test(link)) fuente = 'Investing.com';\n    else if (/federalreserve\\.gov/i.test(link)) fuente = 'Reserva Federal';\n    else if (/sec\\.gov\\/Archives\\/edgar\\//i.test(link)) fuente = 'EDGAR';\n    else if (/sec\\.gov/i.test(link)) fuente = 'SEC';\n    else if (/occ\\.gov/i.test(link)) fuente = 'OCC';\n    else if (/fdic\\.gov/i.test(link)) fuente = 'FDIC';\n    else if (/globenewswire\\.com/i.test(link)) fuente = 'GlobeNewswire';\n    else if (/ecb\\.europa\\.eu/i.test(link)) fuente = 'BCE';\n    else if (/eia\\.gov/i.test(link)) fuente = 'EIA';\n    else if (/bea\\.gov/i.test(link)) fuente = 'BEA';\n  }\n  return { json: {\n    title: String(j.title || '').trim(),\n    link: link,\n    contentSnippet: contentSnippet,\n    pubDate: pubDate,\n    fuente: fuente\n  }};\n});"
+        "jsCode": "// Del BCE solo los comunicados (/press/pr/): discursos, entrevistas y blog llevan nombre de autor y sus terminos piden permiso escrito\nconst PERMITIDO = (link) => !/ecb\\.europa\\.eu/i.test(link) || /ecb\\.europa\\.eu\\/+press\\/pr\\//i.test(link);\nreturn $input.all().filter((item) => PERMITIDO((item.json || {}).link || '')).map(item => {\n  const j = item.json || {};\n  const raw = j.contentSnippet || j.content || j.description || j.summary || j.title || '';\n  const contentSnippet = String(raw).replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\n  const pubDate = j.isoDate || j.pubDate || j.pubdate || j.date || '';\n  const link = j.link || '';\n  // R1 -- ninguno de los nodos RSS etiquetaba su fuente,\n  // asi que las dos llegaban como 'RSS' generico y la atribucion visible que exige la\n  // auditoria legal no podia decir CUAL fuente. Se deriva del dominio del propio link, sin\n  // anadir un nodo nuevo al canvas.\n  let fuente = j.fuente || '';\n  if (!fuente) {\n    if (/cftc\\.gov/i.test(link)) fuente = 'CFTC';\n    else if (/investing\\.com/i.test(link)) fuente = 'Investing.com';\n    else if (/cnbc\\.com/i.test(link)) fuente = 'CNBC';\n    else if (/prnewswire\\.com/i.test(link)) fuente = 'PR Newswire';\n    else if (/federalreserve\\.gov/i.test(link)) fuente = 'Reserva Federal';\n    else if (/sec\\.gov\\/Archives\\/edgar\\//i.test(link)) fuente = 'EDGAR';\n    else if (/sec\\.gov/i.test(link)) fuente = 'SEC';\n    else if (/occ\\.gov/i.test(link)) fuente = 'OCC';\n    else if (/fdic\\.gov/i.test(link)) fuente = 'FDIC';\n    else if (/globenewswire\\.com/i.test(link)) fuente = 'GlobeNewswire';\n    else if (/ecb\\.europa\\.eu/i.test(link)) fuente = 'BCE';\n    else if (/eia\\.gov/i.test(link)) fuente = 'EIA';\n    else if (/bea\\.gov/i.test(link)) fuente = 'BEA';\n  }\n  return { json: {\n    title: String(j.title || '').trim(),\n    link: link,\n    contentSnippet: contentSnippet,\n    pubDate: pubDate,\n    fuente: fuente\n  }};\n});"
       }
     },
     {
@@ -183,7 +183,7 @@
         2080
       ],
       "parameters": {
-        "jsCode": "let data = $json.output?.[0]?.content?.[0]?.text ?? $json.choices?.[0]?.message?.content ?? $json.message?.content ?? $json.text;\nif (typeof data === 'string') {\n  data = data.trim().replace(/^```json\\s*/i, '').replace(/```\\s*$/, '');\n  data = JSON.parse(data);\n}\nif (!data || typeof data !== 'object') {\n  data = {};\n}\nconst feed = $('Normalizar Item').item.json || {};\nconst title = data.title || 'Sin titulo';\nconst slug = (data.slug || title).toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');\nconst sentimentMap = { 'Bullish': 'bullish', 'Bearish': 'bearish', 'Neutro': 'neutral', 'bullish': 'bullish', 'bearish': 'bearish', 'neutral': 'neutral' };\nconst sentiment = sentimentMap[data.sentiment] || 'neutral';\n// CATEGORIA-INICIO -- la categoria nunca cae en \"criptomonedas\" por defecto: solo si el tema ES cripto\nconst slugCat = (s) => String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');\nconst CATEGORIAS = { 'criptomonedas': 1, 'cripto': 1, 'crypto': 1, 'criptoactivos': 1, 'forex': 2, 'divisas': 2, 'fx': 2, 'monedas': 2, 'materias-primas': 3, 'commodities': 3, 'materias': 3, 'energia': 3, 'acciones': 4, 'bolsa': 4, 'renta-variable': 4 };\nconst RX_CRIPTO = /bitcoin|\\bbtc\\b|ethereum|\\beth\\b|cripto|crypto|blockchain|stablecoin|solana|\\bxrp\\b|ripple|dogecoin|binance|coinbase|\\bdefi\\b|\\bnft\\b|altcoin|halving|memecoin|tether|\\busdt\\b|\\busdc\\b|satoshi|zcash|\\btokens?\\b|tokeniz|\\bDLT\\b|\\bCBDC\\b|efectivo digital|moneda digital|ledger|trezor|metamask|hyperliquid|moonpay|polymarket|kalshi/i;\nconst RX_FOREX = /d[oó]lar|\\byen\\b|\\blibra\\b|\\beuro\\b|franco suizo|corona (sueca|noruega|danesa)|yuan|renminbi|divisas?|tipo de cambio|\\bforex\\b|monedas? (asi[aá]ticas?|emergentes)|\\bBOJ\\b|\\bBoE\\b|\\bBCE\\b|\\bECB\\b|\\bFed\\b|inflaci[oó]n|tasas? de inter[eé]s/i;\nconst RX_MATERIAS = /petr[oó]leo|crudo|\\bbrent\\b|\\bwti\\b|\\boro\\b|plata\\b|cobre|gas natural|trigo|ma[ií]z|soja|litio|alumin|materias primas|commodit/i;\nconst clasificarCategoria = (etiqueta, titulo, texto) => {\n  const encabezado = String(titulo || '');\n  const t = encabezado + ' ' + String(texto || '').slice(0, 600);\n  const directa = CATEGORIAS[slugCat(etiqueta)];\n  // GPT dice \"criptomonedas\" pero el texto no habla de cripto: no se confia (era el origen de articulos de banca o salud en esa categoria)\n  if (directa && !(directa === 1 && !RX_CRIPTO.test(t))) return directa;\n  // Cripto: titular o arranque del texto. Divisas y materias primas: SOLO el titular (una palabra suelta en el cuerpo da falsos positivos)\n  if (RX_CRIPTO.test(t)) return 1;\n  if (RX_FOREX.test(encabezado)) return 2;\n  if (RX_MATERIAS.test(encabezado)) return 3;\n  return 4;\n};\n// CATEGORIA-FIN\nconst categoryId = clasificarCategoria(data.category, title, String(data.content_html || '').replace(/<[^>]*>/g, ' '));\nconst originalLocale = data.original_locale === 'en' ? 'en' : 'es';\n// F3.1 -- GPT se pasa a menudo del maximo (salieron 872 y 923 sobre 750): en vez de mandar a borrador\n// un articulo valido, se quitan bloques completos del final (nunca se corta a mitad de frase). Si un\n// solo bloque ya supera el limite, se deja tal cual y el checklist lo rechazara.\nconst LIMITE = 750;\nconst textoDe = (html) => html.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\nconst recortarHtml = (html) => {\n  if (textoDe(html).length <= LIMITE) return html;\n  const bloques = html.match(/<(p|h2|h3|blockquote|ul|ol)\\b[^>]*>[\\s\\S]*?<\\/\\1>/gi);\n  if (!bloques || bloques.length < 2) return html;\n  while (bloques.length > 1 && textoDe(bloques.join('')).length > LIMITE) bloques.pop();\n  while (bloques.length > 1 && /^<h[23]\\b/i.test(bloques[bloques.length - 1])) bloques.pop();\n  return bloques.join('');\n};\n\nconst contentHtml = recortarHtml(data.content_html || '<p>Sin contenido</p>');\nconst plainText = contentHtml.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\nconst format = plainText.length < 350 ? 'brief' : 'article';\nconst wordCount = plainText.length > 0 ? plainText.split(' ').filter(Boolean).length : 0;\nconst readingTimeMinutes = Math.max(1, Math.ceil(wordCount / 200));\n// R1 -- source_id mapea el nombre de fuente al id real de la tabla fuentes (ver la migracion 0011). null si la fuente no esta en el registro, para no romper\n// el insert con un id inventado.\nconst sourceIdMap = { 'CFTC': 11, 'Investing.com': 4, 'Reserva Federal': 9, 'SEC': 10, 'BCE': 12, 'EIA': 13, 'BEA': 14, 'EDGAR': 15, 'OCC': 16, 'FDIC': 17, 'GlobeNewswire': 18 };\n// Banderas y activos de la portada: solo lo que la plantilla sabe dibujar (si GPT inventa otro codigo, se descarta)\nconst BANDERAS_OK = new Set('US EU GB JP CN DE FR IT ES CA AU NZ CH MX BR AR CL CO PE VE IN ID KR TW HK SG TH MY PH VN TR RU UA PL SE NO DK NL BE PT IE AT GR ZA NG EG SA AE IL IR IQ QA KW PK BD CZ HU RO FI SY LY'.split(' '));\nconst ACTIVOS_OK = new Set('BTC ETH SOL XRP ADA DOGE BNB DOT AVAX LINK LTC UNI ATOM POL USDT USDC TRX XLM BCH ETC XAUUSD XAGUSD PLATINUM PALLADIUM COPPER WTI BRENT NG CORN WHEAT SUGAR COFFEE EURUSD GBPUSD USDJPY USDCHF USDCAD AUDUSD NZDUSD EURGBP EURJPY GBPJPY SPX NDX DJI DXY VIX US10Y DAX CAC40 FTSE NIKKEI HSI ESTX50'.split(' '));\nconst limpiarLista = (valor, permitidos, max) => {\n  const lista = Array.isArray(valor) ? valor : typeof valor === 'string' ? valor.split(',') : [];\n  const salida = [];\n  for (const item of lista) {\n    const codigo = String(item || '').trim().toUpperCase();\n    if (permitidos.has(codigo) && !salida.includes(codigo)) salida.push(codigo);\n    if (salida.length >= max) break;\n  }\n  return salida;\n};\nreturn [{ json: {\n  original_locale: originalLocale,\n  title: title,\n  slug: slug,\n  content_html: contentHtml,\n  format: format,\n  reading_time_minutes: readingTimeMinutes,\n  sentiment: sentiment,\n  category_id: categoryId,\n  meta_description: data.meta_description || title,\n  cover_flags: limpiarLista(data.cover_flags, BANDERAS_OK, 2),\n  cover_assets: limpiarLista(data.cover_assets, ACTIVOS_OK, 2),\n  prompt_imagen: data.prompt_imagen || '3D corporate financial illustration with candlestick charts and city skyline, dark background',\n  source_url: feed.link || '',\n  source_title: feed.title || '',\n  source_id: sourceIdMap[feed.fuente] || null,\n  fuente: feed.fuente || 'RSS'\n}}];"
+        "jsCode": "let data = $json.output?.[0]?.content?.[0]?.text ?? $json.choices?.[0]?.message?.content ?? $json.message?.content ?? $json.text;\nif (typeof data === 'string') {\n  data = data.trim().replace(/^```json\\s*/i, '').replace(/```\\s*$/, '');\n  data = JSON.parse(data);\n}\nif (!data || typeof data !== 'object') {\n  data = {};\n}\nconst feed = $('Normalizar Item').item.json || {};\nconst title = data.title || 'Sin titulo';\nconst slug = (data.slug || title).toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');\nconst sentimentMap = { 'Bullish': 'bullish', 'Bearish': 'bearish', 'Neutro': 'neutral', 'bullish': 'bullish', 'bearish': 'bearish', 'neutral': 'neutral' };\nconst sentiment = sentimentMap[data.sentiment] || 'neutral';\n// CATEGORIA-INICIO -- la categoria nunca cae en \"criptomonedas\" por defecto: solo si el tema ES cripto\nconst slugCat = (s) => String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');\nconst CATEGORIAS = { 'criptomonedas': 1, 'cripto': 1, 'crypto': 1, 'criptoactivos': 1, 'forex': 2, 'divisas': 2, 'fx': 2, 'monedas': 2, 'materias-primas': 3, 'commodities': 3, 'materias': 3, 'energia': 3, 'acciones': 4, 'bolsa': 4, 'renta-variable': 4 };\nconst RX_CRIPTO = /bitcoin|\\bbtc\\b|ethereum|\\beth\\b|cripto|crypto|blockchain|stablecoin|solana|\\bxrp\\b|ripple|dogecoin|binance|coinbase|\\bdefi\\b|\\bnft\\b|altcoin|halving|memecoin|tether|\\busdt\\b|\\busdc\\b|satoshi|zcash|\\btokens?\\b|tokeniz|\\bDLT\\b|\\bCBDC\\b|efectivo digital|moneda digital|ledger|trezor|metamask|hyperliquid|moonpay|polymarket|kalshi/i;\nconst RX_FOREX = /d[oó]lar|\\byen\\b|\\blibra\\b|\\beuro\\b|franco suizo|corona (sueca|noruega|danesa)|yuan|renminbi|divisas?|tipo de cambio|\\bforex\\b|monedas? (asi[aá]ticas?|emergentes)|\\bBOJ\\b|\\bBoE\\b|\\bBCE\\b|\\bECB\\b|\\bFed\\b|inflaci[oó]n|tasas? de inter[eé]s/i;\nconst RX_MATERIAS = /petr[oó]leo|crudo|\\bbrent\\b|\\bwti\\b|\\boro\\b|plata\\b|cobre|gas natural|trigo|ma[ií]z|soja|litio|alumin|materias primas|commodit/i;\nconst clasificarCategoria = (etiqueta, titulo, texto) => {\n  const encabezado = String(titulo || '');\n  const t = encabezado + ' ' + String(texto || '').slice(0, 600);\n  const directa = CATEGORIAS[slugCat(etiqueta)];\n  // GPT dice \"criptomonedas\" pero el texto no habla de cripto: no se confia (era el origen de articulos de banca o salud en esa categoria)\n  if (directa && !(directa === 1 && !RX_CRIPTO.test(t))) return directa;\n  // Cripto: titular o arranque del texto. Divisas y materias primas: SOLO el titular (una palabra suelta en el cuerpo da falsos positivos)\n  if (RX_CRIPTO.test(t)) return 1;\n  if (RX_FOREX.test(encabezado)) return 2;\n  if (RX_MATERIAS.test(encabezado)) return 3;\n  return 4;\n};\n// CATEGORIA-FIN\nconst categoryId = clasificarCategoria(data.category, title, String(data.content_html || '').replace(/<[^>]*>/g, ' '));\nconst originalLocale = data.original_locale === 'en' ? 'en' : 'es';\n// F3.1 -- GPT se pasa a menudo del maximo (salieron 872 y 923 sobre 750): en vez de mandar a borrador\n// un articulo valido, se quitan bloques completos del final (nunca se corta a mitad de frase). Si un\n// solo bloque ya supera el limite, se deja tal cual y el checklist lo rechazara.\nconst LIMITE = 750;\nconst textoDe = (html) => html.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\nconst recortarHtml = (html) => {\n  if (textoDe(html).length <= LIMITE) return html;\n  const bloques = html.match(/<(p|h2|h3|blockquote|ul|ol)\\b[^>]*>[\\s\\S]*?<\\/\\1>/gi);\n  if (!bloques || bloques.length < 2) return html;\n  while (bloques.length > 1 && textoDe(bloques.join('')).length > LIMITE) bloques.pop();\n  while (bloques.length > 1 && /^<h[23]\\b/i.test(bloques[bloques.length - 1])) bloques.pop();\n  return bloques.join('');\n};\n\nconst contentHtml = recortarHtml(data.content_html || '<p>Sin contenido</p>');\nconst plainText = contentHtml.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\nconst format = plainText.length < 350 ? 'brief' : 'article';\nconst wordCount = plainText.length > 0 ? plainText.split(' ').filter(Boolean).length : 0;\nconst readingTimeMinutes = Math.max(1, Math.ceil(wordCount / 200));\n// R1 -- source_id mapea el nombre de fuente al id real de la tabla fuentes (ver la migracion 0011). null si la fuente no esta en el registro, para no romper\n// el insert con un id inventado.\nconst sourceIdMap = { 'CFTC': 11, 'Investing.com': 4, 'Reserva Federal': 9, 'SEC': 10, 'BCE': 12, 'EIA': 13, 'BEA': 14, 'EDGAR': 15, 'OCC': 16, 'FDIC': 17, 'GlobeNewswire': 18, 'CNBC': 19, 'PR Newswire': 20 };\n// Banderas y activos de la portada: solo lo que la plantilla sabe dibujar (si GPT inventa otro codigo, se descarta)\nconst BANDERAS_OK = new Set('US EU GB JP CN DE FR IT ES CA AU NZ CH MX BR AR CL CO PE VE IN ID KR TW HK SG TH MY PH VN TR RU UA PL SE NO DK NL BE PT IE AT GR ZA NG EG SA AE IL IR IQ QA KW PK BD CZ HU RO FI SY LY'.split(' '));\nconst ACTIVOS_OK = new Set('BTC ETH SOL XRP ADA DOGE BNB DOT AVAX LINK LTC UNI ATOM POL USDT USDC TRX XLM BCH ETC XAUUSD XAGUSD PLATINUM PALLADIUM COPPER WTI BRENT NG CORN WHEAT SUGAR COFFEE EURUSD GBPUSD USDJPY USDCHF USDCAD AUDUSD NZDUSD EURGBP EURJPY GBPJPY SPX NDX DJI DXY VIX US10Y DAX CAC40 FTSE NIKKEI HSI ESTX50'.split(' '));\nconst limpiarLista = (valor, permitidos, max) => {\n  const lista = Array.isArray(valor) ? valor : typeof valor === 'string' ? valor.split(',') : [];\n  const salida = [];\n  for (const item of lista) {\n    const codigo = String(item || '').trim().toUpperCase();\n    if (permitidos.has(codigo) && !salida.includes(codigo)) salida.push(codigo);\n    if (salida.length >= max) break;\n  }\n  return salida;\n};\nreturn [{ json: {\n  original_locale: originalLocale,\n  title: title,\n  slug: slug,\n  content_html: contentHtml,\n  format: format,\n  reading_time_minutes: readingTimeMinutes,\n  sentiment: sentiment,\n  category_id: categoryId,\n  meta_description: data.meta_description || title,\n  cover_flags: limpiarLista(data.cover_flags, BANDERAS_OK, 2),\n  cover_assets: limpiarLista(data.cover_assets, ACTIVOS_OK, 2),\n  prompt_imagen: data.prompt_imagen || '3D corporate financial illustration with candlestick charts and city skyline, dark background',\n  source_url: feed.link || '',\n  source_title: feed.title || '',\n  source_id: sourceIdMap[feed.fuente] || null,\n  fuente: feed.fuente || 'RSS'\n}}];"
       }
     },
     {
@@ -751,7 +751,7 @@
         255
       ],
       "parameters": {
-        "jsCode": "// Elige las notas de cada vuelta REPARTIENDO entre fuentes. Antes se tomaban las mas recientes por fecha: una fuente que publica\n// muchas (Investing.com, ~10 por hora) se quedaba con todo y las oficiales, que publican poco, casi nunca entraban.\n// Ahora va primero la fuente que menos ha publicado en las ultimas 24 h (a igualdad, la que tiene la nota mas reciente), una nota\n// por fuente; si sobran plazas, se completan con las mas recientes que queden.\nconst N = 3;\nconst fuenteDe = (link) => {\n  const l = String(link || '');\n  if (/cftc\\.gov/i.test(l)) return 'CFTC';\n  if (/investing\\.com/i.test(l)) return 'Investing.com';\n  if (/federalreserve\\.gov/i.test(l)) return 'Reserva Federal';\n  if (/sec\\.gov\\/Archives\\/edgar\\//i.test(l)) return 'EDGAR';\n  if (/sec\\.gov/i.test(l)) return 'SEC';\n  if (/occ\\.gov/i.test(l)) return 'OCC';\n  if (/fdic\\.gov/i.test(l)) return 'FDIC';\n  if (/globenewswire\\.com/i.test(l)) return 'GlobeNewswire';\n  if (/ecb\\.europa\\.eu/i.test(l)) return 'BCE';\n  if (/eia\\.gov/i.test(l)) return 'EIA';\n  if (/bea\\.gov/i.test(l)) return 'BEA';\n  return '';\n};\nconst hace24h = Date.now() - 24 * 3600 * 1000;\nconst pub = $('Publicados recientes').first().json;\nconst recientes = {};\nif (pub && pub.statusCode === 200 && Array.isArray(pub.body)) {\n  for (const p of pub.body) {\n    if (Date.parse(p.created_at) >= hace24h) {\n      const f = fuenteDe(p.source_url);\n      if (f) recientes[f] = (recientes[f] || 0) + 1;\n    }\n  }\n}\nconst items = $input.all().map((it, i) => ({ it, i, t: Date.parse($('Normalizar Item').itemMatching(i).json.pubDate) || 0, f: it.json.fuente || '' }));\nitems.sort((a, b) => b.t - a.t);\nconst porFuente = new Map();\nfor (const x of items) {\n  if (!porFuente.has(x.f)) porFuente.set(x.f, []);\n  porFuente.get(x.f).push(x);\n}\nconst orden = [...porFuente.keys()].sort((a, b) => (recientes[a] || 0) - (recientes[b] || 0) || porFuente.get(b)[0].t - porFuente.get(a)[0].t);\nconst elegidos = [];\nfor (const f of orden) {\n  if (elegidos.length >= N) break;\n  elegidos.push(porFuente.get(f)[0]);\n}\nfor (const x of items) {\n  if (elegidos.length >= N) break;\n  if (!elegidos.includes(x)) elegidos.push(x);\n}\nreturn elegidos.map(({ it, i }) => ({ json: it.json, pairedItem: { item: i } }));"
+        "jsCode": "// Elige las notas de cada vuelta REPARTIENDO entre fuentes. Antes se tomaban las mas recientes por fecha: una fuente que publica\n// muchas (Investing.com, ~10 por hora) se quedaba con todo y las oficiales, que publican poco, casi nunca entraban.\n// Ahora va primero la fuente que menos ha publicado en las ultimas 24 h (a igualdad, la que tiene la nota mas reciente), una nota\n// por fuente; si sobran plazas, se completan con las mas recientes que queden.\nconst N = 3;\nconst fuenteDe = (link) => {\n  const l = String(link || '');\n  if (/cftc\\.gov/i.test(l)) return 'CFTC';\n  if (/investing\\.com/i.test(l)) return 'Investing.com';\n  if (/cnbc\\.com/i.test(l)) return 'CNBC';\n  if (/prnewswire\\.com/i.test(l)) return 'PR Newswire';\n  if (/federalreserve\\.gov/i.test(l)) return 'Reserva Federal';\n  if (/sec\\.gov\\/Archives\\/edgar\\//i.test(l)) return 'EDGAR';\n  if (/sec\\.gov/i.test(l)) return 'SEC';\n  if (/occ\\.gov/i.test(l)) return 'OCC';\n  if (/fdic\\.gov/i.test(l)) return 'FDIC';\n  if (/globenewswire\\.com/i.test(l)) return 'GlobeNewswire';\n  if (/ecb\\.europa\\.eu/i.test(l)) return 'BCE';\n  if (/eia\\.gov/i.test(l)) return 'EIA';\n  if (/bea\\.gov/i.test(l)) return 'BEA';\n  return '';\n};\nconst hace24h = Date.now() - 24 * 3600 * 1000;\nconst pub = $('Publicados recientes').first().json;\nconst recientes = {};\nif (pub && pub.statusCode === 200 && Array.isArray(pub.body)) {\n  for (const p of pub.body) {\n    if (Date.parse(p.created_at) >= hace24h) {\n      const f = fuenteDe(p.source_url);\n      if (f) recientes[f] = (recientes[f] || 0) + 1;\n    }\n  }\n}\nconst items = $input.all().map((it, i) => ({ it, i, t: Date.parse($('Normalizar Item').itemMatching(i).json.pubDate) || 0, f: it.json.fuente || '' }));\nitems.sort((a, b) => b.t - a.t);\nconst porFuente = new Map();\nfor (const x of items) {\n  if (!porFuente.has(x.f)) porFuente.set(x.f, []);\n  porFuente.get(x.f).push(x);\n}\nconst orden = [...porFuente.keys()].sort((a, b) => (recientes[a] || 0) - (recientes[b] || 0) || porFuente.get(b)[0].t - porFuente.get(a)[0].t);\nconst elegidos = [];\nfor (const f of orden) {\n  if (elegidos.length >= N) break;\n  elegidos.push(porFuente.get(f)[0]);\n}\nfor (const x of items) {\n  if (elegidos.length >= N) break;\n  if (!elegidos.includes(x)) elegidos.push(x);\n}\nreturn elegidos.map(({ it, i }) => ({ json: it.json, pairedItem: { item: i } }));"
       }
     },
     {
@@ -783,7 +783,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ p_source_url: $('Normalizar Item').item.json.link, p_title: $('Normalizar Item').item.json.title, p_source_id: ({ 'CFTC': 11, 'Investing.com': 4, 'Reserva Federal': 9, 'SEC': 10, 'BCE': 12, 'EIA': 13, 'BEA': 14, 'EDGAR': 15, 'OCC': 16, 'FDIC': 17, 'GlobeNewswire': 18 })[$('Normalizar Item').item.json.fuente] ?? null, p_author_id: 5 }) }}",
+        "jsonBody": "={{ JSON.stringify({ p_source_url: $('Normalizar Item').item.json.link, p_title: $('Normalizar Item').item.json.title, p_source_id: ({ 'CFTC': 11, 'Investing.com': 4, 'Reserva Federal': 9, 'SEC': 10, 'BCE': 12, 'EIA': 13, 'BEA': 14, 'EDGAR': 15, 'OCC': 16, 'FDIC': 17, 'GlobeNewswire': 18, 'CNBC': 19, 'PR Newswire': 20 })[$('Normalizar Item').item.json.fuente] ?? null, p_author_id: 5 }) }}",
         "options": {
           "response": {
             "response": {
@@ -1235,7 +1235,7 @@
     },
     {
       "parameters": {
-        "content": "## 1 · Disparo, fuentes y seleccion\nFuentes: oficiales (CFTC, Reserva Federal, SEC, BCE solo comunicados, EIA, BEA, OCC, FDIC y los filings 8-K de EDGAR), Investing.com y, con interruptor (MASSIVE_NEWS_ACTIVO), los comunicados de GlobeNewswire via Massive. Cada vuelta elige 3 notas repartidas: primero la fuente que menos publico en las ultimas 24 h.  El disparador corre cada 15 min y la compuerta deja pasar 1 de cada 3 (cada 45 min exactos).",
+        "content": "## 1 · Disparo, fuentes y seleccion\nFuentes: oficiales (CFTC, Reserva Federal, SEC, BCE solo comunicados, EIA, BEA, OCC, FDIC y los filings 8-K de EDGAR), Investing.com, CNBC y PR Newswire (riesgo aceptado por el usuario, ver docs/fuentes.md) y, con interruptor (MASSIVE_NEWS_ACTIVO), los comunicados de GlobeNewswire via Massive. Cada vuelta elige 3 notas repartidas: primero la fuente que menos publico en las ultimas 24 h.  El disparador corre cada 15 min y la compuerta deja pasar 1 de cada 3 (cada 45 min exactos).",
         "height": 1300,
         "width": 2350,
         "color": 4
@@ -2042,6 +2042,36 @@
       "parameters": {
         "jsCode": "// HTML del documento -> texto plano, con la misma forma que devuelve Firecrawl ({ data: { markdown } }) para reutilizar el nodo siguiente.\nconst ENT = { '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '\"', '&#39;': \"'\", '&rsquo;': \"'\", '&lsquo;': \"'\", '&ldquo;': '\"', '&rdquo;': '\"', '&ndash;': '-', '&mdash;': '-', '&#160;': ' ', '&#8217;': \"'\", '&#8220;': '\"', '&#8221;': '\"', '&#8212;': '-', '&#8211;': '-' };\nlet t = String($json.data || '');\nt = t.replace(/<(script|style)[\\s\\S]*?<\\/\\1>/gi, ' ').replace(/<br\\s*\\/?>/gi, '\\n').replace(/<\\/(p|div|tr|li|h\\d|table)>/gi, '\\n').replace(/<[^>]*>/g, ' ');\nt = t.replace(/&#?\\w+;/g, (m) => (m in ENT ? ENT[m] : ' '));\nconst lineas = t.split('\\n').map((l) => l.replace(/\\s+/g, ' ').trim()).filter((l) => l.length > 0);\nreturn [{ json: { data: { markdown: lineas.join('\\n').slice(0, 20000) } } }];"
       }
+    },
+    {
+      "id": "651e0457-0c09-4419-a3cf-87e493bd7e5a",
+      "name": "RSS CNBC",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "onError": "continueRegularOutput",
+      "position": [
+        520,
+        950
+      ],
+      "parameters": {
+        "url": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=15839069",
+        "options": {}
+      }
+    },
+    {
+      "id": "5bb122e1-c4dd-4401-bdac-9069f4340016",
+      "name": "RSS PR Newswire",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "onError": "continueRegularOutput",
+      "position": [
+        520,
+        1045
+      ],
+      "parameters": {
+        "url": "https://www.prnewswire.com/rss/financial-services-latest-news/financial-services-latest-news-list.rss",
+        "options": {}
+      }
     }
   ],
   "connections": {
@@ -2602,6 +2632,16 @@
             "node": "Massive activo?",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "RSS CNBC",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS PR Newswire",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
@@ -3056,6 +3096,28 @@
             "node": "Extraer contenido completo",
             "type": "main",
             "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS CNBC": {
+      "main": [
+        [
+          {
+            "node": "Fuentes Combinadas",
+            "type": "main",
+            "index": 12
+          }
+        ]
+      ]
+    },
+    "RSS PR Newswire": {
+      "main": [
+        [
+          {
+            "node": "Fuentes Combinadas",
+            "type": "main",
+            "index": 13
           }
         ]
       ]
