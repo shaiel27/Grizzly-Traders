@@ -302,7 +302,8 @@
     "categoryTile": "Categoría",
     "assetsTile": "Activos",
     "readFullArticle": "Leer artículo completo",
-    "share": "Compartir"
+    "share": "Compartir",
+    "shareCopied": "Enlace copiado"
   },
   "latestByCategory": {
     "viewAll": "Ver todas",

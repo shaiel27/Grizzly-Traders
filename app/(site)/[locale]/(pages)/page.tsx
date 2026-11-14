@@ -19,6 +19,7 @@ import { getTickerSnapshot } from '@/lib/ticker'
 import { getPivotQuotes } from '@/lib/pivot-data'
 import { calculatePivots } from '@/lib/pivots'
 import { localizedPost, sentimentMeta, timeAgo } from '@/lib/feed'
+import { pickFeaturedPost } from '@/lib/featured-window'
 import { scanTradingView } from '@/lib/markets'
 import { calcularSentimiento, normalizarCambio, type ResultadoSentimiento } from '@/lib/globe/sentimiento'
 import type { PostWithRelations } from '@/lib/types'
@@ -64,6 +65,7 @@ function last24hIso(): string {
 }
 
 // Página prerenderizada por idioma y regenerada cada minuto (cotizaciones del hero) o al publicar (tag 'posts').
+// El minuto también acota cuánto puede tardar en caer el destacado al cumplir 24 h (BreakingPost lo retira además en el cliente).
 // Ya no lee `searchParams`: ningún enlace del sitio apunta a /?categoria=, el filtro por categoría vive en /articulos.
 export const revalidate = 60
 
@@ -88,14 +90,16 @@ export default async function HomePage() {
 
   try {
     const [featuredPosts, latestPosts, postsByCategory, count, assets] = await Promise.all([
-      getFeaturedPosts(1, locale),
+      getFeaturedPosts(5, locale),
       getPublishedPosts({ since: last24h, limit: 60, locale }),
       Promise.all(CATEGORY_SLUGS.map((slug) => getPostsByCategory(slug, 3, locale))),
       getPostCount(),
       getAssetCount(),
     ])
 
-    featured = featuredPosts[0]
+    // Destacado = el más reciente de los marcados en el CMS que sigue dentro de sus 24 h (lib/featured-window.ts).
+    // Se decide aquí, al renderizar, no en la consulta cacheada: así depende de Date.now() de cada regeneración.
+    featured = pickFeaturedPost(featuredPosts)
     latest = latestPosts
     postCount = count
     assetCount = assets
