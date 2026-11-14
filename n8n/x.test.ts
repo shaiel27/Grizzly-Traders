@@ -98,6 +98,14 @@ describe('portada en la publicación', () => {
     }
   })
 
+  it('si la credencial no está conectada, la portada lo dice con claridad y se publica solo el texto', () => {
+    const m = media({ error: {}, details: { message: 'Unable to sign without access token' } })
+    expect(m.mediaId).toBe('')
+    expect(m.errorImagen).toContain('credencial de X sin conectar')
+    expect(m.errorImagen).not.toContain('[object Object]')
+    expect(m.texto).toBe('texto')
+  })
+
   it('«X - Resultado» recuerda si salió con portada, para el registro', () => {
     const resultado = (r: unknown, previo: Record<string, unknown>) =>
       (new Function('$json', '$', codigo('X - Resultado'))(r, () => ({ item: { json: previo } })) as { json: { ok: boolean; conImagen: boolean; errorImagen: string } }).json
@@ -268,6 +276,18 @@ describe('X - Resultado', () => {
     const r = resultado({ error: 'timeout' })
     expect(r.ok).toBe(false)
     expect(r.error).toContain('sin respuesta')
+  })
+  it('credencial sin conectar («Unable to sign without access token»): lo dice claro en vez de «[object Object]»', () => {
+    const r = resultado({ error: {}, details: { message: 'Unable to sign without access token', httpCode: null, body: null } })
+    expect(r.ok).toBe(false)
+    expect(r.error).toContain('credencial de X sin conectar')
+    expect(r.error).toContain('pulsar Connect')
+    expect(r.error).not.toContain('[object Object]')
+  })
+  it('cualquier otro fallo anterior a la petición muestra su mensaje, no «[object Object]»', () => {
+    const r = resultado({ error: {}, details: { message: 'getaddrinfo ENOTFOUND api.x.com' } })
+    expect(r.error).toContain('ENOTFOUND')
+    expect(r.error).not.toContain('[object Object]')
   })
   it('un 201 sin id no se da por publicada', () => {
     expect(resultado({ statusCode: 201, body: {} }).ok).toBe(false)
