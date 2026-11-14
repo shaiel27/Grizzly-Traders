@@ -2706,8 +2706,7 @@
       "parameters": {
         "method": "POST",
         "url": "https://api.x.com/2/media/upload",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "oAuth2Api",
+        "authentication": "none",
         "sendBody": true,
         "contentType": "multipart-form-data",
         "bodyParameters": {
@@ -2731,16 +2730,19 @@
               "neverError": true
             }
           }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $json.authX }}"
+            }
+          ]
         }
       },
       "onError": "continueRegularOutput",
-      "credentials": {
-        "oAuth2Api": {
-          "id": "XcredGrizzly0001",
-          "name": "X (grizzlytraders)"
-        }
-      },
-      "notes": "Sin reintentos. Si la subida falla (por permiso media.write, formato o saldo) se publica solo el texto."
+      "notes": "Sin reintentos. Firma OAuth 1.0a de «X - Firmar subida» (el permiso media.write de OAuth 2.0 no se concede a esta app). Si la subida falla se publica solo el texto."
     },
     {
       "id": "3eb8f3fe-d922-4dbd-9e9f-63d4d32ba4f6",
@@ -2755,6 +2757,21 @@
         "mode": "runOnceForEachItem",
         "jsCode": "// Resultado de la subida de la portada. Con id de imagen, la publicacion lleva portada; SIN id (cualquier fallo) se publica solo el texto: la portada nunca\n// debe impedir una publicacion. Se recuperan los datos del articulo del nodo «Armar texto X».\nconst previo = $('Armar texto X').item.json;\nconst r = $json || {};\nconst estado = Number(r.statusCode || 0);\nlet cuerpo = r.body !== undefined ? r.body : r.data;\nif (typeof cuerpo === 'string') { try { cuerpo = JSON.parse(cuerpo); } catch (_) { /* queda como texto */ } }\nconst id = cuerpo && cuerpo.data && cuerpo.data.id ? String(cuerpo.data.id) : '';\nlet errorImagen = '';\nif (!id) {\n  let detalle = (cuerpo && typeof cuerpo === 'object' && (cuerpo.detail || cuerpo.title)) || (r.details && r.details.message) || r.error || '';\n  if (detalle && typeof detalle !== 'string') detalle = JSON.stringify(detalle);\n  errorImagen = 'portada no subida (X respondio ' + (estado || 'sin respuesta') + (detalle ? ': ' + String(detalle).slice(0, 120) : '') + ')';\n  if (/unable to sign without access token/i.test(String(detalle))) errorImagen = 'portada no subida (credencial de X sin conectar (falta el token de acceso): abrir «X (grizzlytraders)» en n8n y pulsar Connect)';\n}\nreturn { json: { ...previo, mediaId: id, conImagen: id !== '', errorImagen } };"
       }
+    },
+    {
+      "id": "a7d1c2e4-5b3f-4e8a-9c61-0f2b7e9d4a13",
+      "name": "X - Firmar subida",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        850,
+        1250
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Firma OAuth 1.0a (HMAC-SHA1) de la subida de la portada a X. El permiso `media.write` de OAuth 2.0 no se concede a esta app (la subida da 403), pero el mismo\n// endpoint acepta OAuth 1.0a con el token de acceso de la propia cuenta. Las cuatro claves viven solo en variables de entorno del servidor ($env), nunca en el flujo.\n// Sin claves o ante cualquier fallo, `authX` queda vacío: la subida falla y la publicación sale solo con texto (la portada nunca impide publicar).\n// SHA-1 escrito a mano: el nodo de código no permite `require('crypto')` sin ajustes extra del servidor.\nfunction utf8(s) {\n  const b = [];\n  for (const ch of String(s)) {\n    const c = ch.codePointAt(0);\n    if (c < 0x80) b.push(c);\n    else if (c < 0x800) b.push(0xc0 | (c >> 6), 0x80 | (c & 63));\n    else if (c < 0x10000) b.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));\n    else b.push(0xf0 | (c >> 18), 0x80 | ((c >> 12) & 63), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));\n  }\n  return b;\n}\nfunction sha1(bytes) {\n  const rol = (x, n) => ((x << n) | (x >>> (32 - n))) >>> 0;\n  const m = bytes.slice();\n  const bits = m.length * 8;\n  m.push(0x80);\n  while (m.length % 64 !== 56) m.push(0);\n  for (let i = 7; i >= 0; i--) m.push(i >= 4 ? 0 : (bits >>> (i * 8)) & 255);\n  let h0 = 0x67452301, h1 = 0xefcdab89, h2 = 0x98badcfe, h3 = 0x10325476, h4 = 0xc3d2e1f0;\n  for (let o = 0; o < m.length; o += 64) {\n    const w = [];\n    for (let i = 0; i < 16; i++) w[i] = ((m[o + i * 4] << 24) | (m[o + i * 4 + 1] << 16) | (m[o + i * 4 + 2] << 8) | m[o + i * 4 + 3]) >>> 0;\n    for (let i = 16; i < 80; i++) w[i] = rol(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);\n    let a = h0, b = h1, c = h2, d = h3, e = h4;\n    for (let i = 0; i < 80; i++) {\n      let f, k;\n      if (i < 20) { f = (b & c) | (~b & d); k = 0x5a827999; }\n      else if (i < 40) { f = b ^ c ^ d; k = 0x6ed9eba1; }\n      else if (i < 60) { f = (b & c) | (b & d) | (c & d); k = 0x8f1bbcdc; }\n      else { f = b ^ c ^ d; k = 0xca62c1d6; }\n      const t = (rol(a, 5) + (f >>> 0) + e + k + w[i]) >>> 0;\n      e = d; d = c; c = rol(b, 30); b = a; a = t;\n    }\n    h0 = (h0 + a) >>> 0; h1 = (h1 + b) >>> 0; h2 = (h2 + c) >>> 0; h3 = (h3 + d) >>> 0; h4 = (h4 + e) >>> 0;\n  }\n  const out = [];\n  for (const h of [h0, h1, h2, h3, h4]) out.push((h >>> 24) & 255, (h >>> 16) & 255, (h >>> 8) & 255, h & 255);\n  return out;\n}\nfunction hmacSha1(clave, mensaje) {\n  let k = clave.length > 64 ? sha1(clave) : clave.slice();\n  while (k.length < 64) k.push(0);\n  const interno = sha1(k.map((x) => x ^ 0x36).concat(mensaje));\n  return sha1(k.map((x) => x ^ 0x5c).concat(interno));\n}\nfunction base64(bytes) {\n  const T = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';\n  let s = '';\n  for (let i = 0; i < bytes.length; i += 3) {\n    const n = (bytes[i] << 16) | ((bytes[i + 1] || 0) << 8) | (bytes[i + 2] || 0);\n    s += T[(n >> 18) & 63] + T[(n >> 12) & 63] + (i + 1 < bytes.length ? T[(n >> 6) & 63] : '=') + (i + 2 < bytes.length ? T[n & 63] : '=');\n  }\n  return s;\n}\nconst pct = (s) => encodeURIComponent(String(s)).replace(/[!'()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());\nfunction firmarOAuth1(metodo, url, claves, extra, ahora, nonce) {\n  const oauth = {\n    oauth_consumer_key: claves.consumerKey,\n    oauth_nonce: nonce,\n    oauth_signature_method: 'HMAC-SHA1',\n    oauth_timestamp: String(ahora),\n    oauth_token: claves.token,\n    oauth_version: '1.0',\n  };\n  const todos = Object.entries({ ...oauth, ...(extra || {}) })\n    .map(([k, v]) => [pct(k), pct(v)])\n    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0));\n  const base = metodo.toUpperCase() + '&' + pct(url) + '&' + pct(todos.map(([k, v]) => k + '=' + v).join('&'));\n  const firma = base64(hmacSha1(utf8(pct(claves.consumerSecret) + '&' + pct(claves.tokenSecret)), utf8(base)));\n  return 'OAuth ' + Object.entries({ ...oauth, oauth_signature: firma }).map(([k, v]) => pct(k) + '=\"' + pct(v) + '\"').join(', ');\n}\n// --- nodo ---\n// El cuerpo es multipart: sus campos NO entran en la firma (solo los de formularios codificados); basta firmar método, dirección y parámetros oauth.\nlet authX = '';\ntry {\n  const claves = { consumerKey: $env.X_OAUTH1_API_KEY, consumerSecret: $env.X_OAUTH1_API_SECRET, token: $env.X_OAUTH1_TOKEN, tokenSecret: $env.X_OAUTH1_TOKEN_SECRET };\n  if (claves.consumerKey && claves.consumerSecret && claves.token && claves.tokenSecret) {\n    const nonce = Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join('');\n    authX = firmarOAuth1('POST', 'https://api.x.com/2/media/upload', claves, {}, Math.floor(Date.now() / 1000), nonce);\n  }\n} catch (e) {\n  authX = '';\n}\nreturn { json: { ...$json, authX }, binary: $input.item.binary };\n"
+      },
+      "notes": "Firma con OAuth 1.0a (token de la propia cuenta) la subida de la portada: OAuth 2.0 no concede media.write a esta app. Claves en variables de entorno X_OAUTH1_*. Sin claves, la publicacion sale solo con texto."
     }
   ],
   "connections": {
@@ -4084,7 +4101,7 @@
       "main": [
         [
           {
-            "node": "X - Subir portada",
+            "node": "X - Firmar subida",
             "type": "main",
             "index": 0
           }
@@ -4107,6 +4124,17 @@
         [
           {
             "node": "X - Publicar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "X - Firmar subida": {
+      "main": [
+        [
+          {
+            "node": "X - Subir portada",
             "type": "main",
             "index": 0
           }

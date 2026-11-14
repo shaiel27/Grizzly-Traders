@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
@@ -24,7 +25,8 @@ describe('cableado de la publicación en X', () => {
     expect(destinos('Elegir artículo para X')).toEqual([['Armar texto X']])
     expect(destinos('Armar texto X')).toEqual([['¿Publicar en X?']])
     expect(destinos('¿Publicar en X?')).toEqual([['X - Descargar portada'], ['X - Registrar prueba']])
-    expect(destinos('X - Descargar portada')).toEqual([['X - Subir portada']])
+    expect(destinos('X - Descargar portada')).toEqual([['X - Firmar subida']])
+    expect(destinos('X - Firmar subida')).toEqual([['X - Subir portada']])
     expect(destinos('X - Subir portada')).toEqual([['X - Media id']])
     expect(destinos('X - Media id')).toEqual([['X - Publicar']])
     expect(destinos('X - Publicar')).toEqual([['X - Resultado']])
@@ -60,7 +62,7 @@ describe('portada en la publicación', () => {
     expect(p.options.response.response).toMatchObject({ neverError: true, responseFormat: 'file', outputPropertyName: 'data' })
   })
 
-  it('la sube con la API de medios de X, como imagen de publicación, sin reintentos y con la misma credencial OAuth2', () => {
+  it('la sube con la API de medios de X, como imagen de publicación, sin reintentos y con la cabecera OAuth 1.0a ya firmada (sin credencial OAuth2)', () => {
     const p = nodo('X - Subir portada').parameters
     expect(p.url).toBe('https://api.x.com/2/media/upload')
     expect(p.contentType).toBe('multipart-form-data')
@@ -70,7 +72,9 @@ describe('portada en la publicación', () => {
     ])
     expect(p.options.response.response).toMatchObject({ fullResponse: true, neverError: true })
     expect(nodo('X - Subir portada')).not.toHaveProperty('retryOnFail')
-    expect(nodo('X - Subir portada').credentials!.oAuth2Api.id).toBe('XcredGrizzly0001')
+    expect(p.authentication).toBe('none')
+    expect(p.headerParameters.parameters).toEqual([{ name: 'Authorization', value: '={{ $json.authX }}' }])
+    expect(nodo('X - Subir portada').credentials).toBeUndefined()
   })
 
   const media = (r: unknown) =>
@@ -255,6 +259,60 @@ describe('Armar texto X', () => {
     expect(armar(base, {}).publicar).toBe(false)
     expect(armar(base, { X_PUBLICAR_ACTIVO: 'false' }).publicar).toBe(false)
     expect(armar(base, { X_PUBLICAR_ACTIVO: 'true' }).publicar).toBe(true)
+  })
+})
+
+describe('X - Firmar subida (OAuth 1.0a)', () => {
+  const claves = { consumerKey: 'CK', consumerSecret: 'CS', token: 'TK', tokenSecret: 'TS' }
+  const env = { X_OAUTH1_API_KEY: 'CK', X_OAUTH1_API_SECRET: 'CS', X_OAUTH1_TOKEN: 'TK', X_OAUTH1_TOKEN_SECRET: 'TS' }
+  const entrada = { json: { postId: 'p1' }, binary: { data: { fileName: 'p.webp' } } }
+  const correr = (e: Record<string, string>) =>
+    new Function('$json', '$env', '$input', codigo('X - Firmar subida'))(entrada.json, e, { item: { binary: entrada.binary } }) as { json: { postId: string; authX: string }; binary: unknown }
+  // la función de firma sola (el código del nodo hasta el marcador)
+  const firmar = new Function(codigo('X - Firmar subida').split('// --- nodo ---')[0] + '\nreturn firmarOAuth1;')() as (m: string, u: string, c: typeof claves, extra: Record<string, string>, ahora: number, nonce: string) => string
+
+  it('reproduce el ejemplo oficial de firma de la documentación de X', () => {
+    const h = firmar(
+      'POST',
+      'https://api.twitter.com/1.1/statuses/update.json',
+      { consumerKey: 'xvz1evFS4wEEPTGEFPHBog', consumerSecret: 'kAcSOqF21Fu85e7zjz7ZN2U4ZRhfV3WpwPAoE3Z7kBw', token: '370773112-GmHxMAgYyLbNEtIKZeRNFsMKPR9EyMZeS9weJAEb', tokenSecret: 'LswwdoUaIvS8ltyTt5jkRh4J50vUPVVHtR2YPi5kE' },
+      { include_entities: 'true', status: 'Hello Ladies + Gentlemen, a signed OAuth request!' },
+      1318622958,
+      'kYjzVBB8Y0ZFabxSWbWovY3uYSQ2pTgmZeNu2VS4cg',
+    )
+    expect(h).toContain('oauth_signature="hCtSmYh%2BiHYCEqBWrE7C7hYmtUk%3D"')
+  })
+
+  it('la firma coincide con la de la biblioteca crypto de Node para cualquier clave y mensaje (incluye claves largas y símbolos)', () => {
+    for (const [ck, cs, tk, ts] of [['CK', 'CS', 'TK', 'TS'], ['a'.repeat(25), 'b'.repeat(50), '1234-' + 'c'.repeat(40), 'd'.repeat(45)], ['k+/=', 's&=%ñ', 't!*()', "q'~_-"], ['x'.repeat(70), 'y', 'z', 'w']]) {
+      const h = firmar('POST', 'https://api.x.com/2/media/upload', { consumerKey: ck, consumerSecret: cs, token: tk, tokenSecret: ts }, {}, 1700000000, 'abc123')
+      const obtenido = Object.fromEntries([...h.matchAll(/(\w+)="([^"]*)"/g)].map((m) => [m[1], decodeURIComponent(m[2])]))
+      const sinFirma = Object.entries(obtenido).filter(([k]) => k !== 'oauth_signature')
+      const pct = (s: string) => encodeURIComponent(s).replace(/[!'()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase())
+      const base = 'POST&' + pct('https://api.x.com/2/media/upload') + '&' + pct(sinFirma.map(([k, v]) => k + '=' + pct(v)).sort().join('&'))
+      const esperada = createHmac('sha1', pct(cs) + '&' + pct(ts)).update(base).digest('base64')
+      expect(obtenido.oauth_signature).toBe(esperada)
+    }
+  })
+
+  it('con las cuatro claves entrega la cabecera Authorization y conserva el binario y los datos del artículo', () => {
+    const r = correr(env)
+    expect(r.json.postId).toBe('p1')
+    expect(r.binary).toBe(entrada.binary)
+    expect(r.json.authX).toMatch(/^OAuth oauth_consumer_key="CK", oauth_nonce="[0-9a-f]{32}", oauth_signature_method="HMAC-SHA1", oauth_timestamp="\d{10}", oauth_token="TK", oauth_version="1.0", oauth_signature="[^"]+"$/)
+    expect(r.json.authX).not.toContain('CS')
+    expect(r.json.authX).not.toContain('TS')
+  })
+
+  it('sin alguna de las claves no firma (la subida falla y se publica solo el texto)', () => {
+    expect(correr({}).json.authX).toBe('')
+    expect(correr({ ...env, X_OAUTH1_TOKEN_SECRET: '' }).json.authX).toBe('')
+    expect(correr({}).binary).toBe(entrada.binary)
+  })
+
+  it('el código no contiene claves ni secretos', () => {
+    const sinAlfabeto = codigo('X - Firmar subida').replace('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', '')
+    expect(sinAlfabeto).not.toMatch(/[A-Za-z0-9]{35,}/)
   })
 })
 
