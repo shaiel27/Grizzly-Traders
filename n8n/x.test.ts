@@ -111,6 +111,36 @@ describe('portada en la publicación', () => {
   })
 })
 
+describe('detección de avisos de bufetes (Contar publicado)', () => {
+  const marca = (p: Record<string, unknown>) => {
+    const est: Estatico = { ejec: '9', publicados: 0, articulosX: [] }
+    new Function('$json', '$', '$execution', '$getWorkflowStaticData', codigo('Contar publicado'))(
+      {},
+      (n: string) => ({ item: { json: n === 'Parsear JSON' ? { slug: 's', fuente: 'GlobeNewswire', relevancia: 7, category_id: 4, cover_assets: [], ...p } : { body: [{ id: 'id-1' }], cover_image_url: 'https://e.com/p.webp' } } }),
+      { id: '9' },
+      () => est
+    )
+    return est.articulosX[0].aviso as boolean
+  }
+  // titulares REALES que el selector eligió en produccion el 13-nov (el modelo les dio relevancia 7)
+  it.each([
+    ['Advertencia para inversores de Anavex: plazo final para representación legal se aproxima', 'Inversores de Anavex deben asegurarse representación legal antes del 30 de noviembre', 'ANAVEX LIFE SCIENCES INVESTORS: Deadline Alert - Contact Law Firm'],
+    ['Tigo Energy: última oportunidad para inversores', 'Los inversores afectados pueden unirse a la demanda', 'Tigo Energy Investors Encouraged to Contact the Gross Law Firm'],
+    ['Demandan a Intel por supuestos engaños a inversores', 'Un despacho presentó una acción colectiva', 'Robbins Geller Rudman & Dowd LLP Files Class Action Suit Against Intel'],
+    ['Rosen Law Firm recuerda el plazo a los inversores de Yiren Digital', 'Los inversores que perdieron dinero', 'Rosen Law Firm Encourages Yiren Digital Ltd. Investors to Secure Counsel'],
+  ])('es aviso de bufete: %s', (title, meta, source_title) => {
+    expect(marca({ title, meta_description: meta, source_title })).toBe(true)
+  })
+  it.each([
+    ['Tempest Therapeutics presenta resultados del tercer trimestre', 'La compañía informó una pérdida neta menor', 'Tempest Therapeutics Reports Third Quarter 2026 Financial Results'],
+    ['Nvidia: la estrategia de opciones antes de los resultados', 'Los inversores miran la volatilidad implícita', 'Nvidia options strategy ahead of earnings'],
+    ['Windward Bio anuncia su cotización en Nasdaq', 'La biotecnológica comenzará a cotizar', 'Windward Bio announces Nasdaq listing'],
+    ['La Reserva Federal mantiene las tasas sin cambios', 'Evaluará nuevos datos de inflación', 'Federal Reserve issues FOMC statement'],
+  ])('NO es aviso de bufete: %s', (title, meta, source_title) => {
+    expect(marca({ title, meta_description: meta, source_title })).toBe(false)
+  })
+})
+
 describe('Elegir artículo para X', () => {
   const elegir = (id: string, est: Estatico) => new Function('$execution', '$getWorkflowStaticData', codigo('Elegir artículo para X'))({ id }, () => est) as { json: { postId: string } }[]
   const art = (postId: string, relevancia: number, prioridad = 0) => ({ postId, relevancia, prioridad })
@@ -123,6 +153,12 @@ describe('Elegir artículo para X', () => {
   it('a igualdad de relevancia gana la fuente de más prioridad (oficiales primero)', () => {
     const est: Estatico = { ejec: '7', articulosX: [art('a', 8, 0), art('b', 8, 2), art('c', 8, 1)] }
     expect(elegir('7', est)[0].json.postId).toBe('b')
+  })
+  it('NUNCA elige un aviso de bufete, aunque tenga la relevancia más alta; y descarta lo de relevancia menor que 5', () => {
+    const est: Estatico = { ejec: '7', articulosX: [{ ...art('bufete', 10, 2), aviso: true }, art('baja', 4, 2), art('buena', 6, 0)] }
+    expect(elegir('7', est).map((x) => x.json.postId)).toEqual(['buena'])
+    expect(elegir('7', { ejec: '7', articulosX: [{ ...art('b1', 9), aviso: true }, art('b2', 3)] })).toEqual([])
+    expect(elegir('7', { ejec: '7', articulosX: [art('justo', 5)] }).map((x) => x.json.postId)).toEqual(['justo'])
   })
   it('sin candidatos, o de otra vuelta, no publica nada', () => {
     expect(elegir('7', { ejec: '7', articulosX: [] })).toEqual([])

@@ -129,8 +129,8 @@ describe('Control de cupo y Contar publicado', () => {
     publicado = {} // sin la fila del artículo: se usa la misma dirección con la que el flujo subió la imagen al almacenamiento
     contar('1001', est, { ...parsear, fuente: 'CNBC', relevancia: undefined, cover_assets: undefined })
     expect(est.articulosX).toEqual([
-      { postId: 'post-1', portada: 'https://cdn.example/portada-real.webp', titulo: 'Titular', resumen: 'Contexto', categoria: 4, activos: ['BTC'], fuente: 'EDGAR', relevancia: 8, prioridad: 2 },
-      { postId: 'post-1', portada: 'https://pudzvatuubywmwdmboiq.supabase.co/storage/v1/object/public/post-images/mi-slug-post-1.webp', titulo: 'Titular', resumen: 'Contexto', categoria: 4, activos: [], fuente: 'CNBC', relevancia: 5, prioridad: 0 },
+      { postId: 'post-1', portada: 'https://cdn.example/portada-real.webp', titulo: 'Titular', resumen: 'Contexto', categoria: 4, activos: ['BTC'], fuente: 'EDGAR', relevancia: 8, aviso: false, prioridad: 2 },
+      { postId: 'post-1', portada: 'https://pudzvatuubywmwdmboiq.supabase.co/storage/v1/object/public/post-images/mi-slug-post-1.webp', titulo: 'Titular', resumen: 'Contexto', categoria: 4, activos: [], fuente: 'CNBC', relevancia: 5, aviso: false, prioridad: 0 },
     ])
   })
 })
